@@ -155,6 +155,7 @@
   "settings.kuma.url.error.invalid": "Voer een geldige https://-URL in, of laat leeg om uit te schakelen.",
   "settings.kuma.interval": "Interval (seconden)",
   "settings.kuma.hint": "Leeg = uitgeschakeld",
+  "settings.kuma.projectLink": "Uptime Kuma-project (GitHub)",
 
   "settings.logLevel.heading": "Diagnostisch logniveau",
   "settings.logLevel.off": "Uit",

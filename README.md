@@ -88,6 +88,8 @@ for the on-disk shape, including an example of adding endpoints for a fictitious
 Settings → Uptime Kuma lets you configure a push-monitor URL and interval (minimum 60 seconds).
 When a URL is set, the app sends a plain periodic `GET` to it - no dependency on any
 connectivity check, matching how Uptime Kuma push monitors are normally used. Off by default.
+See the [Uptime Kuma project](https://github.com/louislam/uptime-kuma) for what it is and how to
+set up a push monitor to get a URL from.
 
 ## Project structure
 

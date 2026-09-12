@@ -47,6 +47,7 @@ public sealed class SettingsForm : Form
     private readonly NumericUpDown _kumaIntervalNumeric;
     private readonly Label _kumaUrlErrorLabel;
     private readonly Label _kumaHintLabel;
+    private readonly LinkLabel _kumaProjectLink;
 
     private readonly Button _closeButton;
 
@@ -194,12 +195,17 @@ public sealed class SettingsForm : Form
         _kumaIntervalNumeric.Leave += OnKumaSettingsChanged;
 
         _kumaHintLabel = new Label { Text = LocalizationManager.Instance.Get("settings.kuma.hint"), ForeColor = Color.Gray, Font = new Font(Font.FontFamily, 8f), Bounds = new Rectangle(16, 118, 372, 18) };
+
+        _kumaProjectLink = new LinkLabel { Text = LocalizationManager.Instance.Get("settings.kuma.projectLink"), AutoSize = true, Location = new Point(16, 142) };
+        _kumaProjectLink.LinkClicked += (_, _) => OpenUptimeKumaProjectPage();
+
         kumaTab.Controls.Add(_kumaUrlLabel);
         kumaTab.Controls.Add(_kumaUrlTextBox);
         kumaTab.Controls.Add(_kumaUrlErrorLabel);
         kumaTab.Controls.Add(_kumaIntervalLabel);
         kumaTab.Controls.Add(_kumaIntervalNumeric);
         kumaTab.Controls.Add(_kumaHintLabel);
+        kumaTab.Controls.Add(_kumaProjectLink);
 
         tabs.TabPages.Add(generalTab);
         tabs.TabPages.Add(endpointsTab);
@@ -429,6 +435,18 @@ public sealed class SettingsForm : Form
         KumaSettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    private static void OpenUptimeKumaProjectPage()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/louislam/uptime-kuma") { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // No default browser/handler registered - nothing we can do here.
+        }
+    }
+
     private void ApplyLocalizedText()
     {
         Text = LocalizationManager.Instance.Get("settings.title");
@@ -438,6 +456,7 @@ public sealed class SettingsForm : Form
         _kumaUrlLabel.Text = LocalizationManager.Instance.Get("settings.kuma.url");
         _kumaIntervalLabel.Text = LocalizationManager.Instance.Get("settings.kuma.interval");
         _kumaHintLabel.Text = LocalizationManager.Instance.Get("settings.kuma.hint");
+        _kumaProjectLink.Text = LocalizationManager.Instance.Get("settings.kuma.projectLink");
         _closeButton.Text = LocalizationManager.Instance.Get("settings.close");
         // Tab headers and the endpoints/diagnostics tab labels are set once at construction -
         // a full re-localization of every tab would need the tabs rebuilt; language switching

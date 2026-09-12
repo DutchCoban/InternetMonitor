@@ -155,6 +155,7 @@
   "settings.kuma.url.error.invalid": "Enter a valid https:// URL, or leave empty to disable.",
   "settings.kuma.interval": "Interval (seconds)",
   "settings.kuma.hint": "Empty = disabled",
+  "settings.kuma.projectLink": "Uptime Kuma project (GitHub)",
 
   "settings.logLevel.heading": "Diagnostic log level",
   "settings.logLevel.off": "Off",
