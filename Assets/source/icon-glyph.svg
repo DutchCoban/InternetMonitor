@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original artwork (not derived from any third-party asset): a monitor screen showing a
+     rising monitoring graph as the main shape, with a small globe badge (Europe-facing) as an
+     accent in the top-right corner. Bottom-right is deliberately left clear: TrayIconFactory
+     composites a 12x12 status-color badge circle there at runtime, over the tray icon variant
+     of this artwork. Palette matches the app's existing slate-blue/white style. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <style>
+      .bg { fill: #2E4057; }
+      .screen { fill: #FFFFFF; }
+      .graph { fill: none; stroke: #4682B4; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+      .dot { fill: #4682B4; }
+      .globe { fill: #3E7CB1; stroke: #FFFFFF; stroke-width: 2; }
+      .globeLine { fill: none; stroke: #FFFFFF; stroke-width: 1.6; opacity: 0.85; }
+      .globeLand { fill: #FFFFFF; opacity: 0.85; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="200" height="200" rx="34" ry="34"/>
+
+  <!-- Monitor: screen + stand + base -->
+  <rect class="screen" x="24" y="40" width="118" height="78" rx="10" ry="10"/>
+  <rect class="screen" x="70" y="118" width="26" height="10"/>
+  <rect class="screen" x="54" y="126" width="56" height="8" rx="4" ry="4"/>
+
+  <!-- Rising monitoring graph, drawn inside the screen -->
+  <polyline class="graph" points="34,104 58,92 82,98 106,72 128,52"/>
+  <circle class="dot" cx="34" cy="104" r="4"/>
+  <circle class="dot" cx="58" cy="92" r="4"/>
+  <circle class="dot" cx="82" cy="98" r="4"/>
+  <circle class="dot" cx="106" cy="72" r="4"/>
+  <circle class="dot" cx="128" cy="52" r="4"/>
+
+  <!-- Globe accent badge (top-right): meridians/equator plus a simplified landmass suggesting
+       Europe on the visible face. -->
+  <circle class="globe" cx="160" cy="40" r="26"/>
+  <path class="globeLine" d="M 160,14 A 13,26 0 0 0 160,66"/>
+  <path class="globeLine" d="M 160,14 A 13,26 0 0 1 160,66"/>
+  <line class="globeLine" x1="134" y1="40" x2="186" y2="40"/>
+  <path class="globeLand" d="M 156,24 c 4,-2 8,1 7,4 c 3,0 5,3 3,5 c 2,2 0,5 -3,5 c -1,3 -5,3 -7,1 c -3,2 -7,-1 -6,-4 c -3,-1 -3,-5 0,-6 c -1,-3 2,-6 6,-5 z"/>
+</svg>

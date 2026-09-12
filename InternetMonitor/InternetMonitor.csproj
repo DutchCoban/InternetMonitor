@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>InternetMonitor</RootNamespace>
+    <AssemblyName>InternetMonitor</AssemblyName>
+
+    <ApplicationIcon>..\Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
+    <Product>Internet Monitor</Product>
+    <Company>Internet Monitor</Company>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- Self-contained/single-file publish settings default to off here so an ordinary
+         "dotnet build" stays framework-dependent and doesn't need win-x64 runtime packs
+         restored. They are supplied on the command line for the actual publish (see
+         README.md): self contained true, PublishSingleFile true, PublishReadyToRun true.
+         That is the officially supported way to scope these to publish only. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embedded (not Content) so these ship inside the single-file publish exe rather than
+         as loose files alongside it. -->
+    <EmbeddedResource Include="Localization\nl.json" LogicalName="InternetMonitor.Localization.nl.json" />
+    <EmbeddedResource Include="Localization\en.json" LogicalName="InternetMonitor.Localization.en.json" />
+    <EmbeddedResource Include="..\Assets\app.ico" LogicalName="InternetMonitor.Assets.app.ico" />
+  </ItemGroup>
+
+</Project>

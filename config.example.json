@@ -1,0 +1,37 @@
+{
+  "_comment": "Example settings.json. The real file lives at %AppData%\\InternetMonitor\\settings.json and is never checked into source control. Copy the shape below as a starting point.",
+
+  "Language": "en",
+  "AutoStartWithWindows": false,
+
+  "_comment_endpoints": "Application endpoints are entirely user-defined - nothing here is required by the application itself. The two examples below show how an organization would add its own APIs; delete them if you don't need them.",
+  "ApplicationEndpoints": [
+    {
+      "Id": "example-api-primary",
+      "Name": "Example API (primary)",
+      "Url": "https://api.example.com",
+      "Type": "Https",
+      "TimeoutMs": 5000,
+      "Enabled": true
+    },
+    {
+      "Id": "example-api-secondary",
+      "Name": "Example API (secondary)",
+      "Url": "https://api2.example.com",
+      "Type": "Https",
+      "TimeoutMs": 5000,
+      "Enabled": true
+    }
+  ],
+
+  "_comment_logging": "Diagnostic logging is off by default. Levels: Off, Basic, Extended, Full.",
+  "DiagnosticLogLevel": "Off",
+  "LogSuccessfulChecks": false,
+  "LogDetailedMeasurements": false,
+  "MaxDiagnosticLogFiles": 5,
+  "MaxDiagnosticLogFileSizeBytes": 5242880,
+
+  "_comment_kuma": "Uptime Kuma push heartbeat is off by default (KumaPushUrl empty). Paste your own push-monitor URL to activate it; minimum interval is 60 seconds.",
+  "KumaPushUrl": "",
+  "KumaIntervalSeconds": 60
+}
