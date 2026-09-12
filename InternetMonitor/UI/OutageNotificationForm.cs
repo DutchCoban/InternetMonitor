@@ -31,6 +31,7 @@ public sealed class OutageNotificationForm : Form
         StartPosition = FormStartPosition.Manual;
         BackColor = Color.White;
         Text = LocalizationManager.Instance.Get("outage.title");
+        Icon = TrayIconFactory.AppIcon.Value;
 
         int contentWidth = FormWidth - (2 * ContentPadding);
         int y = ContentPadding;

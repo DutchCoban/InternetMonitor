@@ -183,6 +183,25 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         }
 
         _popupController.OnStateChanged(e.OldState, e.NewState);
+
+        // ConnectivityMonitor polls every second and can notice a change well before
+        // DiagnosticsCoordinator's own 15-second cycle would - without this, the outage popup
+        // (driven by this same state change) could appear while the Status window, if already
+        // open, still shows an up-to-15-seconds-stale "everything fine" snapshot. Triggering an
+        // immediate diagnostics cycle here keeps the detailed view in step with the fast one.
+        _ = RunDiagnosticsCycleSafelyAsync();
+    }
+
+    private async Task RunDiagnosticsCycleSafelyAsync()
+    {
+        try
+        {
+            await _diagnosticsCoordinator.RunNowAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            System.Diagnostics.Debug.WriteLine($"RunNowAsync failed: {ex}");
+        }
     }
 
     private void ShowRecoveredBalloon()

@@ -57,6 +57,7 @@
   "probe.gateway.unreachable": "{0} not reachable",
   "probe.dns.noResult": "No result",
   "probe.dns.resolutionFailed": "Resolution failed",
+  "probe.dns.systemResolverBroken": "Your configured DNS server isn't responding, but public DNS servers (9.9.9.9/8.8.8.8/1.1.1.1) resolve this hostname fine - the problem appears to be your configured DNS server specifically.",
   "probe.https.tcpFailed": "TCP connection failed",
   "probe.https.tlsFailed": "TLS handshake failed",
   "probe.https.noResponse": "No HTTP response",

@@ -19,9 +19,29 @@ public sealed class IncidentTracker
     private int _consecutiveHealthy;
     private Incident? _current;
 
+    /// <summary>
+    /// Resumes tracking of any incident that was still open (EndUtc null) when the app last
+    /// closed. Without this, <see cref="_current"/> would start null on every restart even
+    /// though the persisted store still has the incident marked Active - permanently orphaning
+    /// it, since nothing would ever set its EndUtc again. If more than one ended up open (only
+    /// possible from that older bug), only the most recent is resumed; the rest are closed out
+    /// now since their true end time can no longer be known.
+    /// </summary>
     public IncidentTracker(IncidentStore store)
     {
         _store = store;
+
+        List<Incident> stillOpen = _store.All.Where(i => i.EndUtc is null).OrderByDescending(i => i.StartUtc).ToList();
+        if (stillOpen.Count > 0)
+        {
+            _current = stillOpen[0];
+            foreach (Incident orphan in stillOpen.Skip(1))
+            {
+                orphan.EndUtc = DateTimeOffset.UtcNow;
+                orphan.Status = IncidentStatus.Resolved;
+                _store.Update(orphan);
+            }
+        }
     }
 
     public Incident? CurrentIncident => _current;

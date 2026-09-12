@@ -57,6 +57,7 @@
   "probe.gateway.unreachable": "{0} niet bereikbaar",
   "probe.dns.noResult": "Geen resultaat",
   "probe.dns.resolutionFailed": "Resolutie mislukt",
+  "probe.dns.systemResolverBroken": "Uw geconfigureerde DNS-server reageert niet, maar publieke DNS-servers (9.9.9.9/8.8.8.8/1.1.1.1) kunnen deze hostnaam wel oplossen - het probleem lijkt specifiek bij uw geconfigureerde DNS-server te liggen.",
   "probe.https.tcpFailed": "TCP-verbinding mislukt",
   "probe.https.tlsFailed": "TLS-handshake mislukt",
   "probe.https.noResponse": "Geen HTTP-antwoord",

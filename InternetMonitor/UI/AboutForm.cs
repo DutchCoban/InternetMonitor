@@ -16,6 +16,7 @@ public sealed class AboutForm : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterScreen;
         Text = LocalizationManager.Instance.Get("about.title");
+        Icon = TrayIconFactory.AppIcon.Value;
         ClientSize = new Size(320, 220);
 
         _logoImage = TrayIconFactory.LoadLogoBitmap(48);

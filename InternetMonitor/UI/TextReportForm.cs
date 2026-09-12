@@ -10,6 +10,7 @@ public sealed class TextReportForm : Form
     public TextReportForm(string title, string content)
     {
         Text = title;
+        Icon = TrayIconFactory.AppIcon.Value;
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(520, 420);
         MinimumSize = new Size(360, 260);

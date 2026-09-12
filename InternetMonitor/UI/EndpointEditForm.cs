@@ -64,6 +64,7 @@ public sealed class EndpointEditForm : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterParent;
         Text = LocalizationManager.Instance.Get("endpoint.edit.title");
+        Icon = TrayIconFactory.AppIcon.Value;
         ClientSize = new Size(380, 432);
 
         var nameLabel = new Label { Text = LocalizationManager.Instance.Get("endpoint.edit.name"), Bounds = new Rectangle(16, 16, 340, 20) };

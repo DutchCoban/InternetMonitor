@@ -18,9 +18,11 @@ most likely cause instead of being reported as a generic "internet is down":
 
 1. **Network adapter** - is an adapter present, operational, and actually carrying traffic?
 2. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
-3. **Gateway** - is the default gateway known and reachable? (TCP-based, not ICMP - see below.)
+3. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
 4. **Internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1`. A single unreachable endpoint doesn't mean internet is down; the diagnosis only escalates once none of the three respond.
-5. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved?
+5. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved? On failure, also
+   cross-checked against public resolvers to see if it's your configured DNS server specifically
+   (see Known limitations below).
 6. **General HTTPS** - a full DNS → TCP → TLS → HTTP request to a general site, timed at every stage.
 7. **Application endpoints** - any HTTPS or TCP/UDP port endpoints you've configured in Settings.
 8. **Time synchronization** - how far the system clock has drifted from `pool.ntp.org` (a minimal SNTP client; .NET has no built-in NTP support).
@@ -126,11 +128,13 @@ Publish a single self-contained `.exe` (no .NET runtime needed on the target mac
 
 ```powershell
 dotnet publish InternetMonitor/InternetMonitor.csproj -c Release -r win-x64 --self-contained true `
-  -p:PublishSingleFile=true -p:PublishReadyToRun=true -o ./publish
+  -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o ./publish
 ```
 
 The result, `publish/InternetMonitor.exe`, can be copied to and run on any Windows 10/11 x64
-machine.
+machine. This intentionally skips `PublishReadyToRun` (which roughly doubles framework assembly
+sizes by embedding precompiled native code) to keep the download small - a slightly slower JIT
+cold start is an easy trade for a tray app that starts once and runs for days.
 
 ## Settings and data locations
 
@@ -144,11 +148,19 @@ without touching configuration or history.
 
 ## Known limitations
 
-- Gateway reachability is checked via TCP connect attempts to common ports (80/443/53), not
-  ICMP - a gateway with no listener on any of those ports will read as unreachable even if it's
-  functioning correctly. This trade-off exists specifically to work on networks that block ICMP.
+- Gateway reachability races a plain ICMP ping against a TCP connect attempt to a few common
+  ports (80/443/53), all at once - whichever answers first wins - so it works both on networks
+  where ICMP is fine (the common case) and ones that filter it, without waiting through both in
+  sequence. A gateway that answers neither will still read as unreachable, but that combination
+  is rare in practice. This check has no retry: a network settings change (even just the DNS
+  server) can make the gateway genuinely unreachable at the OS level for a few seconds, and
+  that's real, momentary state worth showing, not a measurement error to hide.
 - DNS "resolver used" reporting shows the interface's *configured* DNS servers, not necessarily
   which one actually answered a given query - Windows doesn't expose that for a normal lookup.
+  When a lookup fails, though, the app cross-checks the same hostname directly against three
+  well-known public resolvers (9.9.9.9, 8.8.8.8, 1.1.1.1); if they succeed where the system
+  lookup didn't, the diagnosis says so - narrowing the problem down to "your configured DNS
+  server specifically" rather than a broader network/DNS issue.
 - Application endpoints are entirely user-configured with no target allowlist, by design (this
   is a local, single-user tool) - see [Security notes](#security-notes) below.
 

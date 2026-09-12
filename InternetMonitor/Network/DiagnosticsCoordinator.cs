@@ -1,3 +1,4 @@
+using Microsoft.Win32;
 using InternetMonitor.Configuration;
 using InternetMonitor.Network.Diagnosis;
 using InternetMonitor.Network.Diagnostics;
@@ -26,6 +27,12 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
     public const string PingProbeId = "ping-target";
     private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan PingTimeout = TimeSpan.FromSeconds(2);
+
+    // NTP pools expect clients to poll on the order of minutes to hours, not seconds - querying
+    // pool.ntp.org every 15s (the main cycle's cadence) is excessive and can look like abuse.
+    // Checked at startup, once an hour otherwise, and immediately on an OS-level clock change
+    // (see RunTimeSyncLoopAsync) rather than on the main cycle.
+    private static readonly TimeSpan TimeSyncInterval = TimeSpan.FromHours(1);
 
     // Deliberately NOT www.ripe.net here even though DnsResolutionProbe uses it: ripe.net is
     // served via Akamai's CDN, and live testing showed 1-3+ second, highly variable response
@@ -57,19 +64,33 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
     private readonly DiagnosticLogger _diagnosticLogger;
     private readonly ProbeHistory _history = new();
 
+    // Placeholder so the very first cycle (which can run before the startup TimeSync check
+    // completes) always has a value for ProbeSnapshot.TimeSync. ProbeStatus.Ok rather than
+    // Unknown/Warning is deliberate: those statuses mean something specific to DiagnosisEngine
+    // ("time server unreachable" / "significant drift") and would misreport a problem that
+    // doesn't exist yet - this is replaced within moments by the real result regardless.
+    private TimeSyncProbeResult _latestTimeSyncResult;
+
     public DiagnosticsCoordinator(IncidentTracker incidentTracker, DiagnosticLogger diagnosticLogger)
     {
         _incidentTracker = incidentTracker;
         _diagnosticLogger = diagnosticLogger;
+        _latestTimeSyncResult = new TimeSyncProbeResult(
+            _timeSyncProbe.Id, ProbeStatus.Ok, string.Empty, TimeSpan.Zero, DateTimeOffset.UtcNow,
+            TimeSyncProbe.DefaultServer, null, true);
     }
 
     private PeriodicTimer? _timer;
     private PeriodicTimer? _pingTimer;
     private CancellationTokenSource? _loopCts;
+    private CancellationTokenSource _timeSyncKickCts = new();
     private Task? _loopTask;
     private Task? _pingLoopTask;
+    private Task? _timeSyncLoopTask;
     private bool _cycleInFlight;
 
+    /// <summary>Raised once, right before a cycle's probes are kicked off - lets a UI reset any per-cycle state (e.g. StatusPopupForm's ordered-reveal tracking) before ProbeCompleted starts firing for the new cycle.</summary>
+    public event EventHandler? CycleStarted;
     public event EventHandler<ProbeCompletedEventArgs>? ProbeCompleted;
     public event EventHandler<ProbeSnapshot>? SnapshotUpdated;
     public event EventHandler<DiagnosisResult>? DiagnosisUpdated;
@@ -115,6 +136,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
             _loopCts = new CancellationTokenSource();
             _loopTask = RunLoopAsync(_loopCts.Token);
             _pingLoopTask = RunPingLoopAsync(_loopCts.Token);
+            _timeSyncLoopTask = RunTimeSyncLoopAsync(_loopCts.Token);
         }
     }
 
@@ -166,6 +188,57 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Independent slow-cadence loop for TimeSync (see the rationale on <see cref="TimeSyncInterval"/>):
+    /// checks once immediately (startup), then again either after an hour or as soon as
+    /// <see cref="OnSystemTimeChanged"/> wakes it early, whichever comes first - a plain
+    /// cancellable delay rather than PeriodicTimer, since PeriodicTimer only supports one
+    /// in-flight wait at a time and can't be woken early by an unrelated event.
+    /// </summary>
+    private async Task RunTimeSyncLoopAsync(CancellationToken cancellationToken)
+    {
+        _latestTimeSyncResult = await RunTypedAsync<TimeSyncProbeResult>(_timeSyncProbe, cancellationToken).ConfigureAwait(false);
+
+        SystemEvents.TimeChanged += OnSystemTimeChanged;
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _timeSyncKickCts.Token);
+                try
+                {
+                    await Task.Delay(TimeSyncInterval, linkedCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // Woken early by a system time change, not shutdown - fall through and re-check.
+                }
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                _latestTimeSyncResult = await RunTypedAsync<TimeSyncProbeResult>(_timeSyncProbe, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown path.
+        }
+        finally
+        {
+            SystemEvents.TimeChanged -= OnSystemTimeChanged;
+        }
+    }
+
+    private void OnSystemTimeChanged(object? sender, EventArgs e)
+    {
+        CancellationTokenSource old = Interlocked.Exchange(ref _timeSyncKickCts, new CancellationTokenSource());
+        old.Cancel();
+        old.Dispose();
+    }
+
     private async Task RunCycleAsync(CancellationToken cancellationToken)
     {
         if (_cycleInFlight)
@@ -175,6 +248,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
 
         _cycleInFlight = true;
         IsChecking = true;
+        CycleStarted?.Invoke(this, EventArgs.Empty);
         try
         {
             Task<NetworkInterfaceProbeResult> networkTask = RunTypedAsync<NetworkInterfaceProbeResult>(_networkProbe, cancellationToken);
@@ -183,7 +257,6 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
             Task<InternetProbeResult> internetTask = RunTypedAsync<InternetProbeResult>(_internetProbe, cancellationToken);
             Task<DnsResolutionProbeResult> dnsTask = RunTypedAsync<DnsResolutionProbeResult>(_dnsProbe, cancellationToken);
             Task<HttpsEndpointProbeResult> httpsTask = RunTypedAsync<HttpsEndpointProbeResult>(_generalHttpsProbe, cancellationToken);
-            Task<TimeSyncProbeResult> timeTask = RunTypedAsync<TimeSyncProbeResult>(_timeSyncProbe, cancellationToken);
 
             // Captured once into a local: _applicationProbes can be reassigned by UpdateEndpoints
             // from the UI thread at any time, so both uses below must agree on the same list.
@@ -193,7 +266,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
                 .ToList();
 
             await Task.WhenAll(
-                new Task[] { networkTask, ipTask, gatewayTask, internetTask, dnsTask, httpsTask, timeTask }
+                new Task[] { networkTask, ipTask, gatewayTask, internetTask, dnsTask, httpsTask }
                     .Concat(appResultTasks)).ConfigureAwait(false);
 
             var applicationResults = applicationProbes
@@ -202,7 +275,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
 
             var snapshot = new ProbeSnapshot(
                 networkTask.Result, ipTask.Result, gatewayTask.Result, internetTask.Result,
-                dnsTask.Result, httpsTask.Result, timeTask.Result, applicationResults);
+                dnsTask.Result, httpsTask.Result, _latestTimeSyncResult, applicationResults);
 
             LatestSnapshot = snapshot;
             LastCheckUtc = DateTimeOffset.UtcNow;
@@ -276,8 +349,21 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
             }
         }
 
+        if (_timeSyncLoopTask is not null)
+        {
+            try
+            {
+                await _timeSyncLoopTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on shutdown.
+            }
+        }
+
         _timer?.Dispose();
         _pingTimer?.Dispose();
         _loopCts?.Dispose();
+        _timeSyncKickCts.Dispose();
     }
 }

@@ -20,11 +20,19 @@
     <Company>Internet Monitor</Company>
     <InvariantGlobalization>true</InvariantGlobalization>
 
+    <!-- Only en/nl are ever loaded (see Localization/LocalizationManager.cs) - this stops the
+         self-contained runtime from also bundling framework satellite resource assemblies for
+         every other language, which otherwise ship unused. Safe for ordinary "dotnet build" too. -->
+    <SatelliteResourceLanguages>en;nl</SatelliteResourceLanguages>
+
     <!-- Self-contained/single-file publish settings default to off here so an ordinary
          "dotnet build" stays framework-dependent and doesn't need win-x64 runtime packs
          restored. They are supplied on the command line for the actual publish (see
-         README.md): self contained true, PublishSingleFile true, PublishReadyToRun true.
-         That is the officially supported way to scope these to publish only. -->
+         README.md): self contained true, PublishSingleFile true, EnableCompressionInSingleFile
+         true. That is the officially supported way to scope these to publish only.
+         Deliberately NOT using PublishReadyToRun: it roughly doubles the size of framework
+         assemblies by embedding precompiled native code for faster cold start, which isn't worth
+         the trade-off for a tray app that starts once and runs for days. -->
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 

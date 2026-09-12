@@ -126,7 +126,7 @@ public sealed class SparklineControl : Control
             g.DrawLines(linePen, pts);
         }
 
-        string label = $"{_points[^1].Value:F0} (min {dataMin:F0} / max {dataMax:F0})";
+        string label = $"{_points[^1].Value:F0} ms (min {dataMin:F0} / max {dataMax:F0} ms)";
         using var textBrush = new SolidBrush(Color.DimGray);
         using var smallFont = new Font(Font.FontFamily, 7.5f);
         SizeF labelSize = g.MeasureString(label, smallFont);

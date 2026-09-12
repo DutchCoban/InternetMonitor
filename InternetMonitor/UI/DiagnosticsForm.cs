@@ -54,6 +54,7 @@ public sealed class DiagnosticsForm : Form
             ?? throw new InvalidOperationException("DiagnosticsForm must be constructed on the UI thread.");
 
         Text = LocalizationManager.Instance.Get("diag.title");
+        Icon = TrayIconFactory.AppIcon.Value;
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(780, 800);
         MinimumSize = new Size(620, 600);
@@ -96,11 +97,11 @@ public sealed class DiagnosticsForm : Form
 
         // --- Incidents panel (bottom, above log panel) ---
         var incidentsPanel = new Panel { Dock = DockStyle.Bottom, Height = 180, Padding = new Padding(12, 6, 12, 0) };
-        var incidentsHeaderPanel = new Panel { Dock = DockStyle.Top, Height = 20 };
+        var incidentsHeaderPanel = new Panel { Dock = DockStyle.Top, Height = 26, Margin = new Padding(0, 0, 0, 4) };
         _incidentsLabelFont = new Font(Font.FontFamily, 9f, FontStyle.Bold);
         var incidentsLabel = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Text = LocalizationManager.Instance.Get("diag.incidents"), Font = _incidentsLabelFont };
         var clearIncidentsButtonPanel = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
-        var clearIncidentsButton = new Button { Text = LocalizationManager.Instance.Get("diag.incidents.clear"), Width = 140, Height = 20 };
+        var clearIncidentsButton = new Button { Text = LocalizationManager.Instance.Get("diag.incidents.clear"), Width = 140, Height = 22 };
         clearIncidentsButton.Click += (_, _) =>
         {
             _incidentStore.Clear();

@@ -8,6 +8,17 @@ internal static class TrayIconFactory
 {
     private static readonly Lazy<Bitmap> BaseBitmap = new(LoadBaseBitmap);
 
+    /// <summary>
+    /// The app's own icon (all embedded resolutions, not just the 32x32 used for the tray badge
+    /// composite), for use as every secondary window's title-bar icon. A Form that never sets
+    /// its own Icon falls back to a generic default WinForms icon rather than this app's icon -
+    /// every top-level Form in this app should set <c>Icon = TrayIconFactory.AppIcon.Value;</c>.
+    /// Loaded once and never disposed (shared for the process lifetime, same pattern as
+    /// <see cref="BaseBitmap"/>) - assigning the same Icon instance to multiple forms is safe
+    /// since Form.Icon is just a reference, not ownership transfer.
+    /// </summary>
+    public static readonly Lazy<Icon> AppIcon = new(LoadAppIcon);
+
     public static ManagedIcon Build(ConnectivityState state)
     {
         Color badgeColor = state switch
@@ -43,5 +54,13 @@ internal static class TrayIconFactory
             ?? throw new FileNotFoundException("Embedded app.ico resource not found.");
         using var icon = new Icon(stream, 32, 32);
         return icon.ToBitmap();
+    }
+
+    private static Icon LoadAppIcon()
+    {
+        using Stream stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("InternetMonitor.Assets.app.ico")
+            ?? throw new FileNotFoundException("Embedded app.ico resource not found.");
+        return new Icon(stream);
     }
 }

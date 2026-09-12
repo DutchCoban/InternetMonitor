@@ -69,6 +69,7 @@ public sealed class SettingsForm : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterScreen;
         Text = LocalizationManager.Instance.Get("settings.title");
+        Icon = TrayIconFactory.AppIcon.Value;
         ClientSize = new Size(420, 420);
 
         var tabs = new TabControl { Dock = DockStyle.Top, Height = 360 };
