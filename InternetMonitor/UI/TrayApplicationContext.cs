@@ -2,7 +2,9 @@ using InternetMonitor.Configuration;
 using InternetMonitor.Localization;
 using InternetMonitor.Logging;
 using InternetMonitor.Network;
+using InternetMonitor.Network.Diagnosis;
 using InternetMonitor.Network.Diagnostics;
+using InternetMonitor.Network.Probes;
 
 namespace InternetMonitor.UI;
 
@@ -53,13 +55,14 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         _diagnosticsCoordinator = new DiagnosticsCoordinator(_incidentTracker, _diagnosticLogger);
         _diagnosticsCoordinator.UpdateEndpoints(_settings.ApplicationEndpoints);
         _diagnosticsCoordinator.UpdatePingTarget(_settings.PingTargetAddress);
+        _diagnosticsCoordinator.UpdateLatencyThresholds(_settings.LatencyWarningThresholdMs, _settings.LatencyErrorThresholdMs);
         _diagnosticsCoordinator.Start();
 
-        _currentIcon = TrayIconFactory.Build(ConnectivityState.Unknown);
+        _currentIcon = TrayIconFactory.Build(ProbeStatus.Unknown);
         _trayIcon = new NotifyIcon
         {
             Icon = _currentIcon.Icon,
-            Text = LocalizationManager.Instance.TrayTooltip(ConnectivityState.Unknown),
+            Text = LocalizationManager.Instance.Get("tray.tooltip.checking"),
             Visible = true,
             ContextMenuStrip = BuildContextMenu(),
         };
@@ -70,6 +73,7 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         LocalizationManager.Instance.LanguageChanged += (_, _) => RefreshLocalizedSurfaces();
 
         _monitor.StateChanged += OnMonitorStateChanged;
+        _diagnosticsCoordinator.DiagnosisUpdated += OnDiagnosisUpdated;
         _monitor.Start();
     }
 
@@ -93,7 +97,7 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         }
 
         _trayIcon.ContextMenuStrip = BuildContextMenu();
-        _trayIcon.Text = LocalizationManager.Instance.TrayTooltip(_monitor.CurrentState);
+        _trayIcon.Text = BuildTooltipText(_diagnosticsCoordinator.LatestDiagnosis);
     }
 
     private void OnTrayIconMouseClick(object? sender, MouseEventArgs e)
@@ -146,6 +150,8 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
             _diagnosticsCoordinator.UpdateEndpoints(_settings.ApplicationEndpoints);
         _settingsForm.PingTargetChanged += (_, _) =>
             _diagnosticsCoordinator.UpdatePingTarget(_settings.PingTargetAddress);
+        _settingsForm.LatencyThresholdsChanged += (_, _) =>
+            _diagnosticsCoordinator.UpdateLatencyThresholds(_settings.LatencyWarningThresholdMs, _settings.LatencyErrorThresholdMs);
         _settingsForm.FormClosed += (_, _) => _settingsForm = null;
         _settingsForm.Show();
     }
@@ -163,13 +169,6 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
 
     private void HandleStateChangedOnUiThread(ConnectivityStateChangedEventArgs e)
     {
-        ManagedIcon newIcon = TrayIconFactory.Build(e.NewState);
-        _trayIcon.Icon = newIcon.Icon;
-        _currentIcon?.Dispose();
-        _currentIcon = newIcon;
-
-        _trayIcon.Text = Truncate(LocalizationManager.Instance.TrayTooltip(e.NewState), 63);
-
         if (e.NewState == ConnectivityState.Outage && e.OldState != ConnectivityState.Outage)
         {
             _currentOutageStartedUtc = e.OutageStartedUtc;
@@ -203,6 +202,27 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
             System.Diagnostics.Debug.WriteLine($"RunNowAsync failed: {ex}");
         }
     }
+
+    private void OnDiagnosisUpdated(object? sender, DiagnosisResult diagnosis)
+    {
+        _uiContext.Post(_ => ApplyDiagnosisToIcon(diagnosis), null);
+    }
+
+    private void ApplyDiagnosisToIcon(DiagnosisResult diagnosis)
+    {
+        ManagedIcon newIcon = TrayIconFactory.Build(diagnosis.Severity);
+        _trayIcon.Icon = newIcon.Icon;
+        _currentIcon?.Dispose();
+        _currentIcon = newIcon;
+        _trayIcon.Text = Truncate(BuildTooltipText(diagnosis), 63);
+    }
+
+    private static string BuildTooltipText(DiagnosisResult? diagnosis) => diagnosis switch
+    {
+        null => LocalizationManager.Instance.Get("tray.tooltip.checking"),
+        { Severity: ProbeStatus.Ok } => LocalizationManager.Instance.Get("tray.tooltip.connected"),
+        _ => diagnosis.Headline,
+    };
 
     private void ShowRecoveredBalloon()
     {

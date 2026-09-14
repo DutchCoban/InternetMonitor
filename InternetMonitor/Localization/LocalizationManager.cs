@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
-using InternetMonitor.Network;
 
 namespace InternetMonitor.Localization;
 
@@ -44,13 +43,6 @@ public sealed class LocalizationManager
     public string Get(string key) => _strings.TryGetValue(key, out string? value) ? value : $"[{key}]";
 
     public string Format(string key, params object[] args) => string.Format(Get(key), args);
-
-    public string TrayTooltip(ConnectivityState state) => state switch
-    {
-        ConnectivityState.Connected => Get("tray.tooltip.connected"),
-        ConnectivityState.Outage => Get("tray.tooltip.outage"),
-        _ => Get("tray.tooltip.checking"),
-    };
 
     private static Dictionary<string, string> LoadLanguageFile(string languageCode)
     {

@@ -11,12 +11,13 @@ public readonly record struct SegmentHealth(bool? Ok, bool WarningOnly = false)
 }
 
 /// <summary>
-/// At-a-glance computer/router/cloud/server diagram for the status popup: computer and router
-/// are drawn as broken (red, badged) when the problem is on that node itself, and the three
-/// connector segments between them (computer-router, router-cloud, cloud-server) show which leg
-/// of the path is healthy, degraded, or broken - a summary view, not a replacement for the
-/// detailed row list beneath it. Deliberately simple hand-drawn GDI+ shapes, matching the style
-/// already used by <see cref="MonitoringPulseControl"/> and <see cref="SparklineControl"/>.
+/// At-a-glance computer/router/cloud/server diagram for the status popup: every one of the four
+/// nodes (computer, router, internet/cloud, server) is drawn as broken (red, badged) when the
+/// problem is on that node itself, and the three connector segments between them
+/// (computer-router, router-cloud, cloud-server) show which leg of the path is healthy,
+/// degraded, or broken - a summary view, not a replacement for the detailed row list beneath it.
+/// Deliberately simple hand-drawn GDI+ shapes, matching the style already used by
+/// <see cref="MonitoringPulseControl"/> and <see cref="SparklineControl"/>.
 /// </summary>
 public sealed class ConnectivityDiagramControl : Control
 {
@@ -41,7 +42,9 @@ public sealed class ConnectivityDiagramControl : Control
     private SegmentHealth _computerRouter = SegmentHealth.Unknown;
     private SegmentHealth _router = SegmentHealth.Unknown;
     private SegmentHealth _routerCloud = SegmentHealth.Unknown;
+    private SegmentHealth _internet = SegmentHealth.Unknown;
     private SegmentHealth _cloudServer = SegmentHealth.Unknown;
+    private SegmentHealth _server = SegmentHealth.Unknown;
     private string _serverLabel = "Server";
     private string? _reasonHeadline;
 
@@ -55,17 +58,19 @@ public sealed class ConnectivityDiagramControl : Control
     }
 
     /// <summary>
-    /// Updates the diagram from the diagnosis engine's single root-cause classification, already
-    /// mapped by the caller onto exactly one of these five slots (at most one is ever broken at
-    /// a time, matching <c>DiagnosisEngine</c>'s single-root-cause design). Cloud and Server never
-    /// show their own broken state - no classification is ever attributed purely to either.
+    /// Updates the diagram from the diagnosis engine's root-cause classification, already mapped
+    /// by the caller onto these seven slots: every probe genuinely runs every cycle regardless of
+    /// any other probe's outcome, so real data exists for everything downstream of the root
+    /// cause too, not just the node/leg directly named by the classification.
     /// </summary>
     public void SetState(
         SegmentHealth computer,
         SegmentHealth computerRouter,
         SegmentHealth router,
         SegmentHealth routerCloud,
+        SegmentHealth internet,
         SegmentHealth cloudServer,
+        SegmentHealth server,
         string serverLabel,
         string? reasonHeadline,
         string? reasonExplanation)
@@ -74,7 +79,9 @@ public sealed class ConnectivityDiagramControl : Control
         _computerRouter = computerRouter;
         _router = router;
         _routerCloud = routerCloud;
+        _internet = internet;
         _cloudServer = cloudServer;
+        _server = server;
         _serverLabel = serverLabel;
         _reasonHeadline = reasonHeadline;
 
@@ -108,8 +115,8 @@ public sealed class ConnectivityDiagramControl : Control
 
         DrawComputer(g, computerRect, NodeColor(_computer));
         DrawRouter(g, routerRect, NodeColor(_router));
-        DrawCloud(g, cloudRect, IconColor);
-        DrawServer(g, serverRect, IconColor);
+        DrawCloud(g, cloudRect, NodeColor(_internet));
+        DrawServer(g, serverRect, NodeColor(_server));
 
         if (_computer.Ok == false)
         {
@@ -121,6 +128,16 @@ public sealed class ConnectivityDiagramControl : Control
             DrawNodeBrokenBadge(g, routerRect);
         }
 
+        if (_internet.Ok == false)
+        {
+            DrawNodeBrokenBadge(g, cloudRect);
+        }
+
+        if (_server.Ok == false)
+        {
+            DrawNodeBrokenBadge(g, serverRect);
+        }
+
         DrawCenteredLabel(g, "Computer", computerRect, _labelFont, _labelBrush);
         DrawCenteredLabel(g, "Router", routerRect, _labelFont, _labelBrush);
         DrawCenteredLabel(g, "Internet", cloudRect, _labelFont, _labelBrush);
@@ -129,7 +146,7 @@ public sealed class ConnectivityDiagramControl : Control
         if (_reasonHeadline is not null)
         {
             bool warning = IsBrokenWarning(_computer) || IsBrokenWarning(_computerRouter) || IsBrokenWarning(_router)
-                || IsBrokenWarning(_routerCloud) || IsBrokenWarning(_cloudServer);
+                || IsBrokenWarning(_routerCloud) || IsBrokenWarning(_internet) || IsBrokenWarning(_cloudServer) || IsBrokenWarning(_server);
             Brush reasonBrush = warning ? _warningReasonBrush : _errorReasonBrush;
             SizeF size = g.MeasureString(_reasonHeadline, _reasonFont);
             g.DrawString(_reasonHeadline, _reasonFont, reasonBrush, Math.Max(0, (Width - size.Width) / 2), 62);

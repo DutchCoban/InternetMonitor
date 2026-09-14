@@ -67,15 +67,27 @@ public sealed class HttpsEndpointProbe : IProbe
     public string Id { get; }
     public string Category { get; }
 
+    private static readonly TimeSpan IcmpPingTimeout = TimeSpan.FromMilliseconds(800);
+
+    // DNS gets its own short budget rather than sharing the whole per-probe _timeout: when DNS
+    // is what's actually broken, the probe should fail fast and report a DNS-specific cause
+    // instead of silently burning the entire configured timeout on a resolution that was never
+    // going to succeed, leaving no room for TCP/TLS/HTTP to even be attempted.
+    private static readonly TimeSpan DnsResolutionTimeout = TimeSpan.FromSeconds(1.5);
+
     private readonly string _url;
     private readonly TimeSpan _timeout;
+    private readonly int _warningThresholdMs;
+    private readonly int _errorThresholdMs;
 
-    public HttpsEndpointProbe(string id, string category, string url, TimeSpan timeout)
+    public HttpsEndpointProbe(string id, string category, string url, TimeSpan timeout, int warningThresholdMs = 300, int errorThresholdMs = 1000)
     {
         Id = id;
         Category = category;
         _url = url;
         _timeout = timeout;
+        _warningThresholdMs = warningThresholdMs;
+        _errorThresholdMs = errorThresholdMs;
     }
 
     public async Task<IProbeResult> RunAsync(CancellationToken cancellationToken)
@@ -95,13 +107,19 @@ public sealed class HttpsEndpointProbe : IProbe
         {
             var dnsSw = Stopwatch.StartNew();
             IPAddress[] addresses;
-            try
+            using (var dnsCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token))
             {
-                addresses = await Dns.GetHostAddressesAsync(host, cts.Token).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is SocketException or OperationCanceledException)
-            {
-                return Fail(HttpsFailureStage.Dns, LocalizationManager.Instance.Get("probe.dns.resolutionFailed"), ex.Message, totalSw, uri, port, null, null, null, null);
+                // Linked from cts, which is already bounded by _timeout - this can only ever be
+                // tighter than the overall budget, never looser.
+                dnsCts.CancelAfter(DnsResolutionTimeout);
+                try
+                {
+                    addresses = await Dns.GetHostAddressesAsync(host, dnsCts.Token).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is SocketException or OperationCanceledException)
+                {
+                    return Fail(HttpsFailureStage.Dns, LocalizationManager.Instance.Get("probe.dns.resolutionFailed"), ex.Message, totalSw, uri, port, null, null, null, null);
+                }
             }
             dnsTime = dnsSw.Elapsed;
             remoteAddress = addresses.FirstOrDefault();
@@ -109,6 +127,12 @@ public sealed class HttpsEndpointProbe : IProbe
             {
                 return Fail(HttpsFailureStage.Dns, LocalizationManager.Instance.Get("probe.dns.resolutionFailed"), "No addresses returned", totalSw, uri, port, dnsTime, null, null, null);
             }
+
+            // Started here, alongside the TCP/TLS/HTTP staged work below rather than before it,
+            // so a blocked ICMP path (common on corporate/consumer firewalls) never costs a
+            // serial timeout on every check - by the time we need it (after a successful staged
+            // probe), it has either already answered or is about to time out on its own.
+            Task<TimeSpan?> icmpTask = IcmpPing.TryPingAsync(remoteAddress, IcmpPingTimeout, cts.Token);
 
             using var tcpClient = new TcpClient { NoDelay = true };
             var tcpSw = Stopwatch.StartNew();
@@ -148,7 +172,15 @@ public sealed class HttpsEndpointProbe : IProbe
             httpTime = httpSw.Elapsed;
             totalSw.Stop();
 
-            ProbeStatus status = statusCode >= 500 ? ProbeStatus.Warning : ProbeStatus.Ok;
+            // ICMP when it answered (the real network round-trip, unaffected by TLS/HTTP
+            // overhead); otherwise fall back to the TCP connect time already measured above -
+            // exactly "try ICMP, fall back to another method since ICMP isn't always allowed".
+            TimeSpan? icmpLatency = await icmpTask.ConfigureAwait(false);
+            double effectiveLatencyMs = icmpLatency?.TotalMilliseconds ?? connectTime!.Value.TotalMilliseconds;
+
+            ProbeStatus baseStatus = statusCode >= 500 ? ProbeStatus.Warning : ProbeStatus.Ok;
+            ProbeStatus latencyStatus = LatencyClassifier.Classify(effectiveLatencyMs, _warningThresholdMs, _errorThresholdMs);
+            ProbeStatus status = Worse(baseStatus, latencyStatus);
             string summary = $"HTTP {statusCode} ({totalSw.Elapsed.TotalMilliseconds:F0} ms)";
 
             return new HttpsEndpointProbeResult(
@@ -176,6 +208,11 @@ public sealed class HttpsEndpointProbe : IProbe
                 _url, addr?.ToString(), p, dns, connect, tls, http, null, stage, error);
         }
     }
+
+    private static ProbeStatus Worse(ProbeStatus a, ProbeStatus b) =>
+        a == ProbeStatus.Error || b == ProbeStatus.Error ? ProbeStatus.Error
+        : a == ProbeStatus.Warning || b == ProbeStatus.Warning ? ProbeStatus.Warning
+        : ProbeStatus.Ok;
 
     private static async Task<int> SendMinimalRequestAsync(SslStream stream, string host, string pathAndQuery, CancellationToken cancellationToken)
     {

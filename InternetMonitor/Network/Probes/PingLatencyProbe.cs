@@ -29,10 +29,11 @@ public sealed record PingLatencyProbeResult(
 /// three endpoints, generalized to an arbitrary user-configurable address) intended to be run
 /// on its own fast cadence for a live latency graph, independent of the main poll cycle.
 /// </summary>
-public sealed class PingLatencyProbe(string id, string targetAddress, TimeSpan timeout) : IProbe
+public sealed class PingLatencyProbe(string id, string targetAddress, TimeSpan timeout, int warningThresholdMs = 300, int errorThresholdMs = 1000) : IProbe
 {
     public string Id => id;
     public string Category => "Network";
+    public string TargetAddress => targetAddress;
 
     public async Task<IProbeResult> RunAsync(CancellationToken cancellationToken)
     {
@@ -46,8 +47,9 @@ public sealed class PingLatencyProbe(string id, string targetAddress, TimeSpan t
             if (reply.Status == IPStatus.Success)
             {
                 double latencyMs = reply.RoundtripTime;
+                ProbeStatus status = LatencyClassifier.Classify(latencyMs, warningThresholdMs, errorThresholdMs);
                 return new PingLatencyProbeResult(
-                    Id, ProbeStatus.Ok, $"{targetAddress} ({latencyMs:F0} ms)", sw.Elapsed, DateTimeOffset.UtcNow,
+                    Id, status, $"{targetAddress} ({latencyMs:F0} ms)", sw.Elapsed, DateTimeOffset.UtcNow,
                     targetAddress, latencyMs);
             }
 

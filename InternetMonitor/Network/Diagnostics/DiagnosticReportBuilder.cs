@@ -80,21 +80,32 @@ public static class DiagnosticReportBuilder
         sb.AppendLine(incident.Diagnosis);
         sb.AppendLine();
         sb.AppendLine(loc.Get("report.incident.duringIncident"));
-        foreach (var (probeId, details) in incident.SnapshotAtStart)
-        {
-            sb.AppendLine($"  {probeId}: {(details.TryGetValue("Summary", out string? s) ? s : "-")}");
-        }
+        AppendProbeSnapshot(sb, incident.SnapshotAtStart);
 
         if (incident.SnapshotAtResolution is not null)
         {
             sb.AppendLine();
             sb.AppendLine(loc.Get("report.incident.recovery"));
-            foreach (var (probeId, details) in incident.SnapshotAtResolution)
-            {
-                sb.AppendLine($"  {probeId}: {(details.TryGetValue("Summary", out string? s) ? s : "-")}");
-            }
+            AppendProbeSnapshot(sb, incident.SnapshotAtResolution);
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Every field ToDetails() captured for each probe (exact latency, HTTP status code, failure
+    /// stage, etc.) - not just Summary - so a technician reading an exported incident report has
+    /// the same detail that's already durably stored in the incident, not a lossy subset of it.
+    /// </summary>
+    private static void AppendProbeSnapshot(StringBuilder sb, Dictionary<string, Dictionary<string, string>> snapshot)
+    {
+        foreach (var (probeId, details) in snapshot)
+        {
+            sb.AppendLine($"  {probeId}:");
+            foreach (var (key, value) in details.OrderBy(kv => kv.Key == "Summary" ? 0 : kv.Key == "Status" ? 1 : 2))
+            {
+                sb.AppendLine($"    {key}: {value}");
+            }
+        }
     }
 }

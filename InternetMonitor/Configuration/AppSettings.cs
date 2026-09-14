@@ -19,6 +19,17 @@ public sealed class AppSettings
     /// <summary>Target address for the continuous latency ping shown on the Diagnostics screen.</summary>
     public string PingTargetAddress { get; set; } = "9.9.9.9";
 
+    /// <summary>
+    /// Latency classification thresholds, user-configurable in Settings. Below this is Ok. The
+    /// Warning-&lt;-Error invariant is enforced in SettingsForm at commit time (an inline error
+    /// label), not here - matches how PingTargetAddress/KumaPushUrl validate elsewhere in this
+    /// app, and avoids AppSettings silently rewriting a hand-edited settings.json value.
+    /// </summary>
+    public int LatencyWarningThresholdMs { get; set; } = 300;
+
+    /// <summary>Latency at or above this is Error. See <see cref="LatencyWarningThresholdMs"/>.</summary>
+    public int LatencyErrorThresholdMs { get; set; } = 1000;
+
     private const int MinimumKumaIntervalSeconds = 60;
 
     /// <summary>Empty = feature off. The user pastes in their own push URL to activate it.</summary>

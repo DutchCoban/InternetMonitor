@@ -16,8 +16,8 @@ public sealed class ConnectivityTest
     private const string DnsProbeHostname = "www.ripe.net";
     private const string PrimaryHttpEndpoint = "https://connectivitycheck.volla.tech/generate_204";
     private const string FallbackHttpEndpoint = "https://captiveportal.kuketz.de/generate_204";
-    private static readonly TimeSpan DnsTimeout = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan DnsTimeout = TimeSpan.FromSeconds(1.5);
+    private static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(2);
 
     private readonly HttpClient _httpClient;
 
@@ -35,10 +35,21 @@ public sealed class ConnectivityTest
         // of adding it afterward measurably speeds up how fast a state change is detected.
         Task<bool> dnsTask = DnsProbe.CheckAsync(DnsProbeHostname, DnsTimeout, cancellationToken);
 
-        bool httpOk = await HttpProbe.CheckAsync(_httpClient, PrimaryHttpEndpoint, HttpTimeout, cancellationToken).ConfigureAwait(false);
-        if (!httpOk)
+        // Primary and fallback are raced (both started at once, first success wins) rather than
+        // tried serially - a serial primary-then-fallback can cost up to 2x HttpTimeout when both
+        // are actually unreachable (e.g. DNS broken), which this 1-second-cadence loop can't
+        // afford. Same race pattern as GatewayReachability.CheckAsync.
+        List<Task<bool>> pendingHttpChecks =
+        [
+            HttpProbe.CheckAsync(_httpClient, PrimaryHttpEndpoint, HttpTimeout, cancellationToken),
+            HttpProbe.CheckAsync(_httpClient, FallbackHttpEndpoint, HttpTimeout, cancellationToken),
+        ];
+        bool httpOk = false;
+        while (pendingHttpChecks.Count > 0 && !httpOk)
         {
-            httpOk = await HttpProbe.CheckAsync(_httpClient, FallbackHttpEndpoint, HttpTimeout, cancellationToken).ConfigureAwait(false);
+            Task<bool> completed = await Task.WhenAny(pendingHttpChecks).ConfigureAwait(false);
+            pendingHttpChecks.Remove(completed);
+            httpOk = await completed.ConfigureAwait(false);
         }
 
         bool dnsOk = await dnsTask.ConfigureAwait(false);

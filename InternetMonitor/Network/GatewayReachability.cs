@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using InternetMonitor.Network.Probes;
 
@@ -70,20 +69,8 @@ internal static class GatewayReachability
     private static async Task<(string Method, TimeSpan? Latency)> WrapAsync(string method, Task<TimeSpan?> inner) =>
         (method, await inner.ConfigureAwait(false));
 
-    private static async Task<TimeSpan?> TryPingAsync(IPAddress gateway, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var ping = new Ping();
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            PingReply reply = await ping.SendPingAsync(gateway, (int)IcmpTimeout.TotalMilliseconds).WaitAsync(cancellationToken).ConfigureAwait(false);
-            return reply.Status == IPStatus.Success ? sw.Elapsed : null;
-        }
-        catch (Exception ex) when (ex is PingException or OperationCanceledException)
-        {
-            return null;
-        }
-    }
+    private static Task<TimeSpan?> TryPingAsync(IPAddress gateway, CancellationToken cancellationToken) =>
+        IcmpPing.TryPingAsync(gateway, IcmpTimeout, cancellationToken);
 
     private static async Task<TimeSpan?> TryConnectAsync(IPAddress gateway, int port, CancellationToken cancellationToken)
     {

@@ -39,6 +39,9 @@ public sealed class SettingsForm : Form
     private readonly CheckBox _logDetailedCheckBox;
     private readonly NumericUpDown _maxLogFilesNumeric;
     private readonly NumericUpDown _maxLogSizeMbNumeric;
+    private readonly NumericUpDown _latencyWarningNumeric;
+    private readonly NumericUpDown _latencyErrorNumeric;
+    private readonly Label _latencyValidationLabel;
 
     // Uptime Kuma tab
     private readonly Label _kumaUrlLabel;
@@ -60,6 +63,9 @@ public sealed class SettingsForm : Form
     /// <summary>Raised after the ping target address has been validated and saved, so the coordinator can be reconfigured live.</summary>
     public event EventHandler? PingTargetChanged;
 
+    /// <summary>Raised after the latency Warning/Error thresholds have been validated and saved, so the coordinator can be reconfigured live.</summary>
+    public event EventHandler? LatencyThresholdsChanged;
+
     public SettingsForm(AppSettings settings)
     {
         _settings = settings;
@@ -71,9 +77,9 @@ public sealed class SettingsForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Text = LocalizationManager.Instance.Get("settings.title");
         Icon = TrayIconFactory.AppIcon.Value;
-        ClientSize = new Size(420, 420);
+        ClientSize = new Size(420, 470);
 
-        var tabs = new TabControl { Dock = DockStyle.Top, Height = 360 };
+        var tabs = new TabControl { Dock = DockStyle.Top, Height = 410 };
 
         // ---------------- General tab ----------------
         var generalTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.general"));
@@ -169,6 +175,20 @@ public sealed class SettingsForm : Form
         _maxLogSizeMbNumeric = new NumericUpDown { Minimum = 1, Maximum = 100, Value = Math.Max(1, settings.MaxDiagnosticLogFileSizeBytes / (1024 * 1024)), Bounds = new Rectangle(220, 248, 80, 24) };
         _maxLogSizeMbNumeric.Leave += OnLoggingOptionsChanged;
 
+        var latencyGroup = new GroupBox { Text = LocalizationManager.Instance.Get("settings.latency.heading"), Bounds = new Rectangle(16, 280, 372, 100) };
+        var latencyWarningLabel = new Label { Text = LocalizationManager.Instance.Get("settings.latency.warning"), Bounds = new Rectangle(12, 24, 200, 22) };
+        _latencyWarningNumeric = new NumericUpDown { Minimum = 1, Maximum = 60000, Value = settings.LatencyWarningThresholdMs, Bounds = new Rectangle(216, 22, 80, 24) };
+        _latencyWarningNumeric.Leave += OnLatencyThresholdsChanged;
+        var latencyErrorLabel = new Label { Text = LocalizationManager.Instance.Get("settings.latency.error"), Bounds = new Rectangle(12, 52, 200, 22) };
+        _latencyErrorNumeric = new NumericUpDown { Minimum = 1, Maximum = 60000, Value = settings.LatencyErrorThresholdMs, Bounds = new Rectangle(216, 50, 80, 24) };
+        _latencyErrorNumeric.Leave += OnLatencyThresholdsChanged;
+        _latencyValidationLabel = new Label { ForeColor = Color.Firebrick, AutoSize = false, Bounds = new Rectangle(12, 76, 348, 20) };
+        latencyGroup.Controls.Add(latencyWarningLabel);
+        latencyGroup.Controls.Add(_latencyWarningNumeric);
+        latencyGroup.Controls.Add(latencyErrorLabel);
+        latencyGroup.Controls.Add(_latencyErrorNumeric);
+        latencyGroup.Controls.Add(_latencyValidationLabel);
+
         diagTab.Controls.Add(levelGroup);
         diagTab.Controls.Add(_logSuccessCheckBox);
         diagTab.Controls.Add(_logDetailedCheckBox);
@@ -176,6 +196,7 @@ public sealed class SettingsForm : Form
         diagTab.Controls.Add(_maxLogFilesNumeric);
         diagTab.Controls.Add(maxSizeLabel);
         diagTab.Controls.Add(_maxLogSizeMbNumeric);
+        diagTab.Controls.Add(latencyGroup);
 
         // ---------------- Uptime Kuma tab ----------------
         var kumaTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.kuma"));
@@ -216,7 +237,7 @@ public sealed class SettingsForm : Form
         _closeButton = new Button
         {
             Text = LocalizationManager.Instance.Get("settings.close"),
-            Bounds = new Rectangle(320, 376, 90, 28),
+            Bounds = new Rectangle(320, 426, 90, 28),
             DialogResult = DialogResult.OK,
         };
         _closeButton.Click += (_, _) => Close();
@@ -392,6 +413,23 @@ public sealed class SettingsForm : Form
         _settings.PingTargetAddress = address;
         _settings.Save();
         PingTargetChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnLatencyThresholdsChanged(object? sender, EventArgs e)
+    {
+        int warning = (int)_latencyWarningNumeric.Value;
+        int error = (int)_latencyErrorNumeric.Value;
+        if (warning >= error)
+        {
+            _latencyValidationLabel.Text = LocalizationManager.Instance.Get("settings.latency.invalidOrder");
+            return;
+        }
+
+        _latencyValidationLabel.Text = string.Empty;
+        _settings.LatencyWarningThresholdMs = warning;
+        _settings.LatencyErrorThresholdMs = error;
+        _settings.Save();
+        LatencyThresholdsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Returns false if the registry key couldn't be opened for writing, so the caller can surface that instead of silently pretending it worked.</summary>

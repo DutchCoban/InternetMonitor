@@ -53,6 +53,10 @@ public sealed class PortReachabilityProbe : IProbe
 {
     private static readonly TimeSpan UdpReceiveWindow = TimeSpan.FromMilliseconds(800);
 
+    // DNS gets its own short budget rather than sharing the whole per-probe _timeout - see the
+    // identical rationale on HttpsEndpointProbe.DnsResolutionTimeout.
+    private static readonly TimeSpan DnsResolutionTimeout = TimeSpan.FromSeconds(1.5);
+
     public string Id { get; }
     public string Category => "Application";
 
@@ -60,14 +64,18 @@ public sealed class PortReachabilityProbe : IProbe
     private readonly int _port;
     private readonly PortProtocol _protocol;
     private readonly TimeSpan _timeout;
+    private readonly int _warningThresholdMs;
+    private readonly int _errorThresholdMs;
 
-    public PortReachabilityProbe(string id, string host, int port, PortProtocol protocol, TimeSpan timeout)
+    public PortReachabilityProbe(string id, string host, int port, PortProtocol protocol, TimeSpan timeout, int warningThresholdMs = 300, int errorThresholdMs = 1000)
     {
         Id = id;
         _host = host;
         _port = port;
         _protocol = protocol;
         _timeout = timeout;
+        _warningThresholdMs = warningThresholdMs;
+        _errorThresholdMs = errorThresholdMs;
     }
 
     public async Task<IProbeResult> RunAsync(CancellationToken cancellationToken)
@@ -77,17 +85,21 @@ public sealed class PortReachabilityProbe : IProbe
         cts.CancelAfter(_timeout);
 
         IPAddress? address;
-        try
+        using (var dnsCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token))
         {
-            IPAddress[] addresses = await Dns.GetHostAddressesAsync(_host, cts.Token).ConfigureAwait(false);
-            address = addresses.FirstOrDefault();
-        }
-        catch (Exception ex) when (ex is SocketException or OperationCanceledException)
-        {
-            sw.Stop();
-            return new PortReachabilityProbeResult(
-                Id, ProbeStatus.Error, LocalizationManager.Instance.Get("probe.dns.resolutionFailed"), sw.Elapsed, DateTimeOffset.UtcNow,
-                _host, _port, _protocol, null, null, null, null, ex.Message);
+            dnsCts.CancelAfter(DnsResolutionTimeout);
+            try
+            {
+                IPAddress[] addresses = await Dns.GetHostAddressesAsync(_host, dnsCts.Token).ConfigureAwait(false);
+                address = addresses.FirstOrDefault();
+            }
+            catch (Exception ex) when (ex is SocketException or OperationCanceledException)
+            {
+                sw.Stop();
+                return new PortReachabilityProbeResult(
+                    Id, ProbeStatus.Error, LocalizationManager.Instance.Get("probe.dns.resolutionFailed"), sw.Elapsed, DateTimeOffset.UtcNow,
+                    _host, _port, _protocol, null, null, null, null, ex.Message);
+            }
         }
 
         if (address is null)
@@ -130,6 +142,11 @@ public sealed class PortReachabilityProbe : IProbe
         {
             // TCP is always conclusive - it is the primary signal even in Both mode, per design.
             status = tcpReachable.Value ? ProbeStatus.Ok : ProbeStatus.Error;
+            if (status == ProbeStatus.Ok && tcpLatencyMs is not null)
+            {
+                status = LatencyClassifier.Classify(tcpLatencyMs.Value, _warningThresholdMs, _errorThresholdMs);
+            }
+
             summary = tcpReachable.Value
                 ? loc.Format("probe.port.reachable", _port, tcpLatencyMs!.Value)
                 : loc.Format("probe.port.unreachable", _port);

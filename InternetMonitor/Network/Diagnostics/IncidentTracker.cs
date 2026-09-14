@@ -90,10 +90,18 @@ public sealed class IncidentTracker
         else
         {
             // Keep the ongoing incident's diagnosis current in case the dominant cause shifts
-            // slightly while it's still active - same Id throughout its lifecycle.
+            // slightly while it's still active - same Id throughout its lifecycle. Only persist
+            // when something actually changed: a stable root cause (the common case) would
+            // otherwise rewrite the entire incidents.json file on every single cycle for as long
+            // as the incident stays open, which for a long-running outage is a real, avoidable
+            // cost on the same thread that's also gating the diagnosis cycle.
+            bool changed = _current.Classification != diagnosis.Classification || _current.Diagnosis != diagnosis.Explanation;
             _current.Diagnosis = diagnosis.Explanation;
             _current.Classification = diagnosis.Classification;
-            _store.Update(_current);
+            if (changed)
+            {
+                _store.Update(_current);
+            }
         }
     }
 }

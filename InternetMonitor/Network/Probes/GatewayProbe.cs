@@ -44,6 +44,9 @@ public sealed class GatewayProbe : IProbe
     public string Id => "gateway";
     public string Category => "Network";
 
+    public int WarningThresholdMs { get; set; } = 300;
+    public int ErrorThresholdMs { get; set; } = 1000;
+
     public async Task<IProbeResult> RunAsync(CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
@@ -66,8 +69,9 @@ public sealed class GatewayProbe : IProbe
         }
 
         double latencyMs = latency!.Value.TotalMilliseconds;
+        ProbeStatus status = LatencyClassifier.Classify(latencyMs, WarningThresholdMs, ErrorThresholdMs);
         return new GatewayProbeResult(
-            Id, ProbeStatus.Ok, $"{gateway} ({latencyMs:F0} ms, {method})", sw.Elapsed, DateTimeOffset.UtcNow,
+            Id, status, $"{gateway} ({latencyMs:F0} ms, {method})", sw.Elapsed, DateTimeOffset.UtcNow,
             gateway.ToString(), latencyMs, method);
     }
 }

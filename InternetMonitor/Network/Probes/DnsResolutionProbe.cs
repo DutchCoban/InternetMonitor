@@ -48,8 +48,8 @@ public sealed class DnsResolutionProbe : IProbe
     public string Category => "Network";
 
     private const string DefaultHostname = "www.ripe.net";
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan PublicResolverTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(1.5);
+    private static readonly TimeSpan PublicResolverTimeout = TimeSpan.FromSeconds(1);
     private static readonly IPAddress[] PublicResolvers =
     [
         IPAddress.Parse("9.9.9.9"),

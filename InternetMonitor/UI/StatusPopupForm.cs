@@ -297,10 +297,19 @@ public sealed class StatusPopupForm : Form
 
     /// <summary>
     /// Maps the single layered root-cause classification from <see cref="DiagnosisEngine"/> onto
-    /// the computer/router/cloud/server diagram's five slots - no new diagnosis logic, just a
-    /// lookup, following the engine's own layering (adapter -&gt; IP -&gt; gateway -&gt; WAN/DNS -&gt; HTTPS
-    /// -&gt; application): everything upstream of the actual fault stays healthy, everything
-    /// downstream of it is unknown (not yet meaningfully checked that cycle).
+    /// the diagram's four nodes (computer, router, internet, server) and three connecting legs,
+    /// following the engine's own layering (adapter -&gt; IP -&gt; gateway -&gt; WAN -&gt; DNS -&gt; HTTPS -&gt;
+    /// application): everything upstream of the actual fault stays healthy, the fault itself and
+    /// everything downstream of it is marked broken. Network/IpConfiguration/Gateway failures are
+    /// hardcoded to a full downstream break rather than read from each probe's live status: those
+    /// three mean the local machine has no usable path out at all, so nothing downstream can
+    /// possibly have succeeded regardless of what any individual probe's result happens to say
+    /// (e.g. a self-assigned APIPA address is only ever reported as ProbeStatus.Warning by
+    /// IpAddressProbe, which would otherwise under-represent a problem DiagnosisEngine already
+    /// decided warrants full escalation). The final leg (cloud-server) is the one place real,
+    /// live data is used even here, via <see cref="ResolveCloudServerHealth"/> - a specifically
+    /// chosen application endpoint could legitimately be a LAN-only service that keeps working
+    /// even with zero internet access, and showing that as broken would be untrue.
     /// </summary>
     private void RefreshDiagram(DiagnosisResult? diagnosis)
     {
@@ -313,7 +322,8 @@ public sealed class StatusPopupForm : Form
 
         if (diagnosis is null)
         {
-            _diagram.SetState(SegmentHealth.Unknown, SegmentHealth.Unknown, SegmentHealth.Unknown, SegmentHealth.Unknown, SegmentHealth.Unknown, serverLabel, null, null);
+            SegmentHealth unknown = SegmentHealth.Unknown;
+            _diagram.SetState(unknown, unknown, unknown, unknown, unknown, unknown, unknown, serverLabel, null, null);
             return;
         }
 
@@ -321,60 +331,95 @@ public sealed class StatusPopupForm : Form
         SegmentHealth computerRouter = SegmentHealth.Healthy;
         SegmentHealth router = SegmentHealth.Healthy;
         SegmentHealth routerCloud = SegmentHealth.Healthy;
+        SegmentHealth internet = SegmentHealth.Healthy;
         SegmentHealth cloudServer = SegmentHealth.Healthy;
+        SegmentHealth server = SegmentHealth.Healthy;
 
         switch (diagnosis.Classification)
         {
             case DiagnosisClassification.Network:
-                computer = SegmentHealth.Broken();
-                computerRouter = SegmentHealth.Unknown;
-                router = SegmentHealth.Unknown;
-                routerCloud = SegmentHealth.Unknown;
-                cloudServer = SegmentHealth.Unknown;
-                break;
             case DiagnosisClassification.IpConfiguration:
+                // Both mean "this machine has no usable network identity" (no adapter, or a
+                // self-assigned APIPA address) - equally total for diagram purposes, since
+                // nothing downstream can possibly work either way.
+                computer = SegmentHealth.Broken();
                 computerRouter = SegmentHealth.Broken();
-                router = SegmentHealth.Unknown;
-                routerCloud = SegmentHealth.Unknown;
-                cloudServer = SegmentHealth.Unknown;
+                router = SegmentHealth.Broken();
+                routerCloud = SegmentHealth.Broken();
+                internet = SegmentHealth.Broken();
+                cloudServer = ResolveCloudServerHealth();
+                server = cloudServer;
                 break;
             case DiagnosisClassification.Gateway:
                 router = SegmentHealth.Broken();
-                routerCloud = SegmentHealth.Unknown;
-                cloudServer = SegmentHealth.Unknown;
+                routerCloud = SegmentHealth.Broken();
+                internet = SegmentHealth.Broken();
+                cloudServer = ResolveCloudServerHealth();
+                server = cloudServer;
                 break;
             case DiagnosisClassification.Internet:
+                internet = SegmentHealth.Broken();
+                cloudServer = ResolveCloudServerHealth();
+                server = cloudServer;
+                break;
             case DiagnosisClassification.Dns:
-                routerCloud = SegmentHealth.Broken();
-                cloudServer = SegmentHealth.Unknown;
+                // DNS specifically, not ICMP/"internet" itself: DiagnosisEngine only reaches this
+                // classification once the ICMP check has already succeeded, so the internet node
+                // and the leg leading to it stay healthy - only the DNS-dependent leg to the
+                // server, and the server itself, are affected.
+                cloudServer = ResolveCloudServerHealth();
+                server = cloudServer;
                 break;
             case DiagnosisClassification.FirewallSuspected:
-                // HTTPS already confirmed working to reach this classification, so cloud-server
-                // stays healthy - only ICMP (the router-cloud leg) is flagged, and only as a
-                // warning, not a hard break.
+                // HTTPS already confirmed working to reach this classification, so internet/
+                // cloud-server/server all stay healthy - only ICMP (the router-cloud leg) is
+                // flagged, and only as a warning, not a hard break.
                 routerCloud = SegmentHealth.Broken(warningOnly: true);
                 break;
             case DiagnosisClassification.Https:
-                cloudServer = SegmentHealth.Broken();
-                break;
             case DiagnosisClassification.Application:
-                // Only break the diagram if the *chosen* server endpoint is among the affected
-                // ones - a different (non-chosen) endpoint failing must not mark this broken.
-                // AffectedProbeIds carries ApplicationEndpointProbe's "endpoint:{id}" probe id,
-                // not the raw EndpointConfig.Id stored in settings - must compare like-for-like.
-                if (_settings.StatusDiagramEndpointId is { } id && diagnosis.AffectedProbeIds.Contains($"endpoint:{id}"))
-                {
-                    cloudServer = SegmentHealth.Broken();
-                }
+                // Only the server itself is affected here, not the leg leading to it - DNS
+                // resolved fine and the network path is intact; it's specifically the endpoint
+                // (or the general HTTPS check) that isn't answering correctly.
+                server = ResolveCloudServerHealth();
                 break;
             // Healthy, TimeSync (not a connectivity concept), and the never-emitted Unknown all
             // leave every slot at its default Healthy value.
         }
 
         bool broken = computer.Ok == false || computerRouter.Ok == false || router.Ok == false
-            || routerCloud.Ok == false || cloudServer.Ok == false;
-        _diagram.SetState(computer, computerRouter, router, routerCloud, cloudServer, serverLabel,
+            || routerCloud.Ok == false || internet.Ok == false || cloudServer.Ok == false || server.Ok == false;
+        _diagram.SetState(computer, computerRouter, router, routerCloud, internet, cloudServer, server, serverLabel,
             broken ? diagnosis.Headline : null, broken ? diagnosis.Explanation : null);
+    }
+
+    private static SegmentHealth FromProbeStatus(ProbeStatus status) => status switch
+    {
+        ProbeStatus.Ok => SegmentHealth.Healthy,
+        ProbeStatus.Warning => SegmentHealth.Broken(warningOnly: true),
+        ProbeStatus.Unknown or ProbeStatus.Checking => SegmentHealth.Unknown,
+        _ => SegmentHealth.Broken(),
+    };
+
+    /// <summary>
+    /// Whichever thing the diagram's "server" node actually represents - the specifically chosen
+    /// application endpoint, or (when none is chosen) the general HTTPS check - reflecting its
+    /// real, current status regardless of which classification the overall diagnosis reached.
+    /// </summary>
+    private SegmentHealth ResolveCloudServerHealth()
+    {
+        if (_coordinator.LatestSnapshot is not { } snapshot)
+        {
+            return SegmentHealth.Unknown;
+        }
+
+        if (_settings.StatusDiagramEndpointId is { } id)
+        {
+            var match = snapshot.ApplicationEndpoints.FirstOrDefault(e => e.Result.ProbeId == $"endpoint:{id}");
+            return match.Result is null ? SegmentHealth.Unknown : FromProbeStatus(match.Result.Status);
+        }
+
+        return FromProbeStatus(snapshot.GeneralHttps.Status);
     }
 
     private string ResolveServerLabel()

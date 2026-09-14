@@ -167,6 +167,11 @@
   "settings.maxLogFiles": "Aantal logbestanden",
   "settings.maxLogSize": "Maximale bestandsgrootte (MB)",
 
+  "settings.latency.heading": "Latentieclassificatie",
+  "settings.latency.warning": "Waarschuwing boven (ms)",
+  "settings.latency.error": "Fout boven (ms)",
+  "settings.latency.invalidOrder": "De waarschuwingsdrempel moet lager zijn dan de foutdrempel.",
+
   "settings.endpoint.statusDiagram": "Tonen als \"server\" in statusvenster",
   "settings.endpoint.statusDiagram.general": "Algemene controle",
 

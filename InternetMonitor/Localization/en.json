@@ -167,6 +167,11 @@
   "settings.maxLogFiles": "Number of log files",
   "settings.maxLogSize": "Maximum file size (MB)",
 
+  "settings.latency.heading": "Latency classification",
+  "settings.latency.warning": "Warning above (ms)",
+  "settings.latency.error": "Error above (ms)",
+  "settings.latency.invalidOrder": "The warning threshold must be lower than the error threshold.",
+
   "settings.endpoint.statusDiagram": "Show as \"server\" in status window",
   "settings.endpoint.statusDiagram.general": "General check",
 

@@ -1,6 +1,6 @@
 using System.Drawing.Drawing2D;
 using System.Reflection;
-using InternetMonitor.Network;
+using InternetMonitor.Network.Probes;
 
 namespace InternetMonitor.UI;
 
@@ -19,14 +19,14 @@ internal static class TrayIconFactory
     /// </summary>
     public static readonly Lazy<Icon> AppIcon = new(LoadAppIcon);
 
-    public static ManagedIcon Build(ConnectivityState state)
+    public static ManagedIcon Build(ProbeStatus severity)
     {
-        Color badgeColor = state switch
+        Color badgeColor = severity switch
         {
-            ConnectivityState.Connected => Color.LimeGreen,
-            ConnectivityState.Outage => Color.Red,
-            ConnectivityState.SuspectedOutage => Color.Orange,
-            _ => Color.Gray,
+            ProbeStatus.Ok => Color.LimeGreen,
+            ProbeStatus.Warning => Color.Orange,
+            ProbeStatus.Error or ProbeStatus.Blocked => Color.Red,
+            _ => Color.Gray, // Unknown/Checking - before the first diagnosis cycle completes
         };
 
         using var bmp = new Bitmap(BaseBitmap.Value);

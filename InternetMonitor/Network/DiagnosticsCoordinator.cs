@@ -51,14 +51,16 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
     private readonly InternetProbe _internetProbe = new();
     private readonly DnsResolutionProbe _dnsProbe = new();
     private readonly TimeSyncProbe _timeSyncProbe = new();
-    private readonly HttpsEndpointProbe _generalHttpsProbe = new("https", "Network", GeneralHttpsUrl, TimeSpan.FromSeconds(5));
+    private HttpsEndpointProbe _generalHttpsProbe = new("https", "Network", GeneralHttpsUrl, TimeSpan.FromSeconds(5));
 
     // Volatile + always read into a local once per cycle (see RunCycleAsync): UpdateEndpoints can
     // reassign this from the UI thread at any time, including mid-cycle. Reading the field twice
     // (once to build tasks, once to zip names back onto results) would risk pairing endpoint
     // names from a new list against IProbeResults from an old list's tasks.
-    private volatile List<(string Name, ApplicationEndpointProbe Probe)> _applicationProbes = [];
+    private volatile List<(EndpointConfig Config, ApplicationEndpointProbe Probe)> _applicationProbes = [];
     private PingLatencyProbe _pingProbe = new(PingProbeId, "9.9.9.9", PingTimeout);
+    private int _latencyWarningMs = 300;
+    private int _latencyErrorMs = 1000;
     private readonly object _lifecycleLock = new();
     private readonly IncidentTracker _incidentTracker;
     private readonly DiagnosticLogger _diagnosticLogger;
@@ -87,7 +89,13 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
     private Task? _loopTask;
     private Task? _pingLoopTask;
     private Task? _timeSyncLoopTask;
-    private bool _cycleInFlight;
+
+    // 0 = idle, 1 = running. Interlocked, not a plain bool: RunNowAsync can be invoked
+    // concurrently with the scheduled loop's own call to RunCycleAsync (from
+    // TrayApplicationContext on every connectivity state change, or from an open
+    // StatusPopupForm's "Check now"), so a plain check-then-set bool is a real race that would
+    // let two cycles overlap and pile up during a slow/flapping incident.
+    private int _cycleInFlight;
 
     /// <summary>Raised once, right before a cycle's probes are kicked off - lets a UI reset any per-cycle state (e.g. StatusPopupForm's ordered-reveal tracking) before ProbeCompleted starts firing for the new cycle.</summary>
     public event EventHandler? CycleStarted;
@@ -103,7 +111,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
     public IProbeResult? LatestPingResult { get; private set; }
 
     public IReadOnlyList<(string Id, string Name)> ApplicationEndpointDescriptors =>
-        _applicationProbes.Select(ap => (ap.Probe.Id, ap.Name)).ToList();
+        _applicationProbes.Select(ap => (ap.Probe.Id, ap.Config.Name)).ToList();
 
     public IReadOnlyList<(DateTimeOffset Timestamp, double Value)> GetHistory(string probeId) => _history.Get(probeId);
 
@@ -111,15 +119,29 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
     {
         _applicationProbes = endpoints
             .Where(e => e.Enabled)
-            .Select(e => (e.Name, new ApplicationEndpointProbe(e)))
+            .Select(e => (e, new ApplicationEndpointProbe(e, _latencyWarningMs, _latencyErrorMs)))
             .ToList();
     }
 
     /// <summary>Repoints the continuous ping graph at a new target and discards its old history - mixing latencies to two different hosts in one graph would be misleading.</summary>
     public void UpdatePingTarget(string address)
     {
-        _pingProbe = new PingLatencyProbe(PingProbeId, address, PingTimeout);
+        _pingProbe = new PingLatencyProbe(PingProbeId, address, PingTimeout, _latencyWarningMs, _latencyErrorMs);
         _history.Clear(PingProbeId);
+    }
+
+    /// <summary>Live-reconfigures every latency-aware probe's Warning/Error thresholds (see <see cref="LatencyClassifier"/>) without waiting for the next poll cycle or a fresh <see cref="UpdateEndpoints"/> call.</summary>
+    public void UpdateLatencyThresholds(int warningMs, int errorMs)
+    {
+        _latencyWarningMs = warningMs;
+        _latencyErrorMs = errorMs;
+        _gatewayProbe.WarningThresholdMs = warningMs;
+        _gatewayProbe.ErrorThresholdMs = errorMs;
+        _pingProbe = new PingLatencyProbe(PingProbeId, _pingProbe.TargetAddress, PingTimeout, warningMs, errorMs);
+        _generalHttpsProbe = new HttpsEndpointProbe("https", "Network", GeneralHttpsUrl, TimeSpan.FromSeconds(5), warningMs, errorMs);
+        _applicationProbes = _applicationProbes
+            .Select(ap => (ap.Config, new ApplicationEndpointProbe(ap.Config, warningMs, errorMs)))
+            .ToList();
     }
 
     public void ClearPingHistory() => _history.Clear(PingProbeId);
@@ -241,12 +263,11 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
 
     private async Task RunCycleAsync(CancellationToken cancellationToken)
     {
-        if (_cycleInFlight)
+        if (Interlocked.CompareExchange(ref _cycleInFlight, 1, 0) != 0)
         {
             return;
         }
 
-        _cycleInFlight = true;
         IsChecking = true;
         CycleStarted?.Invoke(this, EventArgs.Empty);
         try
@@ -260,7 +281,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
 
             // Captured once into a local: _applicationProbes can be reassigned by UpdateEndpoints
             // from the UI thread at any time, so both uses below must agree on the same list.
-            List<(string Name, ApplicationEndpointProbe Probe)> applicationProbes = _applicationProbes;
+            List<(EndpointConfig Config, ApplicationEndpointProbe Probe)> applicationProbes = _applicationProbes;
             List<Task<IProbeResult>> appResultTasks = applicationProbes
                 .Select(ap => RunTypedAsync<IProbeResult>(ap.Probe, cancellationToken))
                 .ToList();
@@ -270,7 +291,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
                     .Concat(appResultTasks)).ConfigureAwait(false);
 
             var applicationResults = applicationProbes
-                .Zip(appResultTasks, (ap, task) => (ap.Name, Result: task.Result))
+                .Zip(appResultTasks, (ap, task) => (Name: ap.Config.Name, Result: task.Result))
                 .ToList();
 
             var snapshot = new ProbeSnapshot(
@@ -305,7 +326,7 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
         finally
         {
             IsChecking = false;
-            _cycleInFlight = false;
+            Volatile.Write(ref _cycleInFlight, 0);
         }
     }
 

@@ -16,14 +16,14 @@ public sealed class ApplicationEndpointProbe : IProbe
 
     private readonly IProbe _inner;
 
-    public ApplicationEndpointProbe(EndpointConfig config)
+    public ApplicationEndpointProbe(EndpointConfig config, int warningThresholdMs = 300, int errorThresholdMs = 1000)
     {
         Id = $"endpoint:{config.Id}";
         DisplayName = config.Name;
         _inner = config.Type switch
         {
-            EndpointType.Https => new HttpsEndpointProbe(Id, Category, config.Url, TimeSpan.FromMilliseconds(config.TimeoutMs)),
-            EndpointType.Port => new PortReachabilityProbe(Id, config.Host, config.Port, config.PortProtocol, TimeSpan.FromMilliseconds(config.TimeoutMs)),
+            EndpointType.Https => new HttpsEndpointProbe(Id, Category, config.Url, TimeSpan.FromMilliseconds(config.TimeoutMs), warningThresholdMs, errorThresholdMs),
+            EndpointType.Port => new PortReachabilityProbe(Id, config.Host, config.Port, config.PortProtocol, TimeSpan.FromMilliseconds(config.TimeoutMs), warningThresholdMs, errorThresholdMs),
             _ => throw new NotSupportedException($"Endpoint type {config.Type} is not supported yet."),
         };
     }
