@@ -56,6 +56,7 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         _diagnosticsCoordinator.UpdateEndpoints(_settings.ApplicationEndpoints);
         _diagnosticsCoordinator.UpdatePingTarget(_settings.PingTargetAddress);
         _diagnosticsCoordinator.UpdateLatencyThresholds(_settings.LatencyWarningThresholdMs, _settings.LatencyErrorThresholdMs);
+        _diagnosticsCoordinator.UpdateHistoryRetention(TimeSpan.FromMinutes(_settings.HistoryRetentionMinutes));
         _diagnosticsCoordinator.Start();
 
         _currentIcon = TrayIconFactory.Build(ProbeStatus.Unknown);
@@ -152,6 +153,8 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
             _diagnosticsCoordinator.UpdatePingTarget(_settings.PingTargetAddress);
         _settingsForm.LatencyThresholdsChanged += (_, _) =>
             _diagnosticsCoordinator.UpdateLatencyThresholds(_settings.LatencyWarningThresholdMs, _settings.LatencyErrorThresholdMs);
+        _settingsForm.HistoryRetentionChanged += (_, _) =>
+            _diagnosticsCoordinator.UpdateHistoryRetention(TimeSpan.FromMinutes(_settings.HistoryRetentionMinutes));
         _settingsForm.FormClosed += (_, _) => _settingsForm = null;
         _settingsForm.Show();
     }
@@ -181,7 +184,10 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
             _currentOutageStartedUtc = null;
         }
 
-        _popupController.OnStateChanged(e.OldState, e.NewState);
+        if (_settings.ShowOutagePopups)
+        {
+            _popupController.OnStateChanged(e.OldState, e.NewState);
+        }
 
         // ConnectivityMonitor polls every second and can notice a change well before
         // DiagnosticsCoordinator's own 15-second cycle would - without this, the outage popup

@@ -146,6 +146,9 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
 
     public void ClearPingHistory() => _history.Clear(PingProbeId);
 
+    /// <summary>Live-reconfigures how long persisted probe history is retained (see <see cref="ProbeHistory.SetRetention"/>).</summary>
+    public void UpdateHistoryRetention(TimeSpan window) => _history.SetRetention(window);
+
     public void Start()
     {
         lock (_lifecycleLock)
@@ -294,6 +297,18 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
                 .Zip(appResultTasks, (ap, task) => (Name: ap.Config.Name, Result: task.Result))
                 .ToList();
 
+            // InternetProbeResult only records its aggregate reachable-count under the "internet"
+            // probe id (see PingLatencyProbe/HttpsEndpointProbe for the per-target equivalents) -
+            // recorded here too, per address, so each of the three public-IP rows shown in
+            // DiagnosticsForm has its own real history to chart when double-clicked.
+            foreach (PingEndpointResult ep in internetTask.Result.Endpoints)
+            {
+                if (ep.Reachable && ep.LatencyMs is { } latency)
+                {
+                    _history.Record($"internet:{ep.Address}", internetTask.Result.TimestampUtc, latency);
+                }
+            }
+
             var snapshot = new ProbeSnapshot(
                 networkTask.Result, ipTask.Result, gatewayTask.Result, internetTask.Result,
                 dnsTask.Result, httpsTask.Result, _latestTimeSyncResult, applicationResults);
@@ -386,5 +401,9 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
         _pingTimer?.Dispose();
         _loopCts?.Dispose();
         _timeSyncKickCts.Dispose();
+
+        // Last: by this point every one of this coordinator's own loops has already been
+        // awaited to completion above, so no further Record() call can race the final flush.
+        await _history.DisposeAsync().ConfigureAwait(false);
     }
 }

@@ -32,6 +32,10 @@ public sealed class DiagnosticsForm : Form
     private readonly Label _logInfoLabel;
     private readonly ListView _incidentsListView;
 
+    // Single-window-per-item tracking for double-click history detail popups, keyed by history
+    // key (not always the same as the row's raw probe id - see OpenHistoryDetailForSelectedRow).
+    private readonly Dictionary<string, Form> _openHistoryWindows = new();
+
     // This form is destroyed and recreated fresh each time it's reopened from the tray menu, so
     // these custom Fonts (not owned by Control.Dispose, since they're assigned rather than
     // inherited from the base Control Font) are tracked here for explicit disposal.
@@ -135,6 +139,7 @@ public sealed class DiagnosticsForm : Form
         _probeListView.Columns.Add(LocalizationManager.Instance.Get("diag.table.value"), 220);
         _probeListView.Columns.Add(LocalizationManager.Instance.Get("diag.table.duration"), 80);
         _probeListView.SelectedIndexChanged += (_, _) => ShowSelectedProbeDetails();
+        _probeListView.DoubleClick += (_, _) => OpenHistoryDetailForSelectedRow();
 
         // --- Continuous ping-latency chart (always on, independent of row selection) ---
         var pingHeaderPanel = new Panel { Dock = DockStyle.Top, Height = 26, Margin = new Padding(0, 0, 0, 4) };
@@ -229,8 +234,16 @@ public sealed class DiagnosticsForm : Form
 
     private void RefreshPingChart()
     {
-        var history = _coordinator.GetHistory(DiagnosticsCoordinator.PingProbeId);
         DateTimeOffset windowStart = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(15);
+
+        // This always-on preview is a fixed, short "how's it doing right now" glance - it always
+        // stretches whatever points it's given to fill its small fixed width, so with history
+        // retention now configurable up to 32 days it must filter down to a bounded recent
+        // window itself rather than showing everything GetHistory returns. The full, scrollable
+        // history for any check (including this one) is available via double-click.
+        var history = _coordinator.GetHistory(DiagnosticsCoordinator.PingProbeId)
+            .Where(p => p.Timestamp >= windowStart)
+            .ToList();
         var outages = _incidentStore.All
             .Where(i => i.EndUtc is null || i.EndUtc >= windowStart)
             .Select(i => (i.StartUtc, i.EndUtc))
@@ -432,6 +445,55 @@ public sealed class DiagnosticsForm : Form
         }
 
         _detailsTextBox.Text = string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>
+    /// Opens (or activates the already-open) history detail popup for the selected row. This is
+    /// a deliberately separate mapping from <see cref="GetProbeId"/> - that one returns the bare
+    /// address for internet-endpoint rows (it only exists for reselection-after-refresh); the
+    /// history key for those rows needs the "internet:{address}" shape instead, to match what
+    /// DiagnosticsCoordinator now records per public-IP endpoint.
+    /// </summary>
+    private void OpenHistoryDetailForSelectedRow()
+    {
+        if (_probeListView.SelectedItems.Count == 0)
+        {
+            return;
+        }
+
+        ListViewItem item = _probeListView.SelectedItems[0];
+        string displayName = item.SubItems[0].Text;
+        string historyKey;
+        string triggerProbeId;
+        string valueUnitLabel;
+
+        if (item.Tag is Dictionary<string, string> d && d.TryGetValue("Address", out string? address))
+        {
+            historyKey = $"internet:{address}";
+            triggerProbeId = "internet";
+            valueUnitLabel = "ms";
+        }
+        else if (item.Tag is IProbeResult result)
+        {
+            historyKey = result.ProbeId;
+            triggerProbeId = result.ProbeId;
+            valueUnitLabel = result is TimeSyncProbeResult ? "s" : "ms";
+        }
+        else
+        {
+            return;
+        }
+
+        if (_openHistoryWindows.TryGetValue(historyKey, out Form? existing) && !existing.IsDisposed)
+        {
+            existing.Activate();
+            return;
+        }
+
+        var detailForm = new ProbeHistoryDetailForm(_coordinator, _incidentStore, historyKey, triggerProbeId, displayName, valueUnitLabel);
+        detailForm.FormClosed += (_, _) => _openHistoryWindows.Remove(historyKey);
+        _openHistoryWindows[historyKey] = detailForm;
+        detailForm.Show(this);
     }
 
     private void RefreshIncidentsList()

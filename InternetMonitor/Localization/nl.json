@@ -21,8 +21,9 @@
   "diag.row.dns": "DNS",
   "diag.row.https": "HTTPS (algemeen)",
   "diag.row.time": "Tijdsynchronisatie",
-  "diag.sparkline.noData": "Onvoldoende meetgegevens (laatste 15 minuten)",
+  "diag.sparkline.noData": "Onvoldoende meetgegevens",
   "diag.ping.heading": "Ping naar {0}",
+  "history.detail.titleSuffix": "Geschiedenis",
   "diag.ping.clearHistory": "Geschiedenis wissen",
 
   "diag.title": "Diagnostiek",
@@ -140,6 +141,7 @@
   "settings.language": "Taal",
   "settings.autostart": "Start automatisch met Windows",
   "settings.autostart.error.registry": "Kon de Windows-opstartregistervermelding niet bijwerken.",
+  "settings.showOutagePopups": "Pop-up tonen bij een gedetecteerde storing",
   "settings.pingTarget": "Ping-doel (IP-adres)",
   "settings.pingTarget.error.invalid": "Voer een geldig IP-adres in.",
   "settings.close": "Sluiten",
@@ -171,6 +173,12 @@
   "settings.latency.warning": "Waarschuwing boven (ms)",
   "settings.latency.error": "Fout boven (ms)",
   "settings.latency.invalidOrder": "De waarschuwingsdrempel moet lager zijn dan de foutdrempel.",
+
+  "settings.historyRetention.heading": "Geschiedenis bewaren",
+  "settings.historyRetention.label": "Geschiedenis bewaren voor",
+  "settings.historyRetention.unit.minutes": "Minuten",
+  "settings.historyRetention.unit.hours": "Uur",
+  "settings.historyRetention.unit.days": "Dagen",
 
   "settings.endpoint.statusDiagram": "Tonen als \"server\" in statusvenster",
   "settings.endpoint.statusDiagram.general": "Algemene controle",

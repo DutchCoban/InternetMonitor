@@ -21,8 +21,9 @@
   "diag.row.dns": "DNS",
   "diag.row.https": "HTTPS (general)",
   "diag.row.time": "Time synchronization",
-  "diag.sparkline.noData": "Not enough measurements yet (last 15 minutes)",
+  "diag.sparkline.noData": "Not enough measurements yet",
   "diag.ping.heading": "Ping to {0}",
+  "history.detail.titleSuffix": "History",
   "diag.ping.clearHistory": "Clear history",
 
   "diag.title": "Diagnostics",
@@ -140,6 +141,7 @@
   "settings.language": "Language",
   "settings.autostart": "Start automatically with Windows",
   "settings.autostart.error.registry": "Could not update the Windows startup registry entry.",
+  "settings.showOutagePopups": "Show a pop-up when an outage is detected",
   "settings.pingTarget": "Ping target (IP address)",
   "settings.pingTarget.error.invalid": "Enter a valid IP address.",
   "settings.close": "Close",
@@ -171,6 +173,12 @@
   "settings.latency.warning": "Warning above (ms)",
   "settings.latency.error": "Error above (ms)",
   "settings.latency.invalidOrder": "The warning threshold must be lower than the error threshold.",
+
+  "settings.historyRetention.heading": "History retention",
+  "settings.historyRetention.label": "Keep history for",
+  "settings.historyRetention.unit.minutes": "Minutes",
+  "settings.historyRetention.unit.hours": "Hours",
+  "settings.historyRetention.unit.days": "Days",
 
   "settings.endpoint.statusDiagram": "Show as \"server\" in status window",
   "settings.endpoint.statusDiagram.general": "General check",

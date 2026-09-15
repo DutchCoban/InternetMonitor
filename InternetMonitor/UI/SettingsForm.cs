@@ -17,6 +17,7 @@ public sealed class SettingsForm : Form
     private readonly ComboBox _languageCombo;
     private readonly CheckBox _autostartCheckBox;
     private readonly Label _autostartErrorLabel;
+    private readonly CheckBox _showOutagePopupsCheckBox;
     private readonly Label _pingTargetLabel;
     private readonly TextBox _pingTargetTextBox;
     private readonly Label _pingTargetErrorLabel;
@@ -42,6 +43,8 @@ public sealed class SettingsForm : Form
     private readonly NumericUpDown _latencyWarningNumeric;
     private readonly NumericUpDown _latencyErrorNumeric;
     private readonly Label _latencyValidationLabel;
+    private readonly NumericUpDown _historyRetentionNumeric;
+    private readonly ComboBox _historyRetentionUnitCombo;
 
     // Uptime Kuma tab
     private readonly Label _kumaUrlLabel;
@@ -66,6 +69,9 @@ public sealed class SettingsForm : Form
     /// <summary>Raised after the latency Warning/Error thresholds have been validated and saved, so the coordinator can be reconfigured live.</summary>
     public event EventHandler? LatencyThresholdsChanged;
 
+    /// <summary>Raised after the history retention period has been saved, so the coordinator can be reconfigured live.</summary>
+    public event EventHandler? HistoryRetentionChanged;
+
     public SettingsForm(AppSettings settings)
     {
         _settings = settings;
@@ -77,9 +83,9 @@ public sealed class SettingsForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Text = LocalizationManager.Instance.Get("settings.title");
         Icon = TrayIconFactory.AppIcon.Value;
-        ClientSize = new Size(420, 470);
+        ClientSize = new Size(420, 550);
 
-        var tabs = new TabControl { Dock = DockStyle.Top, Height = 410 };
+        var tabs = new TabControl { Dock = DockStyle.Top, Height = 490 };
 
         // ---------------- General tab ----------------
         var generalTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.general"));
@@ -100,10 +106,20 @@ public sealed class SettingsForm : Form
         _autostartCheckBox.CheckedChanged += OnAutostartChanged;
         _autostartErrorLabel = new Label { ForeColor = Color.Firebrick, AutoSize = false, Bounds = new Rectangle(16, 84, 372, 18) };
 
+        _showOutagePopupsCheckBox = new CheckBox
+        {
+            Text = LocalizationManager.Instance.Get("settings.showOutagePopups"),
+            AutoSize = true,
+            Bounds = new Rectangle(16, 112, 372, 24),
+            Checked = settings.ShowOutagePopups,
+        };
+        _showOutagePopupsCheckBox.CheckedChanged += OnShowOutagePopupsChanged;
+
         generalTab.Controls.Add(_languageLabel);
         generalTab.Controls.Add(_languageCombo);
         generalTab.Controls.Add(_autostartCheckBox);
         generalTab.Controls.Add(_autostartErrorLabel);
+        generalTab.Controls.Add(_showOutagePopupsCheckBox);
 
         // ---------------- Ping tab ----------------
         var pingTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.ping"));
@@ -189,6 +205,20 @@ public sealed class SettingsForm : Form
         latencyGroup.Controls.Add(_latencyErrorNumeric);
         latencyGroup.Controls.Add(_latencyValidationLabel);
 
+        var historyGroup = new GroupBox { Text = LocalizationManager.Instance.Get("settings.historyRetention.heading"), Bounds = new Rectangle(16, 386, 372, 76) };
+        var historyRetentionLabel = new Label { Text = LocalizationManager.Instance.Get("settings.historyRetention.label"), Bounds = new Rectangle(12, 28, 130, 22) };
+        _historyRetentionNumeric = new NumericUpDown { Bounds = new Rectangle(148, 26, 70, 24) };
+        _historyRetentionUnitCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Bounds = new Rectangle(226, 26, 120, 24) };
+        _historyRetentionUnitCombo.Items.Add(LocalizationManager.Instance.Get("settings.historyRetention.unit.minutes"));
+        _historyRetentionUnitCombo.Items.Add(LocalizationManager.Instance.Get("settings.historyRetention.unit.hours"));
+        _historyRetentionUnitCombo.Items.Add(LocalizationManager.Instance.Get("settings.historyRetention.unit.days"));
+        InitializeHistoryRetentionControls(settings.HistoryRetentionMinutes);
+        _historyRetentionUnitCombo.SelectedIndexChanged += OnHistoryRetentionUnitChanged;
+        _historyRetentionNumeric.Leave += OnHistoryRetentionChanged;
+        historyGroup.Controls.Add(historyRetentionLabel);
+        historyGroup.Controls.Add(_historyRetentionNumeric);
+        historyGroup.Controls.Add(_historyRetentionUnitCombo);
+
         diagTab.Controls.Add(levelGroup);
         diagTab.Controls.Add(_logSuccessCheckBox);
         diagTab.Controls.Add(_logDetailedCheckBox);
@@ -197,6 +227,7 @@ public sealed class SettingsForm : Form
         diagTab.Controls.Add(maxSizeLabel);
         diagTab.Controls.Add(_maxLogSizeMbNumeric);
         diagTab.Controls.Add(latencyGroup);
+        diagTab.Controls.Add(historyGroup);
 
         // ---------------- Uptime Kuma tab ----------------
         var kumaTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.kuma"));
@@ -237,7 +268,7 @@ public sealed class SettingsForm : Form
         _closeButton = new Button
         {
             Text = LocalizationManager.Instance.Get("settings.close"),
-            Bounds = new Rectangle(320, 426, 90, 28),
+            Bounds = new Rectangle(320, 506, 90, 28),
             DialogResult = DialogResult.OK,
         };
         _closeButton.Click += (_, _) => Close();
@@ -400,6 +431,12 @@ public sealed class SettingsForm : Form
         _autostartErrorLabel.Text = applied ? string.Empty : LocalizationManager.Instance.Get("settings.autostart.error.registry");
     }
 
+    private void OnShowOutagePopupsChanged(object? sender, EventArgs e)
+    {
+        _settings.ShowOutagePopups = _showOutagePopupsCheckBox.Checked;
+        _settings.Save();
+    }
+
     private void OnPingTargetChanged(object? sender, EventArgs e)
     {
         string address = _pingTargetTextBox.Text.Trim();
@@ -430,6 +467,46 @@ public sealed class SettingsForm : Form
         _settings.LatencyErrorThresholdMs = error;
         _settings.Save();
         LatencyThresholdsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Minutes-per-unit for the History retention value+unit picker, indexed to match
+    // _historyRetentionUnitCombo's item order (Minutes, Hours, Days).
+    private static readonly int[] HistoryRetentionUnitMinutes = [1, 60, 1440];
+
+    private void InitializeHistoryRetentionControls(int totalMinutes)
+    {
+        int unitIndex = totalMinutes % 1440 == 0 ? 2 : totalMinutes % 60 == 0 ? 1 : 0;
+        _historyRetentionUnitCombo.SelectedIndex = unitIndex;
+        ApplyHistoryRetentionUnitRange();
+        decimal value = (decimal)totalMinutes / HistoryRetentionUnitMinutes[unitIndex];
+        _historyRetentionNumeric.Value = Math.Clamp(value, _historyRetentionNumeric.Minimum, _historyRetentionNumeric.Maximum);
+    }
+
+    /// <summary>Keeps the numeric field's own range in sync with the selected unit so the control can never represent a value outside AppSettings' 15-minute-to-32-day clamp - no separate validation label needed.</summary>
+    private void ApplyHistoryRetentionUnitRange()
+    {
+        (decimal min, decimal max) = _historyRetentionUnitCombo.SelectedIndex switch
+        {
+            1 => (1m, 768m),    // Hours: 1 hour - 32 days
+            2 => (1m, 32m),     // Days: 1 - 32 days
+            _ => (15m, 46080m), // Minutes: 15 minutes - 32 days
+        };
+        _historyRetentionNumeric.Minimum = min;
+        _historyRetentionNumeric.Maximum = max;
+    }
+
+    private void OnHistoryRetentionUnitChanged(object? sender, EventArgs e)
+    {
+        ApplyHistoryRetentionUnitRange();
+        OnHistoryRetentionChanged(sender, e);
+    }
+
+    private void OnHistoryRetentionChanged(object? sender, EventArgs e)
+    {
+        int unitMinutes = HistoryRetentionUnitMinutes[_historyRetentionUnitCombo.SelectedIndex];
+        _settings.HistoryRetentionMinutes = (int)(_historyRetentionNumeric.Value * unitMinutes); // setter clamps
+        _settings.Save();
+        HistoryRetentionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Returns false if the registry key couldn't be opened for writing, so the caller can surface that instead of silently pretending it worked.</summary>
@@ -490,6 +567,7 @@ public sealed class SettingsForm : Form
         Text = LocalizationManager.Instance.Get("settings.title");
         _languageLabel.Text = LocalizationManager.Instance.Get("settings.language");
         _autostartCheckBox.Text = LocalizationManager.Instance.Get("settings.autostart");
+        _showOutagePopupsCheckBox.Text = LocalizationManager.Instance.Get("settings.showOutagePopups");
         _pingTargetLabel.Text = LocalizationManager.Instance.Get("settings.pingTarget");
         _kumaUrlLabel.Text = LocalizationManager.Instance.Get("settings.kuma.url");
         _kumaIntervalLabel.Text = LocalizationManager.Instance.Get("settings.kuma.interval");
