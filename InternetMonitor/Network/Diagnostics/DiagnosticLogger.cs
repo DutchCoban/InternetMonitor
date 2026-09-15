@@ -60,17 +60,52 @@ public sealed class DiagnosticLogger
         }
     }
 
-    public void LogIncidentOpened(Incident incident) =>
+    public void LogIncidentOpened(Incident incident)
+    {
+        if (_settings.DiagnosticLogLevel == DiagnosticLogLevel.Off)
+        {
+            return;
+        }
+
         WriteLine("ERROR", "Incident", LocalizationManager.Instance.Format("diagnosticLog.incident.opened", incident.Diagnosis), incident.Id, new Dictionary<string, string>
         {
             ["classification"] = incident.Classification.ToString(),
         });
+    }
 
-    public void LogIncidentResolved(Incident incident) =>
+    public void LogIncidentResolved(Incident incident)
+    {
+        if (_settings.DiagnosticLogLevel == DiagnosticLogLevel.Off)
+        {
+            return;
+        }
+
         WriteLine("INFO", "Incident", LocalizationManager.Instance.Format("diagnosticLog.incident.resolved", incident.Duration?.ToString(@"hh\:mm\:ss") ?? "-"), incident.Id, new Dictionary<string, string>
         {
             ["classification"] = incident.Classification.ToString(),
         });
+    }
+
+    /// <summary>Logged at any level except Off, not further gated by Basic/Extended/Full nuance - a speed test is a deliberate, infrequent, information-dense event, not a routine per-cycle check.</summary>
+    public void LogSpeedTestCompleted(SpeedTestResult result, TimeSpan duration)
+    {
+        if (_settings.DiagnosticLogLevel == DiagnosticLogLevel.Off)
+        {
+            return;
+        }
+
+        WriteLine("INFO", "SpeedTest",
+            LocalizationManager.Instance.Format("diagnosticLog.speedTest.completed", result.DownloadMbps.ToString("F1"), result.UploadMbps.ToString("F1")),
+            null,
+            new Dictionary<string, string>
+            {
+                ["downloadMbps"] = result.DownloadMbps.ToString("F1"),
+                ["uploadMbps"] = result.UploadMbps.ToString("F1"),
+                ["pingMs"] = result.PingMs.ToString("F0"),
+                ["jitterMs"] = result.JitterMs.ToString("F0"),
+                ["durationMs"] = duration.TotalMilliseconds.ToString("F0"),
+            });
+    }
 
     private void LogProbeIfNeeded(IProbeResult result, string? incidentId)
     {

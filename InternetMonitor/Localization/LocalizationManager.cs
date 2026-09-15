@@ -14,11 +14,27 @@ namespace InternetMonitor.Localization;
 /// </summary>
 public sealed class LocalizationManager
 {
+    /// <summary>
+    /// Every language the app ships a string table for, in display order (used to populate the
+    /// Settings language picker) - the single place that list is defined, so adding a language
+    /// means adding one entry here plus its embedded &lt;code&gt;.json, not hunting down every
+    /// place a language code is compared or displayed.
+    /// </summary>
+    public static readonly IReadOnlyList<(string Code, string DisplayName)> SupportedLanguages =
+    [
+        ("nl", "Nederlands"),
+        ("en", "English"),
+        ("de", "Deutsch"),
+        ("pl", "Polski"),
+    ];
+
+    private const string DefaultLanguageCode = "nl";
+
     public static LocalizationManager Instance { get; private set; } = null!;
 
     public event EventHandler? LanguageChanged;
 
-    public string CurrentLanguage { get; private set; } = "nl";
+    public string CurrentLanguage { get; private set; } = DefaultLanguageCode;
 
     private Dictionary<string, string> _strings = new();
 
@@ -34,11 +50,15 @@ public sealed class LocalizationManager
 
     public void SetLanguage(string languageCode)
     {
-        CurrentLanguage = languageCode == "en" ? "en" : "nl";
+        CurrentLanguage = SupportedLanguages.Any(l => l.Code == languageCode) ? languageCode : DefaultLanguageCode;
         _strings = LoadLanguageFile(CurrentLanguage);
         AssertKeysMatchInDebug();
         LanguageChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>This language's own display name (e.g. "English", "Deutsch"), for showing in UI without a caller needing to look it up in <see cref="SupportedLanguages"/> itself.</summary>
+    public string CurrentLanguageDisplayName =>
+        SupportedLanguages.FirstOrDefault(l => l.Code == CurrentLanguage).DisplayName ?? CurrentLanguage;
 
     public string Get(string key) => _strings.TryGetValue(key, out string? value) ? value : $"[{key}]";
 
@@ -56,14 +76,21 @@ public sealed class LocalizationManager
     [Conditional("DEBUG")]
     private void AssertKeysMatchInDebug()
     {
-        string other = CurrentLanguage == "nl" ? "en" : "nl";
-        var otherStrings = LoadLanguageFile(other);
-        var missingInOther = _strings.Keys.Except(otherStrings.Keys).ToList();
-        var missingInCurrent = otherStrings.Keys.Except(_strings.Keys).ToList();
-        Debug.Assert(
-            missingInOther.Count == 0 && missingInCurrent.Count == 0,
-            $"Localization key mismatch between nl.json and en.json. " +
-            $"Missing in {other}: {string.Join(", ", missingInOther)}. " +
-            $"Missing in {CurrentLanguage}: {string.Join(", ", missingInCurrent)}.");
+        foreach ((string code, _) in SupportedLanguages)
+        {
+            if (code == CurrentLanguage)
+            {
+                continue;
+            }
+
+            var otherStrings = LoadLanguageFile(code);
+            var missingInOther = _strings.Keys.Except(otherStrings.Keys).ToList();
+            var missingInCurrent = otherStrings.Keys.Except(_strings.Keys).ToList();
+            Debug.Assert(
+                missingInOther.Count == 0 && missingInCurrent.Count == 0,
+                $"Localization key mismatch between {CurrentLanguage}.json and {code}.json. " +
+                $"Missing in {code}: {string.Join(", ", missingInOther)}. " +
+                $"Missing in {CurrentLanguage}: {string.Join(", ", missingInCurrent)}.");
+        }
     }
 }

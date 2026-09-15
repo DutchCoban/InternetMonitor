@@ -16,7 +16,7 @@ public sealed class SparklineControl : Control
 
     private IReadOnlyList<(DateTimeOffset Timestamp, double Value)> _points = [];
     private IReadOnlyList<(DateTimeOffset Start, DateTimeOffset? End)> _outages = [];
-    private string _emptyMessage = "Onvoldoende data";
+    private string _emptyMessage = string.Empty;
 
     public SparklineControl()
     {

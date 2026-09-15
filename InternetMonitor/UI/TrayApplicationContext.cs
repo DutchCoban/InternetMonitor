@@ -1,3 +1,4 @@
+using System.Reflection;
 using InternetMonitor.Configuration;
 using InternetMonitor.Localization;
 using InternetMonitor.Logging;
@@ -21,6 +22,8 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
     private readonly OutagePopupController _popupController = new();
     private readonly SimpleFileLogger _logger = new();
     private readonly UptimeKumaPusher _kumaPusher;
+    private readonly UpdateChecker _updateChecker;
+    private string? _pendingUpdateReleaseUrl;
     private readonly IncidentStore _incidentStore = new();
     private readonly IncidentTracker _incidentTracker;
     private readonly DiagnosticLogger _diagnosticLogger;
@@ -50,13 +53,23 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         _kumaPusher = new UptimeKumaPusher(_logger);
         _kumaPusher.Reconfigure(_settings.KumaPushUrl, _settings.KumaIntervalSeconds);
 
+        Version currentVersion = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
+        _updateChecker = new UpdateChecker(currentVersion);
+        _updateChecker.CheckCompleted += OnUpdateCheckCompleted;
+        if (_settings.CheckForUpdates)
+        {
+            _updateChecker.Start();
+        }
+
         _incidentTracker = new IncidentTracker(_incidentStore);
         _diagnosticLogger = new DiagnosticLogger(_settings);
         _diagnosticsCoordinator = new DiagnosticsCoordinator(_incidentTracker, _diagnosticLogger);
         _diagnosticsCoordinator.UpdateEndpoints(_settings.ApplicationEndpoints);
-        _diagnosticsCoordinator.UpdatePingTarget(_settings.PingTargetAddress);
+        _diagnosticsCoordinator.UpdatePingTargets(_settings.PingTargets);
         _diagnosticsCoordinator.UpdateLatencyThresholds(_settings.LatencyWarningThresholdMs, _settings.LatencyErrorThresholdMs);
         _diagnosticsCoordinator.UpdateHistoryRetention(TimeSpan.FromMinutes(_settings.HistoryRetentionMinutes));
+        _diagnosticsCoordinator.UpdateTimeSyncCheckEnabled(_settings.TimeSyncCheckEnabled);
+        _diagnosticsCoordinator.UpdateSpeedTestAutoRun(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
         _diagnosticsCoordinator.Start();
 
         _currentIcon = TrayIconFactory.Build(ProbeStatus.Unknown);
@@ -68,6 +81,13 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
             ContextMenuStrip = BuildContextMenu(),
         };
         _trayIcon.MouseClick += OnTrayIconMouseClick;
+        _trayIcon.BalloonTipClicked += (_, _) =>
+        {
+            if (_pendingUpdateReleaseUrl is { } url)
+            {
+                OpenUrl(url);
+            }
+        };
 
         _popupController.RecoveredNotificationRequested += (_, _) => ShowRecoveredBalloon();
 
@@ -85,6 +105,7 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         menu.Items.Add(LocalizationManager.Instance.Get("menu.diagnostics"), null, (_, _) => ShowDiagnostics());
         menu.Items.Add(LocalizationManager.Instance.Get("menu.settings"), null, (_, _) => ShowSettings());
         menu.Items.Add(LocalizationManager.Instance.Get("menu.about"), null, (_, _) => ShowAbout());
+        menu.Items.Add(LocalizationManager.Instance.Get("menu.checkForUpdates"), null, OnCheckForUpdatesClicked);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(LocalizationManager.Instance.Get("menu.exit"), null, OnExitClicked);
         return menu;
@@ -149,12 +170,27 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
             _kumaPusher.Reconfigure(_settings.KumaPushUrl, _settings.KumaIntervalSeconds);
         _settingsForm.EndpointsChanged += (_, _) =>
             _diagnosticsCoordinator.UpdateEndpoints(_settings.ApplicationEndpoints);
-        _settingsForm.PingTargetChanged += (_, _) =>
-            _diagnosticsCoordinator.UpdatePingTarget(_settings.PingTargetAddress);
+        _settingsForm.PingTargetsChanged += (_, _) =>
+            _diagnosticsCoordinator.UpdatePingTargets(_settings.PingTargets);
         _settingsForm.LatencyThresholdsChanged += (_, _) =>
             _diagnosticsCoordinator.UpdateLatencyThresholds(_settings.LatencyWarningThresholdMs, _settings.LatencyErrorThresholdMs);
         _settingsForm.HistoryRetentionChanged += (_, _) =>
             _diagnosticsCoordinator.UpdateHistoryRetention(TimeSpan.FromMinutes(_settings.HistoryRetentionMinutes));
+        _settingsForm.TimeSyncCheckEnabledChanged += (_, _) =>
+            _diagnosticsCoordinator.UpdateTimeSyncCheckEnabled(_settings.TimeSyncCheckEnabled);
+        _settingsForm.SpeedTestSettingsChanged += (_, _) =>
+            _diagnosticsCoordinator.UpdateSpeedTestAutoRun(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
+        _settingsForm.CheckForUpdatesChanged += (_, _) =>
+        {
+            if (_settings.CheckForUpdates)
+            {
+                _updateChecker.Start();
+            }
+            else
+            {
+                _updateChecker.Stop();
+            }
+        };
         _settingsForm.FormClosed += (_, _) => _settingsForm = null;
         _settingsForm.Show();
     }
@@ -184,7 +220,7 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
             _currentOutageStartedUtc = null;
         }
 
-        if (_settings.ShowOutagePopups)
+        if (_settings.ShowOutagePopups && !IsWithinQuietHours())
         {
             _popupController.OnStateChanged(e.OldState, e.NewState);
         }
@@ -195,6 +231,24 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         // open, still shows an up-to-15-seconds-stale "everything fine" snapshot. Triggering an
         // immediate diagnostics cycle here keeps the detailed view in step with the fast one.
         _ = RunDiagnosticsCycleSafelyAsync();
+    }
+
+    /// <summary>
+    /// Whether the current local time falls inside the configured quiet-hours window. Handles a
+    /// window that wraps past midnight (e.g. 22:00-06:00): when Start &gt; End, "inside" means
+    /// at-or-after Start OR before End, rather than the usual "between Start and End".
+    /// </summary>
+    private bool IsWithinQuietHours()
+    {
+        if (!_settings.QuietHoursEnabled)
+        {
+            return false;
+        }
+
+        TimeOnly now = TimeOnly.FromDateTime(DateTime.Now);
+        TimeOnly start = _settings.QuietHoursStart;
+        TimeOnly end = _settings.QuietHoursEnd;
+        return start <= end ? now >= start && now < end : now >= start || now < end;
     }
 
     private async Task RunDiagnosticsCycleSafelyAsync()
@@ -232,9 +286,69 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
 
     private void ShowRecoveredBalloon()
     {
+        _pendingUpdateReleaseUrl = null;
         _trayIcon.BalloonTipTitle = LocalizationManager.Instance.Get("outage.recoveredBalloon.title");
         _trayIcon.BalloonTipText = LocalizationManager.Instance.Get("outage.recoveredBalloon.text");
         _trayIcon.ShowBalloonTip(5000);
+    }
+
+    private void OnUpdateCheckCompleted(object? sender, UpdateCheckResult result)
+    {
+        if (!result.IsUpdateAvailable)
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            _pendingUpdateReleaseUrl = result.ReleaseUrl;
+            _trayIcon.BalloonTipTitle = LocalizationManager.Instance.Get("update.available.title");
+            _trayIcon.BalloonTipText = LocalizationManager.Instance.Format("update.available.text", result.LatestVersion ?? "?");
+            _trayIcon.ShowBalloonTip(8000);
+        }, null);
+    }
+
+    /// <summary>
+    /// Manual "Check for updates" from the tray menu - unlike the automatic background check,
+    /// this always gives feedback (found, not found, or couldn't check), since a user who just
+    /// clicked "check" deserves an answer even when there's nothing new to report.
+    /// </summary>
+    private async void OnCheckForUpdatesClicked(object? sender, EventArgs e)
+    {
+        UpdateCheckResult? result = await _updateChecker.CheckOnceAsync(CancellationToken.None).ConfigureAwait(true);
+        string caption = LocalizationManager.Instance.Get("menu.checkForUpdates");
+
+        if (result is null)
+        {
+            MessageBox.Show(LocalizationManager.Instance.Get("update.check.failed"), caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (!result.IsUpdateAvailable)
+        {
+            MessageBox.Show(LocalizationManager.Instance.Get("update.check.upToDate"), caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        DialogResult choice = MessageBox.Show(
+            LocalizationManager.Instance.Format("update.available.text", result.LatestVersion ?? "?"),
+            caption, MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+        if (choice == DialogResult.Yes && result.ReleaseUrl is { } url)
+        {
+            OpenUrl(url);
+        }
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // No default handler registered - nothing we can do here.
+        }
     }
 
     private static string Truncate(string value, int maxLength) =>
@@ -246,6 +360,7 @@ public sealed class TrayApplicationContext : System.Windows.Forms.ApplicationCon
         await _monitor.DisposeAsync();
         await _diagnosticsCoordinator.DisposeAsync();
         await _kumaPusher.DisposeAsync();
+        await _updateChecker.DisposeAsync();
         _popupController.Dispose();
         _currentIcon?.Dispose();
         _trayIcon.ContextMenuStrip?.Dispose();

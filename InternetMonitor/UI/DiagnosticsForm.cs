@@ -60,7 +60,7 @@ public sealed class DiagnosticsForm : Form
         Text = LocalizationManager.Instance.Get("diag.title");
         Icon = TrayIconFactory.AppIcon.Value;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(780, 800);
+        ClientSize = new Size(900, 800);
         MinimumSize = new Size(620, 600);
 
         // --- Header: diagnosis headline + explanation ---
@@ -82,6 +82,22 @@ public sealed class DiagnosticsForm : Form
         toolbarPanel.Controls.Add(_nextCheckLabel);
         toolbarPanel.Controls.Add(_pulse);
         toolbarPanel.Controls.Add(checkNowButton);
+
+        var tracerouteButton = new Button { Text = LocalizationManager.Instance.Get("traceroute.title"), Location = new Point(610, 2), Width = 130 };
+        tracerouteButton.Click += (_, _) =>
+        {
+            using var tracerouteForm = new TracerouteForm(DefaultTracerouteTarget());
+            tracerouteForm.ShowDialog(this);
+        };
+        toolbarPanel.Controls.Add(tracerouteButton);
+
+        var speedTestButton = new Button { Text = LocalizationManager.Instance.Get("speedTest.title"), Location = new Point(750, 2), Width = 130 };
+        speedTestButton.Click += (_, _) =>
+        {
+            using var speedTestForm = new SpeedTestForm(_coordinator);
+            speedTestForm.ShowDialog(this);
+        };
+        toolbarPanel.Controls.Add(speedTestButton);
 
         // --- Logging info panel (bottom) ---
         var logPanel = new Panel { Dock = DockStyle.Bottom, Height = 90, Padding = new Padding(12, 6, 12, 6) };
@@ -105,6 +121,12 @@ public sealed class DiagnosticsForm : Form
         _incidentsLabelFont = new Font(Font.FontFamily, 9f, FontStyle.Bold);
         var incidentsLabel = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Text = LocalizationManager.Instance.Get("diag.incidents"), Font = _incidentsLabelFont };
         var clearIncidentsButtonPanel = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        var uptimeReportButton = new Button { Text = LocalizationManager.Instance.Get("uptimeReport.title"), Width = 140, Height = 22 };
+        uptimeReportButton.Click += (_, _) =>
+        {
+            using var reportForm = new UptimeReportForm(_incidentStore, _settings);
+            reportForm.ShowDialog(this);
+        };
         var clearIncidentsButton = new Button { Text = LocalizationManager.Instance.Get("diag.incidents.clear"), Width = 140, Height = 22 };
         clearIncidentsButton.Click += (_, _) =>
         {
@@ -112,6 +134,7 @@ public sealed class DiagnosticsForm : Form
             RefreshIncidentsList();
             RefreshPingChart();
         };
+        clearIncidentsButtonPanel.Controls.Add(uptimeReportButton);
         clearIncidentsButtonPanel.Controls.Add(clearIncidentsButton);
         incidentsHeaderPanel.Controls.Add(incidentsLabel);
         incidentsHeaderPanel.Controls.Add(clearIncidentsButtonPanel);
@@ -149,8 +172,11 @@ public sealed class DiagnosticsForm : Form
         var clearHistoryButton = new Button { Text = LocalizationManager.Instance.Get("diag.ping.clearHistory"), Width = 140, Height = 22 };
         clearHistoryButton.Click += (_, _) =>
         {
-            _coordinator.ClearPingHistory();
-            RefreshPingChart();
+            if (PrimaryPingTarget is { } primary)
+            {
+                _coordinator.ClearPingHistory(primary.Id);
+                RefreshPingChart();
+            }
         };
         clearHistoryButtonPanel.Controls.Add(clearHistoryButton);
         pingHeaderPanel.Controls.Add(_pingHeaderLabel);
@@ -218,9 +244,22 @@ public sealed class DiagnosticsForm : Form
         }
     }
 
+    /// <summary>
+    /// The always-on quick-glance sparkline (independent of row selection) tracks exactly one
+    /// ping target - the first enabled entry in Settings' Ping tab - rather than every configured
+    /// target, since only one small chart is pinned in this always-visible spot. Every target
+    /// (including this one) is still double-click-able from its own row in the probe table for a
+    /// full, scrollable history - this is purely a "how's the main one doing right now" glance.
+    /// </summary>
+    private PingTargetConfig? PrimaryPingTarget => _settings.PingTargets.FirstOrDefault(t => t.Enabled);
+
+    /// <summary>Pre-fills the traceroute target with whatever's already being watched, so the common case ("why is my primary ping target slow?") needs no typing - falls back to the general internet check's address if no ping target is configured.</summary>
+    private string? DefaultTracerouteTarget() =>
+        PrimaryPingTarget?.Address ?? _coordinator.LatestSnapshot?.Internet.Endpoints.FirstOrDefault()?.Address;
+
     private void OnProbeCompleted(object? sender, ProbeCompletedEventArgs e)
     {
-        if (e.ProbeId != DiagnosticsCoordinator.PingProbeId)
+        if (PrimaryPingTarget is not { } primary || e.ProbeId != DiagnosticsCoordinator.PingProbeId(primary.Id))
         {
             return;
         }
@@ -234,6 +273,14 @@ public sealed class DiagnosticsForm : Form
 
     private void RefreshPingChart()
     {
+        if (PrimaryPingTarget is not { } primary)
+        {
+            _sparkline.SetOutages([]);
+            _sparkline.SetData([], LocalizationManager.Instance.Get("diag.sparkline.noData"));
+            _pingHeaderLabel.Text = LocalizationManager.Instance.Get("diag.ping.noTarget");
+            return;
+        }
+
         DateTimeOffset windowStart = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(15);
 
         // This always-on preview is a fixed, short "how's it doing right now" glance - it always
@@ -241,7 +288,7 @@ public sealed class DiagnosticsForm : Form
         // retention now configurable up to 32 days it must filter down to a bounded recent
         // window itself rather than showing everything GetHistory returns. The full, scrollable
         // history for any check (including this one) is available via double-click.
-        var history = _coordinator.GetHistory(DiagnosticsCoordinator.PingProbeId)
+        var history = _coordinator.GetHistory(DiagnosticsCoordinator.PingProbeId(primary.Id))
             .Where(p => p.Timestamp >= windowStart)
             .ToList();
         var outages = _incidentStore.All
@@ -250,7 +297,7 @@ public sealed class DiagnosticsForm : Form
             .ToList();
         _sparkline.SetOutages(outages);
         _sparkline.SetData(history, LocalizationManager.Instance.Get("diag.sparkline.noData"));
-        _pingHeaderLabel.Text = LocalizationManager.Instance.Format("diag.ping.heading", _settings.PingTargetAddress);
+        _pingHeaderLabel.Text = LocalizationManager.Instance.Format("diag.ping.heading", $"{primary.Name} ({primary.Address})");
     }
 
     private void OnSnapshotUpdated(object? sender, ProbeSnapshot snapshot) =>
@@ -354,13 +401,23 @@ public sealed class DiagnosticsForm : Form
         AddRow(LocalizationManager.Instance.Get("diag.row.network"), snapshot.NetworkInterface);
         AddRow(LocalizationManager.Instance.Get("diag.row.ip"), snapshot.IpAddress);
         AddRow(LocalizationManager.Instance.Get("diag.row.gateway"), snapshot.Gateway);
-        if (_coordinator.LatestPingResult is { } pingResult)
+        foreach (var (config, result) in _coordinator.LatestPingResults)
         {
-            AddRow(LocalizationManager.Instance.Get("diag.row.ping"), pingResult);
+            AddRow(config.Name, result);
+        }
+        if (_coordinator.LatestWifiResult is { } wifiResult)
+        {
+            AddRow(LocalizationManager.Instance.Get("diag.row.wifi"), wifiResult);
+        }
+        if (_coordinator.LatestSpeedTestResults is { } speedTest)
+        {
+            AddRow(LocalizationManager.Instance.Get("diag.row.speedTestDownload"), speedTest.Download);
+            AddRow(LocalizationManager.Instance.Get("diag.row.speedTestUpload"), speedTest.Upload);
         }
         foreach (PingEndpointResult ep in snapshot.Internet.Endpoints)
         {
-            var item = new ListViewItem([ep.Address, ep.Reachable ? "OK" : "ERROR", ep.Address, ep.Reachable ? $"{ep.LatencyMs:F0} ms" : "-"])
+            string reachableText = ep.Reachable ? LocalizationManager.Instance.Get("status.ok") : LocalizationManager.Instance.Get("status.timeout");
+            var item = new ListViewItem([ep.Address, reachableText, ep.Address, ep.Reachable ? $"{ep.LatencyMs:F0} ms" : "-"])
             {
                 Tag = new Dictionary<string, string>
                 {
@@ -405,7 +462,7 @@ public sealed class DiagnosticsForm : Form
 
     private void AddRow(string name, IProbeResult result)
     {
-        var item = new ListViewItem([name, result.Status.ToString(), result.Summary, $"{result.Duration.TotalMilliseconds:F0} ms"])
+        var item = new ListViewItem([name, result.Status.Localize(), result.Summary, $"{result.Duration.TotalMilliseconds:F0} ms"])
         {
             Tag = result,
         };
@@ -430,21 +487,12 @@ public sealed class DiagnosticsForm : Form
         }
 
         object tag = _probeListView.SelectedItems[0].Tag!;
-        IReadOnlyDictionary<string, string> details = tag switch
+        _detailsTextBox.Text = tag switch
         {
-            IProbeResult r => r.ToDetails(),
-            Dictionary<string, string> d => d,
-            _ => new Dictionary<string, string>(),
+            IProbeResult r => ProbeDetailsFormatter.Format(r),
+            Dictionary<string, string> d => string.Join(Environment.NewLine, d.Select(kv => $"{kv.Key}: {kv.Value}")),
+            _ => string.Empty,
         };
-
-        string? errorDetail = (tag as IProbeResult)?.ErrorDetail;
-        var lines = details.Select(kv => $"{kv.Key}: {kv.Value}").ToList();
-        if (!string.IsNullOrEmpty(errorDetail))
-        {
-            lines.Add($"Error: {errorDetail}");
-        }
-
-        _detailsTextBox.Text = string.Join(Environment.NewLine, lines);
     }
 
     /// <summary>
@@ -466,18 +514,37 @@ public sealed class DiagnosticsForm : Form
         string historyKey;
         string triggerProbeId;
         string valueUnitLabel;
+        string? initialDetailsText;
+        bool detailsLiveUpdate;
 
         if (item.Tag is Dictionary<string, string> d && d.TryGetValue("Address", out string? address))
         {
             historyKey = $"internet:{address}";
             triggerProbeId = "internet";
             valueUnitLabel = "ms";
+            // "internet" is the aggregate probe id shared by all three public-IP endpoints, so a
+            // ProbeCompleted for it doesn't carry this specific endpoint's own data - shown once,
+            // not kept live (it's also just address+latency, both already visible in the chart).
+            initialDetailsText = string.Join(Environment.NewLine, d.Select(kv => $"{kv.Key}: {kv.Value}"));
+            detailsLiveUpdate = false;
         }
         else if (item.Tag is IProbeResult result)
         {
             historyKey = result.ProbeId;
             triggerProbeId = result.ProbeId;
-            valueUnitLabel = result is TimeSyncProbeResult ? "s" : "ms";
+            // Most charted probes report a latency in milliseconds, but not all - TimeSync's
+            // ChartValue is a clock offset in seconds, WifiSignalProbe's is a 0-100 signal
+            // quality percentage, and SpeedTestProbeResult's is a throughput in Mbps - none of
+            // those are a duration.
+            valueUnitLabel = result switch
+            {
+                TimeSyncProbeResult => "s",
+                WifiSignalProbeResult => "%",
+                SpeedTestProbeResult => "Mbps",
+                _ => "ms",
+            };
+            initialDetailsText = ProbeDetailsFormatter.Format(result);
+            detailsLiveUpdate = true;
         }
         else
         {
@@ -490,7 +557,7 @@ public sealed class DiagnosticsForm : Form
             return;
         }
 
-        var detailForm = new ProbeHistoryDetailForm(_coordinator, _incidentStore, historyKey, triggerProbeId, displayName, valueUnitLabel);
+        var detailForm = new ProbeHistoryDetailForm(_coordinator, _incidentStore, historyKey, triggerProbeId, displayName, valueUnitLabel, initialDetailsText, detailsLiveUpdate);
         detailForm.FormClosed += (_, _) => _openHistoryWindows.Remove(historyKey);
         _openHistoryWindows[historyKey] = detailForm;
         detailForm.Show(this);
@@ -503,7 +570,7 @@ public sealed class DiagnosticsForm : Form
         foreach (Incident incident in _incidentStore.All.OrderByDescending(i => i.StartUtc))
         {
             string duration = incident.Duration is { } d ? d.ToString(@"hh\:mm\:ss") : "-";
-            var item = new ListViewItem([incident.Id, incident.StartUtc.ToLocalTime().ToString("HH:mm:ss"), duration, incident.Classification.ToString(), incident.Status.ToString()])
+            var item = new ListViewItem([incident.Id, incident.StartUtc.ToLocalTime().ToString("HH:mm:ss"), duration, incident.Classification.Localize(), incident.Status.Localize()])
             {
                 Tag = incident,
             };

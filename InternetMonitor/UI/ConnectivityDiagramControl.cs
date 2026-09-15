@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using InternetMonitor.Localization;
 
 namespace InternetMonitor.UI;
 
@@ -38,6 +39,14 @@ public sealed class ConnectivityDiagramControl : Control
     private readonly Brush _warningReasonBrush = new SolidBrush(Color.DarkOrange);
     private readonly Brush _errorReasonBrush = new SolidBrush(Color.Firebrick);
 
+    // Fetched once at construction rather than on every OnPaint - this control is recreated
+    // fresh each time the status popup opens (same lifecycle as every other form/control this
+    // session), so a language switch is picked up the next time it's shown, consistent with how
+    // this app already handles language changes elsewhere.
+    private readonly string _computerLabel = LocalizationManager.Instance.Get("status.diagram.computer");
+    private readonly string _routerLabel = LocalizationManager.Instance.Get("status.diagram.router");
+    private readonly string _internetLabel = LocalizationManager.Instance.Get("status.diagram.internet");
+
     private SegmentHealth _computer = SegmentHealth.Unknown;
     private SegmentHealth _computerRouter = SegmentHealth.Unknown;
     private SegmentHealth _router = SegmentHealth.Unknown;
@@ -45,7 +54,7 @@ public sealed class ConnectivityDiagramControl : Control
     private SegmentHealth _internet = SegmentHealth.Unknown;
     private SegmentHealth _cloudServer = SegmentHealth.Unknown;
     private SegmentHealth _server = SegmentHealth.Unknown;
-    private string _serverLabel = "Server";
+    private string _serverLabel = LocalizationManager.Instance.Get("status.diagram.server");
     private string? _reasonHeadline;
 
     public ConnectivityDiagramControl()
@@ -138,9 +147,9 @@ public sealed class ConnectivityDiagramControl : Control
             DrawNodeBrokenBadge(g, serverRect);
         }
 
-        DrawCenteredLabel(g, "Computer", computerRect, _labelFont, _labelBrush);
-        DrawCenteredLabel(g, "Router", routerRect, _labelFont, _labelBrush);
-        DrawCenteredLabel(g, "Internet", cloudRect, _labelFont, _labelBrush);
+        DrawCenteredLabel(g, _computerLabel, computerRect, _labelFont, _labelBrush);
+        DrawCenteredLabel(g, _routerLabel, routerRect, _labelFont, _labelBrush);
+        DrawCenteredLabel(g, _internetLabel, cloudRect, _labelFont, _labelBrush);
         DrawCenteredLabel(g, _serverLabel, serverRect, _labelFont, _labelBrush);
 
         if (_reasonHeadline is not null)

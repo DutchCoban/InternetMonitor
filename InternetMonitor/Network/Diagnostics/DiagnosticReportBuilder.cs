@@ -24,18 +24,18 @@ public static class DiagnosticReportBuilder
         sb.AppendLine();
 
         sb.AppendLine(loc.Get("report.gateway"));
-        sb.AppendLine($"  {snapshot.Gateway.GatewayAddress ?? "-"}: {snapshot.Gateway.Status} ({snapshot.Gateway.Summary})");
+        sb.AppendLine($"  {snapshot.Gateway.GatewayAddress ?? "-"}: {snapshot.Gateway.Status.Localize()} ({snapshot.Gateway.Summary})");
         sb.AppendLine();
 
         sb.AppendLine(loc.Get("report.externalConnectivity"));
         foreach (PingEndpointResult ep in snapshot.Internet.Endpoints)
         {
-            sb.AppendLine(ep.Reachable ? $"  {ep.Address}: OK ({ep.LatencyMs:F0} ms)" : $"  {ep.Address}: TIMEOUT");
+            sb.AppendLine(ep.Reachable ? $"  {ep.Address}: {loc.Get("status.ok")} ({ep.LatencyMs:F0} ms)" : $"  {ep.Address}: {loc.Get("status.timeout")}");
         }
         sb.AppendLine();
 
         sb.AppendLine(loc.Get("report.dns"));
-        sb.AppendLine($"  {snapshot.Dns.Hostname}: {snapshot.Dns.Status} ({snapshot.Dns.Summary})");
+        sb.AppendLine($"  {snapshot.Dns.Hostname}: {snapshot.Dns.Status.Localize()} ({snapshot.Dns.Summary})");
         sb.AppendLine();
 
         sb.AppendLine(loc.Get("report.https"));
@@ -68,8 +68,8 @@ public static class DiagnosticReportBuilder
         LocalizationManager loc = LocalizationManager.Instance;
         var sb = new StringBuilder();
         sb.AppendLine(incident.Id);
-        sb.AppendLine($"{loc.Get("report.incident.status")} {incident.Status}");
-        sb.AppendLine($"{loc.Get("report.incident.type")} {incident.Classification}");
+        sb.AppendLine($"{loc.Get("report.incident.status")} {incident.Status.Localize()}");
+        sb.AppendLine($"{loc.Get("report.incident.type")} {incident.Classification.Localize()}");
         sb.AppendLine(loc.Format("report.incident.start", incident.StartUtc.ToString("yyyy-MM-dd HH:mm:ss")));
         sb.AppendLine(incident.EndUtc is { } end
             ? loc.Format("report.incident.end", end.ToString("yyyy-MM-dd HH:mm:ss"))

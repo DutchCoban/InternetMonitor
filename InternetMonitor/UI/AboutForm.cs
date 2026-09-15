@@ -54,7 +54,7 @@ public sealed class AboutForm : Form
 
         var languageLabel = new Label
         {
-            Text = LocalizationManager.Instance.Format("about.language", LocalizationManager.Instance.CurrentLanguage == "en" ? "English" : "Nederlands"),
+            Text = LocalizationManager.Instance.Format("about.language", LocalizationManager.Instance.CurrentLanguageDisplayName),
             AutoSize = false,
             Bounds = new Rectangle(16, 104, 270, 20),
         };
