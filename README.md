@@ -32,6 +32,19 @@ specifically compares ping results against HTTPS results: if ping fails but HTTP
 reports "internet available, ICMP possibly filtered" rather than claiming the connection is
 down.
 
+Three more things show up as extra rows on the Diagnostics screen whenever they apply:
+
+- **Ping targets** - Settings → Ping lets you name and add as many continuous ping targets as you
+  want (each gets its own 1-second-cadence latency graph, independent of the main cycle), instead
+  of a single fixed target.
+- **Wi-Fi signal** - when the active adapter is wireless, a row shows SSID, BSSID, signal quality,
+  link speed, and PHY type (802.11a/b/g/n/ac/ax), queried via the native Windows WLAN API as part
+  of the main cycle. This row is absent entirely on a wired connection.
+- **Speed Test** - download/upload throughput via a public [LibreSpeed](https://librespeed.org/)
+  server. Always available as a manual "Run" from the Diagnostics screen; optionally also runs
+  automatically on a 1/2/4/8/12/24-hour interval, configured on its own Settings tab. Either way,
+  the result becomes a normal chartable row and is written to the diagnostic log.
+
 ## Two screens
 
 - **Status** (left-click the tray icon): a simple green/red/amber overview for end users - is
@@ -40,7 +53,12 @@ down.
   probe's raw measurements (latency, resolved IPs, HTTP status codes, TLS timings, exact error
   text), the derived diagnosis, incident history, and diagnostic-log status. Includes a
   "Check now" button and a "Copy diagnostics" button that generates a plain-text report suitable
-  for pasting into a support ticket.
+  for pasting into a support ticket. A "Traceroute" button opens a live-filling hop list for
+  whichever address you point it at.
+
+Double-click any row on the Diagnostics screen to open a scrollable, zoomable history chart for
+that check - mouse wheel to zoom, drag to pan, hover a point for its exact time and value. History
+persists across restarts, with a configurable retention from 15 minutes up to 32 days.
 
 ## Incidents
 
@@ -50,6 +68,14 @@ is grouped into a single **incident** with a unique ID (`INC-yyyyMMdd-####`), a 
 FirewallSuspected), a start/end time, and a snapshot of every probe's result at the start and at
 resolution. Incidents are listed and browsable from the Diagnostics screen, independent of
 whatever diagnostic logging level is configured.
+
+## Uptime report
+
+Settings → Uptime Report lets you choose exactly which infrastructure-level checks and which
+configured application endpoints count toward an uptime percentage, then view it (with downtime
+and incident count) for the last 7/30/90 days via the "Uptime report" button on the Diagnostics
+screen. Excluded items are opted out explicitly, so anything newly added - a classification or an
+endpoint - is included by default rather than silently missing until you remember to opt it in.
 
 ## Diagnostic logging
 
@@ -91,6 +117,19 @@ connectivity check, matching how Uptime Kuma push monitors are normally used. Of
 See the [Uptime Kuma project](https://github.com/louislam/uptime-kuma) for what it is and how to
 set up a push monitor to get a URL from.
 
+## Other settings
+
+- **Quiet hours** (General) - suppress the outage pop-up and "back online" balloon during a
+  configured daily time window. The tray icon, status window, and incident log keep reflecting
+  the real state regardless; only the interruptive notification is silenced.
+- **Check for updates** (General) - checks GitHub for a newer release once a day by default
+  (configurable), plus a manual "Check for updates" in the tray menu - both open the release page
+  directly. Off means zero outbound calls for this feature.
+- **Export/Import** (bottom of the Settings window) - back up the current configuration to a JSON
+  file, or load one back in. Applied live, no restart needed.
+- **Language** (General) - English, Dutch, German, or Polish. Switching takes effect immediately
+  across the whole app, including an already-open Settings window.
+
 ## Project structure
 
 For a new contributor, the call chain from startup to a diagnosis on screen is:
@@ -114,9 +153,22 @@ For a new contributor, the call chain from startup to a diagnosis on screen is:
   `UI/DiagnosticsForm.cs` render the result - both marshal background-thread events onto the UI
   thread via `SynchronizationContext`, guarding every continuation with an `IsDisposed` check.
 
+Besides the main 15-second cycle, `DiagnosticsCoordinator` also owns three independent loops with
+their own cadence and their own live-reconfigure `Update*` methods, each following the same
+plain-`Task.Delay`-plus-cancellation-token shape: a 1-second ping loop
+(`Network/Probes/PingLatencyProbe.cs`, one per configured `PingTargetConfig`), an hourly NTP
+time-sync check, and an interval-based automatic Speed Test loop (`Network/SpeedTestClient.cs`).
+Wi-Fi signal info (`Network/WifiInfo.cs`, a native `wlanapi.dll` wrapper) is queried as part of
+the main cycle itself, conditionally, only when the active adapter is wireless; traceroute
+(`Network/Traceroute.cs`, TTL-increment ICMP) is the one genuinely on-demand tool, triggered only
+by its button. Speed test and Wi-Fi results are wrapped into normal `IProbeResult`s
+(`Network/Probes/ProbeDetailsFormatter.cs` / `Network/StatusLocalization.cs` format them for
+display) purely so they can reuse the same history/charting machinery as every core probe.
+
 All user-facing text (including diagnosis headlines/explanations) goes through
-`Localization/LocalizationManager.cs`, loading `Localization/en.json` / `nl.json`; there is no
-hardcoded UI language anywhere in the probe/diagnosis layer.
+`Localization/LocalizationManager.cs`, loading `Localization/{en,nl,de,pl}.json` - four languages,
+switchable live from Settings; there is no hardcoded UI language anywhere in the probe/diagnosis
+layer.
 
 ## Building and running
 
@@ -143,6 +195,7 @@ cold start is an easy trade for a tray app that starts once and runs for days.
 - Settings: `%AppData%\InternetMonitor\settings.json`
 - Diagnostic log: `%AppData%\InternetMonitor\logs\diagnostics.log` (+ rotated `.log.1`, `.log.2`, ...)
 - Incident history: `%AppData%\InternetMonitor\incidents.json`
+- Per-check history (the double-click charts): `%AppData%\InternetMonitor\history\`
 - Simple outage log: `%AppData%\InternetMonitor\logs\log.txt`
 
 None of these live inside the application directory, so the app itself can be replaced/updated
@@ -180,6 +233,16 @@ without touching configuration or history.
   off for such endpoints. The Uptime Kuma push URL is handled separately and is never logged.
 - **TLS validation is never bypassed.** The HTTPS probe (`Network/Probes/HttpsEndpointProbe.cs`)
   uses .NET's default certificate validation with no custom callback, on every request.
+- **Speed Test moves real data to a third-party server.** Unlike every other check, a speed test
+  (manual or automatic) transfers real download/upload traffic to a public
+  [LibreSpeed](https://librespeed.org/) server, not just small probe packets. It never runs
+  unless a manual "Run" is clicked or automatic runs are explicitly turned on in Settings, and
+  automatic runs are capped to an interval of at least 1 hour.
+- **Reading the Wi-Fi SSID ties into Windows' Location privacy setting.** The Wi-Fi signal check
+  queries the native WLAN API for the connected network's SSID/BSSID; Windows treats SSID
+  visibility as location-adjacent for any process, regardless of intent, so this may show up
+  under Settings → Privacy → Location on Windows even though the app never calls any location
+  API itself. If Location is off, the SSID may come back blank rather than the check failing.
 - The app runs unelevated (`asInvoker`, see `app.manifest`) and only ever talks outbound over
   the network - it opens no listening ports and requires no special permissions.
 
