@@ -26,7 +26,14 @@ public sealed class ProbeHistory : IAsyncDisposable
 
     private readonly string _historyDir;
     private readonly object _lock = new();
-    private readonly Dictionary<string, List<(DateTimeOffset Timestamp, double Value)>> _byProbe = new();
+
+    // Metadata is an optional, opaque (as far as this class is concerned) third field - null for
+    // every probe except Wi-Fi signal, which uses it to remember each point's own SSID/BSSID/
+    // link speed (see WifiHistoryPointMetadata) so a history chart can show what was actually true
+    // at that point in time, not just whatever's current right now. Kept as a plain string (not a
+    // richer type) so this class doesn't need to know or care what it means - Record/Get's
+    // existing 2-field overloads (used by every other probe) are untouched by this.
+    private readonly Dictionary<string, List<(DateTimeOffset Timestamp, double Value, string? Metadata)>> _byProbe = new();
     private readonly Dictionary<string, DateTimeOffset> _lastFlushedTimestamp = new();
     private TimeSpan _window = DefaultWindow;
 
@@ -51,25 +58,32 @@ public sealed class ProbeHistory : IAsyncDisposable
         }
     }
 
-    public void Record(string probeId, DateTimeOffset timestamp, double value)
+    public void Record(string probeId, DateTimeOffset timestamp, double value) => Record(probeId, timestamp, value, null);
+
+    /// <summary>Same as the 3-arg overload, but also stashes an opaque per-point metadata string - see the field-level comment on <see cref="_byProbe"/>.</summary>
+    public void Record(string probeId, DateTimeOffset timestamp, double value, string? metadata)
     {
         lock (_lock)
         {
-            if (!_byProbe.TryGetValue(probeId, out List<(DateTimeOffset Timestamp, double Value)>? list))
+            if (!_byProbe.TryGetValue(probeId, out List<(DateTimeOffset Timestamp, double Value, string? Metadata)>? list))
             {
                 list = [];
                 _byProbe[probeId] = list;
             }
 
-            list.Add((timestamp, value));
+            list.Add((timestamp, value, metadata));
         }
     }
 
-    public IReadOnlyList<(DateTimeOffset Timestamp, double Value)> Get(string probeId)
+    public IReadOnlyList<(DateTimeOffset Timestamp, double Value)> Get(string probeId) =>
+        GetWithMetadata(probeId).Select(p => (p.Timestamp, p.Value)).ToList();
+
+    /// <summary>Same as <see cref="Get"/>, but also returns each point's metadata string (null for every probe that never recorded any).</summary>
+    public IReadOnlyList<(DateTimeOffset Timestamp, double Value, string? Metadata)> GetWithMetadata(string probeId)
     {
         lock (_lock)
         {
-            return _byProbe.TryGetValue(probeId, out List<(DateTimeOffset Timestamp, double Value)>? list)
+            return _byProbe.TryGetValue(probeId, out List<(DateTimeOffset Timestamp, double Value, string? Metadata)>? list)
                 ? list.ToList()
                 : [];
         }
@@ -112,7 +126,7 @@ public sealed class ProbeHistory : IAsyncDisposable
         foreach (string file in files)
         {
             string probeId = Uri.UnescapeDataString(Path.GetFileNameWithoutExtension(file));
-            List<(DateTimeOffset Timestamp, double Value)> diskPoints;
+            List<(DateTimeOffset Timestamp, double Value, string? Metadata)> diskPoints;
             try
             {
                 diskPoints = await ReadAndCompactAsync(file).ConfigureAwait(false);
@@ -124,7 +138,7 @@ public sealed class ProbeHistory : IAsyncDisposable
 
             lock (_lock)
             {
-                if (_byProbe.TryGetValue(probeId, out List<(DateTimeOffset Timestamp, double Value)>? existing))
+                if (_byProbe.TryGetValue(probeId, out List<(DateTimeOffset Timestamp, double Value, string? Metadata)>? existing))
                 {
                     // Record() may already have appended fresh points for this probe while this
                     // file was being read. Disk points were all flushed by a *previous* run,
@@ -150,33 +164,42 @@ public sealed class ProbeHistory : IAsyncDisposable
     /// session are never individually re-checked against the window on disk), self-correcting on
     /// the next one.
     /// </summary>
-    private async Task<List<(DateTimeOffset Timestamp, double Value)>> ReadAndCompactAsync(string path)
+    private async Task<List<(DateTimeOffset Timestamp, double Value, string? Metadata)>> ReadAndCompactAsync(string path)
     {
         string[] lines = await File.ReadAllLinesAsync(path).ConfigureAwait(false);
         DateTimeOffset cutoff = DateTimeOffset.UtcNow - _window;
-        var points = new List<(DateTimeOffset Timestamp, double Value)>(lines.Length);
+        var points = new List<(DateTimeOffset Timestamp, double Value, string? Metadata)>(lines.Length);
         foreach (string line in lines)
         {
-            int comma = line.IndexOf(',');
-            if (comma < 0)
+            int firstComma = line.IndexOf(',');
+            if (firstComma < 0)
             {
                 continue;
             }
 
-            if (!long.TryParse(line.AsSpan(0, comma), out long ticks))
+            if (!long.TryParse(line.AsSpan(0, firstComma), out long ticks))
             {
                 continue;
             }
 
-            if (!double.TryParse(line.AsSpan(comma + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+            // An optional third field (Wi-Fi's per-point SSID/BSSID/link speed metadata) can
+            // follow a second comma - every other probe's lines only ever have the first, so this
+            // stays backward compatible with every existing history file with zero migration.
+            int secondComma = line.IndexOf(',', firstComma + 1);
+            ReadOnlySpan<char> valueSpan = secondComma < 0
+                ? line.AsSpan(firstComma + 1)
+                : line.AsSpan(firstComma + 1, secondComma - firstComma - 1);
+            if (!double.TryParse(valueSpan, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
             {
                 continue;
             }
+
+            string? metadata = secondComma < 0 ? null : line[(secondComma + 1)..];
 
             var timestamp = new DateTimeOffset(ticks, TimeSpan.Zero);
             if (timestamp >= cutoff)
             {
-                points.Add((timestamp, value));
+                points.Add((timestamp, value, metadata));
             }
         }
 
@@ -214,11 +237,11 @@ public sealed class ProbeHistory : IAsyncDisposable
 
     private async Task FlushOnceAsync()
     {
-        var toFlush = new List<(string ProbeId, List<(DateTimeOffset Timestamp, double Value)> NewPoints)>();
+        var toFlush = new List<(string ProbeId, List<(DateTimeOffset Timestamp, double Value, string? Metadata)> NewPoints)>();
         lock (_lock)
         {
             DateTimeOffset cutoff = DateTimeOffset.UtcNow - _window;
-            foreach ((string probeId, List<(DateTimeOffset Timestamp, double Value)> list) in _byProbe)
+            foreach ((string probeId, List<(DateTimeOffset Timestamp, double Value, string? Metadata)> list) in _byProbe)
             {
                 DateTimeOffset since = _lastFlushedTimestamp.GetValueOrDefault(probeId, DateTimeOffset.MinValue);
                 int firstNew = list.FindIndex(p => p.Timestamp > since);
@@ -231,7 +254,7 @@ public sealed class ProbeHistory : IAsyncDisposable
             }
         }
 
-        foreach ((string probeId, List<(DateTimeOffset Timestamp, double Value)> newPoints) in toFlush)
+        foreach ((string probeId, List<(DateTimeOffset Timestamp, double Value, string? Metadata)> newPoints) in toFlush)
         {
             try
             {
@@ -249,17 +272,19 @@ public sealed class ProbeHistory : IAsyncDisposable
         }
     }
 
-    private async Task AppendAsync(string path, List<(DateTimeOffset Timestamp, double Value)> points)
+    private async Task AppendAsync(string path, List<(DateTimeOffset Timestamp, double Value, string? Metadata)> points)
     {
         Directory.CreateDirectory(_historyDir);
         await File.AppendAllLinesAsync(path, ToLines(points)).ConfigureAwait(false);
     }
 
-    private static Task WriteAllAsync(string path, List<(DateTimeOffset Timestamp, double Value)> points) =>
+    private static Task WriteAllAsync(string path, List<(DateTimeOffset Timestamp, double Value, string? Metadata)> points) =>
         File.WriteAllLinesAsync(path, ToLines(points));
 
-    private static IEnumerable<string> ToLines(List<(DateTimeOffset Timestamp, double Value)> points) =>
-        points.Select(p => $"{p.Timestamp.UtcTicks},{p.Value.ToString(CultureInfo.InvariantCulture)}");
+    private static IEnumerable<string> ToLines(List<(DateTimeOffset Timestamp, double Value, string? Metadata)> points) =>
+        points.Select(p => p.Metadata is { } metadata
+            ? $"{p.Timestamp.UtcTicks},{p.Value.ToString(CultureInfo.InvariantCulture)},{metadata}"
+            : $"{p.Timestamp.UtcTicks},{p.Value.ToString(CultureInfo.InvariantCulture)}");
 
     public async ValueTask DisposeAsync()
     {

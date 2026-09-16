@@ -9,6 +9,7 @@ public sealed class TextReportForm : Form
 
     public TextReportForm(string title, string content)
     {
+        AutoScaleMode = AutoScaleMode.Dpi;
         Text = title;
         Icon = TrayIconFactory.AppIcon.Value;
         StartPosition = FormStartPosition.CenterScreen;

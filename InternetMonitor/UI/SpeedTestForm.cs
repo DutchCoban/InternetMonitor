@@ -24,6 +24,7 @@ public sealed class SpeedTestForm : Form
     public SpeedTestForm(DiagnosticsCoordinator coordinator)
     {
         _coordinator = coordinator;
+        AutoScaleMode = AutoScaleMode.Dpi;
         Text = LocalizationManager.Instance.Get("speedTest.title");
         Icon = TrayIconFactory.AppIcon.Value;
         FormBorderStyle = FormBorderStyle.FixedDialog;

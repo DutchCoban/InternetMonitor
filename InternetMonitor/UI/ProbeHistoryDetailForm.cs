@@ -21,10 +21,18 @@ public sealed class ProbeHistoryDetailForm : Form
     private readonly string _valueUnitLabel;
     private readonly bool _detailsLiveUpdate;
 
+    // IP-address is a string, not a number - charting it (even as some hashed/encoded fake value)
+    // would be meaningless to read, so it gets a second display mode: a plain change log instead
+    // of the chart every other probe uses. Both _chart and _changeLogListView are always
+    // constructed regardless of mode (simpler than making every method that touches one of them
+    // nullable-aware) - only the one this instance actually needs is added to _historyPanel.
+    private readonly bool _isChangeLog;
+
     private readonly TextBox _detailsTextBox;
     private readonly Font _detailsFont;
     private readonly Panel _historyPanel;
     private readonly HistoryChartControl _chart;
+    private readonly ListView _changeLogListView;
 
     /// <param name="initialDetailsText">
     /// The selected row's details (SSID/BSSID/link speed, target address, etc. - whatever
@@ -54,9 +62,11 @@ public sealed class ProbeHistoryDetailForm : Form
         _triggerProbeId = triggerProbeId;
         _valueUnitLabel = valueUnitLabel;
         _detailsLiveUpdate = detailsLiveUpdate;
+        _isChangeLog = triggerProbeId == "ip";
         _uiContext = SynchronizationContext.Current
             ?? throw new InvalidOperationException("ProbeHistoryDetailForm must be constructed on the UI thread.");
 
+        AutoScaleMode = AutoScaleMode.Dpi;
         Text = $"{displayName} — {LocalizationManager.Instance.Get("history.detail.titleSuffix")}";
         Icon = TrayIconFactory.AppIcon.Value;
         StartPosition = FormStartPosition.CenterScreen;
@@ -82,14 +92,32 @@ public sealed class ProbeHistoryDetailForm : Form
             Size = new Size(600, 300),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,
         };
-        _historyPanel.Controls.Add(_chart);
-        _historyPanel.Resize += (_, _) => _chart.NotifyViewportResized();
+        _changeLogListView = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            GridLines = true,
+        };
+        _changeLogListView.Columns.Add(LocalizationManager.Instance.Get("history.changeLog.time"), 160);
+        _changeLogListView.Columns.Add(LocalizationManager.Instance.Get("history.changeLog.ipAddress"), 200);
+
+        if (_isChangeLog)
+        {
+            _historyPanel.Controls.Add(_changeLogListView);
+        }
+        else
+        {
+            _historyPanel.Controls.Add(_chart);
+            _historyPanel.Resize += (_, _) => _chart.NotifyViewportResized();
+        }
+
         Controls.Add(_historyPanel);
         Controls.Add(_detailsTextBox);
 
         // Deferred to Load rather than done here: before the form/panel handle exists,
         // _historyPanel.ClientSize can still read 0,0, which would compute a wrong initial zoom.
-        Load += (_, _) => RefreshChart();
+        Load += (_, _) => RefreshHistory();
 
         _coordinator.ProbeCompleted += OnProbeCompleted;
         FormClosed += (_, _) => _coordinator.ProbeCompleted -= OnProbeCompleted;
@@ -105,12 +133,63 @@ public sealed class ProbeHistoryDetailForm : Form
         _uiContext.Post(_ =>
         {
             if (IsDisposed) return;
-            RefreshChart();
+            RefreshHistory();
             if (_detailsLiveUpdate)
             {
                 _detailsTextBox.Text = ProbeDetailsFormatter.Format(e.Result);
             }
         }, null);
+    }
+
+    private void RefreshHistory()
+    {
+        if (_isChangeLog)
+        {
+            RefreshChangeLog();
+        }
+        else
+        {
+            RefreshChart();
+        }
+    }
+
+    private void RefreshChangeLog()
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        var points = _coordinator.GetHistoryWithMetadata(_historyKey);
+
+        // Only keep entries whose value actually differs from the previous *kept* entry, so a
+        // value that changes away and later back to an earlier one still shows both transitions
+        // rather than collapsing across the gap.
+        var changes = new List<(DateTimeOffset Timestamp, string? Address)>();
+        string? previousAddress = null;
+        foreach (var point in points)
+        {
+            if (point.Metadata != previousAddress)
+            {
+                changes.Add((point.Timestamp, point.Metadata));
+                previousAddress = point.Metadata;
+            }
+        }
+
+        _changeLogListView.BeginUpdate();
+        _changeLogListView.Items.Clear();
+        if (changes.Count == 0)
+        {
+            _changeLogListView.Items.Add(new ListViewItem([LocalizationManager.Instance.Get("history.changeLog.noData"), string.Empty]));
+        }
+        else
+        {
+            foreach (var change in changes.AsEnumerable().Reverse())
+            {
+                _changeLogListView.Items.Add(new ListViewItem([change.Timestamp.LocalDateTime.ToString("g"), change.Address ?? string.Empty]));
+            }
+        }
+        _changeLogListView.EndUpdate();
     }
 
     private void RefreshChart()
@@ -120,10 +199,53 @@ public sealed class ProbeHistoryDetailForm : Form
             return;
         }
 
-        var history = _coordinator.GetHistory(_historyKey);
         var outages = _incidentStore.All.Select(i => (i.StartUtc, i.EndUtc)).ToList();
         _chart.SetOutages(outages);
-        _chart.SetData(history, _valueUnitLabel, LocalizationManager.Instance.Get("diag.sparkline.noData"));
+
+        // Time sync checks only run once an hour (see TimeSyncProbe.Id == "time" /
+        // DiagnosticsCoordinator's TimeSyncInterval) - a generic "not enough measurements yet"
+        // reads as broken shortly after starting the app, when there's genuinely only been time
+        // for 0-1 checks so far, rather than as the expected, working, just-sparse state it is.
+        string emptyMessage = _triggerProbeId == "time"
+            ? LocalizationManager.Instance.Get("diag.sparkline.noData.timeSync")
+            : LocalizationManager.Instance.Get("diag.sparkline.noData");
+
+        if (_triggerProbeId == WifiSignalProbe.ProbeIdValue)
+        {
+            // Each point's own SSID/BSSID/link speed, decoded from the opaque metadata string
+            // DiagnosticsCoordinator recorded alongside it - what was actually true at that exact
+            // moment, not just whatever's current now. A point recorded before this feature
+            // existed simply has no metadata and shows time+value only, same as before.
+            var pointsWithWifiInfo = _coordinator.GetHistoryWithMetadata(_historyKey)
+                .Select(p => (p.Timestamp, p.Value, FormatWifiMetadata(p.Metadata)))
+                .ToList();
+            _chart.SetData(pointsWithWifiInfo, _valueUnitLabel, emptyMessage);
+        }
+        else if (_triggerProbeId == "network")
+        {
+            // "Connected"/"Not connected" is fully derivable from the 0/1 value itself - no
+            // stored metadata needed, unlike Wi-Fi's SSID/BSSID/Linkspeed.
+            var pointsWithConnectionState = _coordinator.GetHistory(_historyKey)
+                .Select(p => (p.Timestamp, p.Value,
+                    (string?)(p.Value >= 0.5
+                        ? LocalizationManager.Instance.Get("diag.network.connected")
+                        : LocalizationManager.Instance.Get("diag.network.disconnected"))))
+                .ToList();
+            _chart.SetData(pointsWithConnectionState, _valueUnitLabel, emptyMessage);
+        }
+        else
+        {
+            var history = _coordinator.GetHistory(_historyKey);
+            _chart.SetData(history, _valueUnitLabel, emptyMessage);
+        }
+    }
+
+    private static string? FormatWifiMetadata(string? raw)
+    {
+        WifiHistoryPointMetadata? metadata = WifiHistoryPointMetadata.Decode(raw);
+        return metadata is null
+            ? null
+            : $"SSID: {metadata.Ssid}\nBSSID: {metadata.Bssid}\nLinkspeed: {metadata.LinkSpeedMbps} Mbps";
     }
 
     protected override void Dispose(bool disposing)

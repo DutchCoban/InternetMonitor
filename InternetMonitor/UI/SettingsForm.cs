@@ -124,19 +124,25 @@ public sealed class SettingsForm : Form
     {
         _settings = settings;
 
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
+        AutoScaleMode = AutoScaleMode.Dpi;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
         MinimizeBox = false;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterScreen;
         Text = LocalizationManager.Instance.Get("settings.title");
         Icon = TrayIconFactory.AppIcon.Value;
         ClientSize = new Size(440, 550);
+        MinimumSize = new Size(460, 360);
 
-        var tabs = new TabControl { Dock = DockStyle.Top, Height = 490 };
+        // Fills whatever space is left above the button panel (Dock=Bottom, added later) - unlike
+        // the old fixed Height=490, this actually grows/shrinks with the window, and each TabPage
+        // below gets AutoScroll=true so content is always reachable via scrollbar even if the
+        // window ends up smaller than a tab's natural content height (a small/scaled screen).
+        var tabs = new TabControl { Dock = DockStyle.Fill };
 
         // ---------------- General tab ----------------
-        _generalTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.general"));
+        _generalTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.general")) { AutoScroll = true };
         _languageLabel = new Label { Text = LocalizationManager.Instance.Get("settings.language"), Bounds = new Rectangle(16, 20, 100, 22) };
         _languageCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Bounds = new Rectangle(140, 18, 160, 24) };
         foreach ((string _, string displayName) in LocalizationManager.SupportedLanguages)
@@ -224,7 +230,7 @@ public sealed class SettingsForm : Form
         _generalTab.Controls.Add(_timeSyncCheckEnabledCheckBox);
 
         // ---------------- Speed Test tab ----------------
-        _speedTestTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.speedTest"));
+        _speedTestTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.speedTest")) { AutoScroll = true };
         _speedTestAutoRunCheckBox = new CheckBox
         {
             Text = LocalizationManager.Instance.Get("settings.speedTest.autoRun"),
@@ -263,7 +269,7 @@ public sealed class SettingsForm : Form
         _speedTestTab.Controls.Add(_speedTestHintLabel);
 
         // ---------------- Ping tab ----------------
-        _pingTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.ping"));
+        _pingTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.ping")) { AutoScroll = true };
         _pingTargetsListView = new ListView { View = View.Details, FullRowSelect = true, MultiSelect = false, Bounds = new Rectangle(16, 16, 372, 220) };
         _pingTargetsListView.Columns.Add(LocalizationManager.Instance.Get("pingTarget.name"), 150);
         _pingTargetsListView.Columns.Add(LocalizationManager.Instance.Get("pingTarget.address"), 160);
@@ -293,7 +299,7 @@ public sealed class SettingsForm : Form
         _pingTab.Controls.Add(_pingTargetsHintLabel);
 
         // ---------------- Endpoints tab ----------------
-        _endpointsTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.endpoints"));
+        _endpointsTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.endpoints")) { AutoScroll = true };
         _endpointsListView = new ListView { View = View.Details, FullRowSelect = true, MultiSelect = false, Bounds = new Rectangle(16, 16, 372, 220) };
         _endpointsListView.Columns.Add(LocalizationManager.Instance.Get("endpoint.name"), 150);
         _endpointsListView.Columns.Add(LocalizationManager.Instance.Get("endpoint.url"), 160);
@@ -321,7 +327,7 @@ public sealed class SettingsForm : Form
         _endpointsTab.Controls.Add(_statusDiagramEndpointCombo);
 
         // ---------------- Diagnostics (logging) tab ----------------
-        _diagTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.diagnostics"));
+        _diagTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.diagnostics")) { AutoScroll = true };
         _levelGroup = new GroupBox { Text = LocalizationManager.Instance.Get("settings.logLevel.heading"), Bounds = new Rectangle(16, 12, 372, 140) };
         _logOffRadio = new RadioButton { Text = LocalizationManager.Instance.Get("settings.logLevel.off"), Bounds = new Rectangle(12, 24, 340, 22) };
         _logBasicRadio = new RadioButton { Text = LocalizationManager.Instance.Get("settings.logLevel.basic"), Bounds = new Rectangle(12, 50, 340, 22) };
@@ -391,7 +397,7 @@ public sealed class SettingsForm : Form
         _diagTab.Controls.Add(_historyGroup);
 
         // ---------------- SLA Report tab ----------------
-        _slaTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.sla"));
+        _slaTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.sla")) { AutoScroll = true };
         _slaHintLabel = new Label
         {
             Text = LocalizationManager.Instance.Get("settings.sla.hint"),
@@ -406,7 +412,7 @@ public sealed class SettingsForm : Form
         _slaTab.Controls.Add(_slaChecklist);
 
         // ---------------- Uptime Kuma tab ----------------
-        _kumaTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.kuma"));
+        _kumaTab = new TabPage(LocalizationManager.Instance.Get("settings.tab.kuma")) { AutoScroll = true };
         _kumaUrlLabel = new Label { Text = LocalizationManager.Instance.Get("settings.kuma.url"), Bounds = new Rectangle(16, 16, 340, 20) };
         _kumaUrlTextBox = new TextBox { Text = settings.KumaPushUrl, Bounds = new Rectangle(16, 38, 372, 24) };
         _kumaUrlTextBox.Leave += OnKumaSettingsChanged;
@@ -443,23 +449,29 @@ public sealed class SettingsForm : Form
         tabs.TabPages.Add(_speedTestTab);
         tabs.TabPages.Add(_kumaTab);
 
-        _exportButton = new Button { Text = LocalizationManager.Instance.Get("settings.export"), Bounds = new Rectangle(16, 506, 150, 28) };
+        // Docked to the bottom (rather than the buttons being individually Bounds-positioned
+        // directly on the Form at a fixed y, as before) so they stay anchored to the bottom of
+        // the window at any size instead of overlapping the now-resizable tab area.
+        var buttonPanel = new Panel { Dock = DockStyle.Bottom, Height = 44 };
+        _exportButton = new Button { Text = LocalizationManager.Instance.Get("settings.export"), Bounds = new Rectangle(16, 8, 150, 28) };
         _exportButton.Click += OnExportClicked;
-        _importButton = new Button { Text = LocalizationManager.Instance.Get("settings.import"), Bounds = new Rectangle(182, 506, 150, 28) };
+        _importButton = new Button { Text = LocalizationManager.Instance.Get("settings.import"), Bounds = new Rectangle(182, 8, 150, 28) };
         _importButton.Click += OnImportClicked;
 
         _closeButton = new Button
         {
             Text = LocalizationManager.Instance.Get("settings.close"),
-            Bounds = new Rectangle(348, 506, 80, 28),
+            Bounds = new Rectangle(348, 8, 80, 28),
             DialogResult = DialogResult.OK,
         };
         _closeButton.Click += (_, _) => Close();
 
+        buttonPanel.Controls.Add(_exportButton);
+        buttonPanel.Controls.Add(_importButton);
+        buttonPanel.Controls.Add(_closeButton);
+
         Controls.Add(tabs);
-        Controls.Add(_exportButton);
-        Controls.Add(_importButton);
-        Controls.Add(_closeButton);
+        Controls.Add(buttonPanel);
         AcceptButton = _closeButton;
     }
 

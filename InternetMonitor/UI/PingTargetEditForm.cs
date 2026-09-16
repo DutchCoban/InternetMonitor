@@ -25,6 +25,7 @@ public sealed class PingTargetEditForm : Form
                 Enabled = existing.Enabled,
             };
 
+        AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

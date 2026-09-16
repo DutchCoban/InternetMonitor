@@ -56,9 +56,13 @@ Three more things show up as extra rows on the Diagnostics screen whenever they 
   for pasting into a support ticket. A "Traceroute" button opens a live-filling hop list for
   whichever address you point it at.
 
-Double-click any row on the Diagnostics screen to open a scrollable, zoomable history chart for
-that check - mouse wheel to zoom, drag to pan, hover a point for its exact time and value. History
-persists across restarts, with a configurable retention from 15 minutes up to 32 days.
+Double-click any row on the Diagnostics screen to open its history. Most rows open a scrollable,
+zoomable chart - mouse wheel to zoom, drag to pan, hover a point for its exact time and value (the
+Wi-Fi signal row's tooltip also shows that point's SSID, BSSID, and link speed; the Network row
+charts a connected/disconnected timeline rather than a numeric value). IP address is the one
+exception: an address isn't a number worth charting, so its history is a plain change log instead,
+listing only the moments it actually changed. History persists across restarts, with a
+configurable retention from 15 minutes up to 32 days.
 
 ## Incidents
 

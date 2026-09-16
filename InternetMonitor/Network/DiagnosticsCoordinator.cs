@@ -145,6 +145,9 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
 
     public IReadOnlyList<(DateTimeOffset Timestamp, double Value)> GetHistory(string probeId) => _history.Get(probeId);
 
+    /// <summary>Same as <see cref="GetHistory"/>, but also returns each point's opaque metadata string (currently only ever non-null for Wi-Fi signal history).</summary>
+    public IReadOnlyList<(DateTimeOffset Timestamp, double Value, string? Metadata)> GetHistoryWithMetadata(string probeId) => _history.GetWithMetadata(probeId);
+
     public void UpdateEndpoints(IEnumerable<EndpointConfig> endpoints)
     {
         _applicationProbes = endpoints
@@ -519,12 +522,41 @@ public sealed class DiagnosticsCoordinator : IAsyncDisposable
                 }
             }
 
+            // IpAddressProbeResult.ChartValue is deliberately always null (a literal IP address
+            // isn't a number worth charting) - its Diagnostics-screen popup instead shows a change
+            // log (only entries where the address actually differs from the previous one), built
+            // from this same per-cycle recording via the metadata channel carrying the raw
+            // address string. The 0 is an unused placeholder value.
+            if (ipTask.Result.IPv4Address is { } ipv4Address)
+            {
+                _history.Record(ipTask.Result.ProbeId, ipTask.Result.TimestampUtc, 0, ipv4Address);
+            }
+
             // Only queried when the active adapter is actually wireless - a WLAN query on a wired
             // connection would just report "no connection" every cycle for no benefit, and this
             // keeps LatestWifiResult correctly null (not stale) the moment the adapter changes.
-            LatestWifiResult = networkTask.Result.InterfaceType == NetworkInterfaceType.Wireless80211
-                ? await RunTypedAsync<IProbeResult>(_wifiProbe, cancellationToken).ConfigureAwait(false)
-                : null;
+            //
+            // Bypasses the generic RunTypedAsync (bare 2-field history record) and does its two
+            // steps by hand instead, same as RunCycleAsync already does for the per-address
+            // "internet:{address}" rows and DiagnosticsCoordinator does for Speed Test - the
+            // generic path has nowhere to carry each point's own SSID/BSSID/link speed alongside
+            // its signal-quality value, which the Diagnostics screen's history chart needs so a
+            // hovered point shows what was actually true then, not just what's current now.
+            LatestWifiResult = null;
+            if (networkTask.Result.InterfaceType == NetworkInterfaceType.Wireless80211)
+            {
+                var wifiResult = (WifiSignalProbeResult)await _wifiProbe.RunAsync(cancellationToken).ConfigureAwait(false);
+                LatestWifiResult = wifiResult;
+                if (wifiResult.ChartValue is { } signalQuality)
+                {
+                    string? metadata = wifiResult is { Ssid: { } ssid, Bssid: { } bssid, LinkSpeedMbps: { } linkSpeed, PhyType: { } phyType }
+                        ? new WifiHistoryPointMetadata(ssid, bssid, linkSpeed, phyType).Encode()
+                        : null;
+                    _history.Record(_wifiProbe.Id, wifiResult.TimestampUtc, signalQuality, metadata);
+                }
+
+                ProbeCompleted?.Invoke(this, new ProbeCompletedEventArgs { ProbeId = _wifiProbe.Id, Result = wifiResult });
+            }
 
             var snapshot = new ProbeSnapshot(
                 networkTask.Result, ipTask.Result, gatewayTask.Result, internetTask.Result,

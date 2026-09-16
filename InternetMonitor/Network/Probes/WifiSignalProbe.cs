@@ -1,6 +1,38 @@
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace InternetMonitor.Network.Probes;
+
+/// <summary>
+/// A single Wi-Fi signal history point's SSID/BSSID/link speed, as they were at that exact
+/// moment - not just whatever's current now. Encoded/decoded as a JSON blob wrapped in
+/// <see cref="Uri.EscapeDataString(string)"/> (same escaping <see cref="Diagnosis.ProbeHistory"/>
+/// already uses for probe-id-to-filename safety) so an SSID containing a comma or newline can
+/// never corrupt the single-line CSV format that opaque metadata string is stored as.
+/// </summary>
+public sealed record WifiHistoryPointMetadata(string Ssid, string Bssid, int LinkSpeedMbps, string PhyType)
+{
+    public string Encode() => Uri.EscapeDataString(JsonSerializer.Serialize(this));
+
+    public static WifiHistoryPointMetadata? Decode(string? encoded)
+    {
+        if (string.IsNullOrEmpty(encoded))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<WifiHistoryPointMetadata>(Uri.UnescapeDataString(encoded));
+        }
+        catch (JsonException)
+        {
+            // A corrupted/unexpected metadata field shouldn't break the whole history chart -
+            // just show that point without its extra context, same as a point with none at all.
+            return null;
+        }
+    }
+}
 
 public sealed record WifiSignalProbeResult(
     string ProbeId,

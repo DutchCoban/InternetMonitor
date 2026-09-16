@@ -10,6 +10,7 @@ public sealed class AboutForm : Form
 
     public AboutForm()
     {
+        AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

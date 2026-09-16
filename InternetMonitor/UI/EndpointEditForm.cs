@@ -58,6 +58,7 @@ public sealed class EndpointEditForm : Form
                 Enabled = existing.Enabled,
             };
 
+        AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

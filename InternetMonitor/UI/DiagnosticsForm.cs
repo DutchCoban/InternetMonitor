@@ -57,11 +57,19 @@ public sealed class DiagnosticsForm : Form
         _uiContext = SynchronizationContext.Current
             ?? throw new InvalidOperationException("DiagnosticsForm must be constructed on the UI thread.");
 
+        AutoScaleMode = AutoScaleMode.Dpi;
         Text = LocalizationManager.Instance.Get("diag.title");
         Icon = TrayIconFactory.AppIcon.Value;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(900, 800);
         MinimumSize = new Size(620, 600);
+
+        // The incidents panel (with its Clear button) is docked to the very bottom of this tall
+        // form - on a screen shorter than ~900px of usable height, an unclamped 900x800 request
+        // opens partially below the visible desktop, and that bottom panel is the first casualty.
+        Size workingArea = Screen.FromPoint(Cursor.Position).WorkingArea.Size;
+        ClientSize = new Size(
+            Math.Max(MinimumSize.Width, Math.Min(900, workingArea.Width - 40)),
+            Math.Max(MinimumSize.Height, Math.Min(800, workingArea.Height - 80)));
 
         // --- Header: diagnosis headline + explanation ---
         var headerPanel = new Panel { Dock = DockStyle.Top, Height = 70, Padding = new Padding(12, 8, 12, 8) };
@@ -120,7 +128,10 @@ public sealed class DiagnosticsForm : Form
         var incidentsHeaderPanel = new Panel { Dock = DockStyle.Top, Height = 26, Margin = new Padding(0, 0, 0, 4) };
         _incidentsLabelFont = new Font(Font.FontFamily, 9f, FontStyle.Bold);
         var incidentsLabel = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Text = LocalizationManager.Instance.Get("diag.incidents"), Font = _incidentsLabelFont };
-        var clearIncidentsButtonPanel = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        // WrapContents must be off: with it on (the default), two buttons in this height-26
+        // header wrap the second one onto a hidden second row instead of the panel growing
+        // wider - it silently disappears rather than rendering.
+        var clearIncidentsButtonPanel = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
         var uptimeReportButton = new Button { Text = LocalizationManager.Instance.Get("uptimeReport.title"), Width = 140, Height = 22 };
         uptimeReportButton.Click += (_, _) =>
         {
@@ -462,7 +473,12 @@ public sealed class DiagnosticsForm : Form
 
     private void AddRow(string name, IProbeResult result)
     {
-        var item = new ListViewItem([name, result.Status.Localize(), result.Summary, $"{result.Duration.TotalMilliseconds:F0} ms"])
+        // These four rows' "how long did this take" duration isn't a metric worth surfacing -
+        // deliberately hidden rather than just technically accurate.
+        string durationText = result is NetworkInterfaceProbeResult or IpAddressProbeResult or WifiSignalProbeResult or TimeSyncProbeResult
+            ? string.Empty
+            : $"{result.Duration.TotalMilliseconds:F0} ms";
+        var item = new ListViewItem([name, result.Status.Localize(), result.Summary, durationText])
         {
             Tag = result,
         };
@@ -534,13 +550,18 @@ public sealed class DiagnosticsForm : Form
             triggerProbeId = result.ProbeId;
             // Most charted probes report a latency in milliseconds, but not all - TimeSync's
             // ChartValue is a clock offset in seconds, WifiSignalProbe's is a 0-100 signal
-            // quality percentage, and SpeedTestProbeResult's is a throughput in Mbps - none of
-            // those are a duration.
+            // quality percentage, SpeedTestProbeResult's is a throughput in Mbps, and
+            // NetworkInterfaceProbeResult's is a bare 0/1 connected state (its own hover line
+            // spells that out in words - see ProbeHistoryDetailForm.RefreshChart). IpAddressProbeResult
+            // opens in change-log mode instead of a chart at all (see ProbeHistoryDetailForm),
+            // so its unit label is unused, but still given one for clarity/consistency.
             valueUnitLabel = result switch
             {
                 TimeSyncProbeResult => "s",
                 WifiSignalProbeResult => "%",
                 SpeedTestProbeResult => "Mbps",
+                NetworkInterfaceProbeResult => "",
+                IpAddressProbeResult => "",
                 _ => "ms",
             };
             initialDetailsText = ProbeDetailsFormatter.Format(result);

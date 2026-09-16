@@ -19,7 +19,8 @@ public sealed record NetworkInterfaceProbeResult(
     long? LinkSpeedMbps,
     string? ErrorDetail = null) : IProbeResult
 {
-    public double? ChartValue => null;
+    /// <summary>1 = ActuallyConnected, 0 = not - lets the Diagnostics screen chart a connected/disconnected timeline for this row instead of nothing.</summary>
+    public double? ChartValue => ActuallyConnected ? 1.0 : 0.0;
 
     public IReadOnlyDictionary<string, string> ToDetails()
     {

@@ -28,7 +28,7 @@ public sealed class HistoryChartControl : Control
 
     private static readonly Color OutageColor = Color.FromArgb(60, Color.Firebrick);
 
-    private IReadOnlyList<(DateTimeOffset Timestamp, double Value)> _points = [];
+    private IReadOnlyList<(DateTimeOffset Timestamp, double Value, string? Metadata)> _points = [];
     private IReadOnlyList<(DateTimeOffset Start, DateTimeOffset? End)> _outages = [];
     private string _valueUnitLabel = "ms";
     private string _emptyMessage = string.Empty;
@@ -43,7 +43,15 @@ public sealed class HistoryChartControl : Control
         Size = new Size(600, 300);
     }
 
-    public void SetData(IReadOnlyList<(DateTimeOffset Timestamp, double Value)> points, string valueUnitLabel, string emptyMessage)
+    public void SetData(IReadOnlyList<(DateTimeOffset Timestamp, double Value)> points, string valueUnitLabel, string emptyMessage) =>
+        SetData(points.Select(p => (p.Timestamp, p.Value, (string?)null)).ToList(), valueUnitLabel, emptyMessage);
+
+    /// <summary>
+    /// Same as the 2-tuple overload, but each point can also carry an opaque, already-formatted
+    /// extra-info string (e.g. Wi-Fi's per-point SSID/BSSID/link speed) appended to the hover
+    /// tooltip - this control doesn't parse or care what it means, it just displays it verbatim.
+    /// </summary>
+    public void SetData(IReadOnlyList<(DateTimeOffset Timestamp, double Value, string? Metadata)> points, string valueUnitLabel, string emptyMessage)
     {
         _points = points;
         _valueUnitLabel = valueUnitLabel;
@@ -214,7 +222,7 @@ public sealed class HistoryChartControl : Control
 
         if (_hoverIndex >= 0 && _hoverIndex < _points.Count)
         {
-            (DateTimeOffset ts, double value) = _points[_hoverIndex];
+            (DateTimeOffset ts, double value, string? metadata) = _points[_hoverIndex];
             float hoverX = ToX(_hoverIndex);
             float hoverY = ToY(value);
 
@@ -225,6 +233,10 @@ public sealed class HistoryChartControl : Control
             g.FillEllipse(hoverDotBrush, hoverX - 3.5f, hoverY - 3.5f, 7, 7);
 
             string info = $"{ts.ToLocalTime():HH:mm:ss}\n{value:F0} {_valueUnitLabel}";
+            if (!string.IsNullOrEmpty(metadata))
+            {
+                info += $"\n{metadata}";
+            }
             using var infoFont = new Font(Font.FontFamily, 8f);
             SizeF infoSize = g.MeasureString(info, infoFont);
             float boxX = Math.Clamp(hoverX + 8, PlotPadding, Width - infoSize.Width - PlotPadding - 4);

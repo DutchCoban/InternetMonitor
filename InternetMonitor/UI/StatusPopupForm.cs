@@ -66,6 +66,7 @@ public sealed class StatusPopupForm : Form
         _uiContext = SynchronizationContext.Current
             ?? throw new InvalidOperationException("StatusPopupForm must be constructed on the UI thread.");
 
+        AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedToolWindow;
         ShowInTaskbar = false;
         TopMost = true;

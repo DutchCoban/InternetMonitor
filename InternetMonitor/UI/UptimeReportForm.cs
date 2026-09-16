@@ -25,6 +25,7 @@ public sealed class UptimeReportForm : Form
         _incidentStore = incidentStore;
         _settings = settings;
 
+        AutoScaleMode = AutoScaleMode.Dpi;
         Text = LocalizationManager.Instance.Get("uptimeReport.title");
         Icon = TrayIconFactory.AppIcon.Value;
         FormBorderStyle = FormBorderStyle.FixedDialog;

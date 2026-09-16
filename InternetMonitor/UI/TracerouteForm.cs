@@ -23,6 +23,7 @@ public sealed class TracerouteForm : Form
         _uiContext = SynchronizationContext.Current
             ?? throw new InvalidOperationException("TracerouteForm must be constructed on the UI thread.");
 
+        AutoScaleMode = AutoScaleMode.Dpi;
         Text = LocalizationManager.Instance.Get("traceroute.title");
         Icon = TrayIconFactory.AppIcon.Value;
         FormBorderStyle = FormBorderStyle.FixedDialog;

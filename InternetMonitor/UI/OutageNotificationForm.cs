@@ -25,6 +25,7 @@ public sealed class OutageNotificationForm : Form
 
     public OutageNotificationForm()
     {
+        AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedToolWindow;
         ShowInTaskbar = false;
         TopMost = true;
