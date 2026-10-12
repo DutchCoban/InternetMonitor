@@ -21,6 +21,30 @@ namespace InternetMonitor.Ui.Shell;
 public abstract class PageBase : Panel
 {
     private bool _built;
+    private bool _settlingScroll;
+
+    /// <summary>
+    /// Suppresses WinForms' scroll-into-view while a page is first being shown.
+    ///
+    /// A ScrollableControl scrolls to whichever child takes focus. On a page taller than the
+    /// window that means the first focusable control - a button in the header, a chart - drags the
+    /// view down during layout, and the page opens with its own title already scrolled off the
+    /// top. Resetting the scroll position does not help, because the focus arrives after it.
+    ///
+    /// Only the opening moment is suppressed. Once the page has settled, tabbing to an off-screen
+    /// control scrolls to it as it should, which matters on the long Settings page.
+    /// </summary>
+    protected override Point ScrollToControl(Control activeControl) =>
+        _settlingScroll ? AutoScrollPosition : base.ScrollToControl(activeControl);
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+
+        // By the first paint the layout has run and focus has landed, so normal behaviour can
+        // resume.
+        _settlingScroll = false;
+    }
 
     protected PageBase(AppServices services)
     {
@@ -84,6 +108,9 @@ public abstract class PageBase : Panel
         }
 
         Visible = true;
+        _settlingScroll = true;
+        AutoScrollPosition = Point.Empty;
+
         OnActivated();
     }
 

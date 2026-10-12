@@ -30,6 +30,12 @@ internal static class Program
     /// <summary>Milliseconds of artificial delay per network step, so in-flight UI can be observed.</summary>
     private const string SimulateDelayArgument = "--simulate-delay";
 
+    /// <summary>
+    /// Opens the window straight onto a named page ("history", "incidents", ...). Implies --show.
+    /// Also what the tray's Settings item would want if it were a shortcut.
+    /// </summary>
+    private const string PageArgument = "--page";
+
     [STAThread]
     private static void Main(string[] args)
     {
@@ -63,9 +69,10 @@ internal static class Program
         AppDomain.CurrentDomain.UnhandledException += (_, e) => ReportFatal(e.ExceptionObject as Exception);
 
         bool showWindow = args.Any(a => string.Equals(a, ShowWindowArgument, StringComparison.OrdinalIgnoreCase));
+        string? page = TryGetArgumentValue(args, PageArgument);
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new AppHost(showWindow));
+        Application.Run(new AppHost(showWindow || page is not null, page));
     }
 
     /// <summary>

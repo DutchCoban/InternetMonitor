@@ -1,4 +1,5 @@
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.History;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
@@ -21,11 +22,12 @@ public sealed class AppHost : ApplicationContext
     private readonly ThemeWatcher _themeWatcher;
     private readonly StepPipeline _pipeline;
     private readonly CadenceController _cadence;
+    private readonly MetricStore _history;
     private readonly TrayController _tray;
     private readonly MainWindow _window;
     private readonly SynchronizationContext _ui;
 
-    public AppHost(bool showWindowOnStart = false)
+    public AppHost(bool showWindowOnStart = false, string? initialPage = null)
     {
         _settings = AppSettings.Load();
 
@@ -43,7 +45,15 @@ public sealed class AppHost : ApplicationContext
         _pipeline = new StepPipeline(() => targets);
         _cadence = new CadenceController(_pipeline, () => _settings);
 
-        var services = new AppServices(_settings, _pipeline, _cadence);
+        _history = new MetricStore
+        {
+            // History is sampled at the background rate regardless of how fast the pipeline is
+            // actually running, so retention and chart density do not change depending on whether
+            // a window happens to be open.
+            MinimumSampleInterval = TimeSpan.FromSeconds(_settings.BackgroundIntervalSeconds),
+        };
+
+        var services = new AppServices(_settings, targets, _pipeline, _cadence, _history);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -66,13 +76,49 @@ public sealed class AppHost : ApplicationContext
         {
             ShowWindow();
         }
+
+        if (initialPage is not null)
+        {
+            _window.ShowPage(initialPage);
+        }
     }
 
     /// <summary>
     /// Keeps the tray badge in step with the pipeline. The tray is the only part of the app that
     /// is always visible, so it reflects the real state whether or not a window is open.
     /// </summary>
-    private void OnCycleCompleted(StepSnapshot snapshot) => _ui.Post(
+    private void OnCycleCompleted(StepSnapshot snapshot)
+    {
+        RecordHistory(snapshot);
+        UpdateTray(snapshot);
+    }
+
+    /// <summary>
+    /// Writes each step's one chartable number into its series. Runs on the pipeline's thread
+    /// rather than the UI's: it is pure bookkeeping, and the UI thread has no business waiting on
+    /// a lock that a flush might be holding.
+    /// </summary>
+    private void RecordHistory(StepSnapshot snapshot)
+    {
+        foreach (StepResult result in snapshot.All)
+        {
+            if (result.ChartValue is not { } value || SeriesNames.For(result.Step) is not { } series)
+            {
+                continue;
+            }
+
+            // Skipped steps measured nothing. Recording a zero for them would draw a cliff on the
+            // chart that looks like a measurement rather than an absence.
+            if (result.State == StepState.Skipped)
+            {
+                continue;
+            }
+
+            _history.Sample(series, result.TimestampUtc, value);
+        }
+    }
+
+    private void UpdateTray(StepSnapshot snapshot) => _ui.Post(
         _ =>
         {
             StepResult? failure = snapshot.FirstFailure;
@@ -131,6 +177,10 @@ public sealed class AppHost : ApplicationContext
             _cadence.Dispose();
             _pipeline.CycleCompleted -= OnCycleCompleted;
             _pipeline.Dispose();
+
+            // Blocking on shutdown is acceptable and necessary: this is the final flush, and
+            // letting the process exit without it loses up to two minutes of recorded history.
+            _history.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
             _tray.Dispose();
             _themeWatcher.Dispose();

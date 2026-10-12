@@ -1,4 +1,5 @@
 using InternetMonitor.App;
+using InternetMonitor.Core.History;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -20,6 +21,8 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
     private StatusHero _hero = null!;
     private Card _stepsCard = null!;
     private StepList _steps = null!;
+    private Card _latencyCard = null!;
+    private MetricChart _latencyChart = null!;
     private AppButton _checkNow = null!;
     private bool _subscribed;
 
@@ -33,6 +36,11 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _stepsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Status };
         _stepsCard.Controls.Add(_steps);
 
+        _latencyChart = new MetricChart { Dock = DockStyle.Fill, Compact = true };
+        _latencyCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Globe };
+        _latencyCard.Height = Dp(150);
+        _latencyCard.Controls.Add(_latencyChart);
+
         _hero = new StatusHero { Dock = DockStyle.Top };
         _hero.Height = _hero.PreferredHeight;
 
@@ -42,6 +50,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
 
         // Added in reverse visual order: DockStyle.Top stacks later siblings nearer the top edge,
         // and PageBase adds its header after this runs.
+        Controls.Add(_latencyCard);
         Controls.Add(_stepsCard);
         Controls.Add(_hero);
 
@@ -61,6 +70,8 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _checkNow.SizeToContent();
         _stepsCard.Title = Loc.Get("status.steps.title");
         _stepsCard.Subtitle = Loc.Get("status.steps.subtitle");
+        _latencyCard.Title = Loc.Get("status.latency.title");
+        _latencyCard.Subtitle = Loc.Get("status.latency.subtitle");
         ResizeStepsCard();
         Header.RefreshActions();
 
@@ -92,6 +103,8 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
 
             _hero.Apply(snapshot, checking: false);
         }
+
+        RefreshLatencyChart();
     }
 
     protected override void OnDeactivated()
@@ -118,7 +131,33 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         }
     });
 
-    private void OnCycleCompleted(StepSnapshot snapshot) => Post(() => _hero.Apply(snapshot, checking: false));
+    private void OnCycleCompleted(StepSnapshot snapshot) => Post(() =>
+    {
+        _hero.Apply(snapshot, checking: false);
+        RefreshLatencyChart();
+    });
+
+    /// <summary>
+    /// The inline strip shows the last hour of public-internet latency - the number the hero
+    /// quotes, so the card underneath is the history of the number above it rather than a
+    /// different measurement that happens to be nearby.
+    /// </summary>
+    private void RefreshLatencyChart()
+    {
+        if (SeriesNames.For(StepId.PublicIp) is not { } series)
+        {
+            return;
+        }
+
+        _latencyChart.SetSeries(
+            Services.History.Get(series, DateTimeOffset.UtcNow - TimeSpan.FromHours(1)),
+            SeriesNames.UnitFor(StepId.PublicIp),
+            stateSeries: false,
+            Services.Targets.LatencyWarningMs,
+            Services.Targets.LatencyErrorMs);
+
+        _latencyChart.ResetView();
+    }
 
     /// <summary>
     /// Marshals onto the UI thread, dropping the callback if the page has gone away in the

@@ -1,4 +1,5 @@
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.History;
 using InternetMonitor.Core.Steps;
 
 namespace InternetMonitor.App;
@@ -12,11 +13,21 @@ namespace InternetMonitor.App;
 /// keeps it obvious which page uses what. Statics would make the pipeline impossible to replace
 /// in a test, which matters as the root-cause analyser grows.
 /// </summary>
-public sealed class AppServices(AppSettings settings, StepPipeline pipeline, CadenceController cadence)
+public sealed class AppServices(
+    AppSettings settings,
+    CheckTargets targets,
+    StepPipeline pipeline,
+    CadenceController cadence,
+    MetricStore history)
 {
     public AppSettings Settings { get; } = settings;
+
+    /// <summary>What the checks aim at and the thresholds they judge against; charts read the thresholds too.</summary>
+    public CheckTargets Targets { get; } = targets;
 
     public StepPipeline Pipeline { get; } = pipeline;
 
     public CadenceController Cadence { get; } = cadence;
+
+    public MetricStore History { get; } = history;
 }
