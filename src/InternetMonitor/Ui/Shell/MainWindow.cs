@@ -114,6 +114,16 @@ public sealed class MainWindow : Form
     /// <summary>Shows the number of open incidents on the nav rail, or clears it at zero.</summary>
     public void SetIncidentBadge(int count) => _rail.SetBadge("incidents", count);
 
+    /// <summary>Opens the Tools page and traces a route, as the --trace command line asks for.</summary>
+    public void StartTraceroute(string target)
+    {
+        ShowPage("tools");
+        if (_pages["tools"] is ToolsPage tools)
+        {
+            tools.StartTrace(target);
+        }
+    }
+
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);

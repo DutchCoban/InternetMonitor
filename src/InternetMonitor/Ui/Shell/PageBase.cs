@@ -131,7 +131,16 @@ public abstract class PageBase : Panel
         }
 
         BackColor = Theme.Current.Bg;
+        OnThemeChanged();
         Invalidate(true);
+    }
+
+    /// <summary>
+    /// Hook for pages hosting stock WinForms controls, which do not take part in the theme the way
+    /// the custom ones do and have to have their colours assigned explicitly.
+    /// </summary>
+    protected virtual void OnThemeChanged()
+    {
     }
 
     protected override void Dispose(bool disposing)

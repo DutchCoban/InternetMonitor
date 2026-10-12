@@ -32,7 +32,7 @@ public sealed class AppHost : ApplicationContext
     private readonly MainWindow _window;
     private readonly SynchronizationContext _ui;
 
-    public AppHost(bool showWindowOnStart = false, string? initialPage = null)
+    public AppHost(bool showWindowOnStart = false, string? initialPage = null, string? initialTrace = null)
     {
         _settings = AppSettings.Load();
 
@@ -91,6 +91,11 @@ public sealed class AppHost : ApplicationContext
         if (initialPage is not null)
         {
             _window.ShowPage(initialPage);
+        }
+
+        if (initialTrace is not null)
+        {
+            _window.StartTraceroute(initialTrace);
         }
     }
 

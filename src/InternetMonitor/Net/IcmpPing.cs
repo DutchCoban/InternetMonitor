@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -43,6 +44,55 @@ public static class IcmpPing
             // A PingException here usually means the address is unroutable or the raw-socket
             // handle could not be created at all; neither is distinguishable from an unreachable
             // host as far as the diagnosis is concerned.
+            return new PingOutcome(IPStatus.Unknown, null, null);
+        }
+    }
+
+    /// <summary>
+    /// Sends one echo with a fixed TTL, for traceroute. A router that discards the packet answers
+    /// with TtlExpired and its own address, which is how each hop is discovered.
+    ///
+    /// A fresh <see cref="Ping"/> per call is deliberate: Ping does not support concurrent sends
+    /// on one instance, and traceroute deliberately has many in flight at once.
+    /// </summary>
+    public static async Task<PingOutcome> SendWithTtlAsync(
+        IPAddress address,
+        int ttl,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        using var ping = new Ping();
+        var options = new PingOptions(ttl, dontFragment: true);
+        var watch = Stopwatch.StartNew();
+
+        try
+        {
+            PingReply reply = await ping
+                .SendPingAsync(address, timeout, Payload, options)
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            watch.Stop();
+
+            // Windows does not fill in RoundtripTime for a TTL-expired reply - it comes back as
+            // zero - so every intermediate hop of a traceroute would read 0 ms if this trusted it.
+            // The measured elapsed time is the honest number for those, and is used whenever the
+            // reported round-trip is absent.
+            double? latency = reply.Status is IPStatus.Success or IPStatus.TtlExpired
+                ? reply.RoundtripTime > 0 ? reply.RoundtripTime : watch.Elapsed.TotalMilliseconds
+                : null;
+
+            return new PingOutcome(
+                reply.Status,
+                latency,
+                reply.Address is { } responder && !responder.Equals(IPAddress.Any) ? responder : null);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is PingException or SocketException or ObjectDisposedException or OperationCanceledException)
+        {
             return new PingOutcome(IPStatus.Unknown, null, null);
         }
     }

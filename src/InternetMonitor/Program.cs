@@ -36,6 +36,9 @@ internal static class Program
     /// </summary>
     private const string PageArgument = "--page";
 
+    /// <summary>Opens the Tools page and immediately traces a route to the given target.</summary>
+    private const string TraceArgument = "--trace";
+
     [STAThread]
     private static void Main(string[] args)
     {
@@ -70,9 +73,10 @@ internal static class Program
 
         bool showWindow = args.Any(a => string.Equals(a, ShowWindowArgument, StringComparison.OrdinalIgnoreCase));
         string? page = TryGetArgumentValue(args, PageArgument);
+        string? trace = TryGetArgumentValue(args, TraceArgument);
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new AppHost(showWindow || page is not null, page));
+        Application.Run(new AppHost(showWindow || page is not null || trace is not null, page, trace));
     }
 
     /// <summary>
