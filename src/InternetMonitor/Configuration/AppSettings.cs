@@ -78,6 +78,15 @@ public sealed class AppSettings
     /// </summary>
     public bool TracerouteOwnerLookup { get; set; } = true;
 
+    // ---- Endpoints ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// User-added step-7 targets, appended after the built-in generate_204 reachability check.
+    /// Empty by default - this is a generic diagnostics tool with no organisation's endpoints
+    /// baked in, exactly as v1 described itself.
+    /// </summary>
+    public List<EndpointConfig> ApplicationEndpoints { get; set; } = [];
+
     // ---- Persistence --------------------------------------------------------------------------
 
     public static AppSettings Load()

@@ -26,7 +26,7 @@ public enum ButtonVariant
 /// UI feel responsive, and it stops itself the moment it reaches its target so an idle window
 /// burns no CPU. (v1's pulse control ran a 30Hz timer whenever it was visible.)
 /// </summary>
-public sealed class AppButton : ThemedControl
+public sealed class AppButton : ThemedControl, IButtonControl
 {
     private const int AnimationIntervalMs = 16;
     private const float AnimationStep = 0.22f;
@@ -48,6 +48,29 @@ public sealed class AppButton : ThemedControl
     }
 
     public ButtonVariant Variant { get; set; } = ButtonVariant.Secondary;
+
+    // ---- IButtonControl ------------------------------------------------------------------------
+    // Lets a plain AppButton be used as a Form's AcceptButton/CancelButton (Enter/Escape in a
+    // small dialog), which otherwise only a stock Button can be. DialogResult is left at None and
+    // unused: callers that need the dialog to close on click already do so explicitly in their own
+    // Click handler, so Button's usual "set DialogResult, which closes the form" side effect is
+    // deliberately not replicated here - one close path, not two.
+
+    public DialogResult DialogResult { get; set; }
+
+    public void NotifyDefault(bool value)
+    {
+        // No distinct "this is the default button" visual treatment (yet) - implemented only so
+        // AppButton satisfies the interface Form.AcceptButton/CancelButton require.
+    }
+
+    public void PerformClick()
+    {
+        if (Enabled)
+        {
+            OnClick(EventArgs.Empty);
+        }
+    }
 
     public Glyph? Glyph
     {

@@ -97,7 +97,13 @@ public class Card : ThemedControl
     }
 
     /// <summary>The inset between the card edge and its content, in device pixels.</summary>
-    protected int Inset => Sp(4);
+    /// <summary>
+    /// The gap between the card's edge and its content, in device pixels. Public rather than
+    /// protected: code outside Card that manually positions children inside one (rather than
+    /// relying on Dock/Anchor, which already read DisplayRectangle automatically) needs this same
+    /// number to line up with it - SettingsPage's row layout is exactly that case.
+    /// </summary>
+    public int Inset => Sp(4);
 
     public override Rectangle DisplayRectangle
     {

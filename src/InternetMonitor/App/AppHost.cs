@@ -46,8 +46,31 @@ public sealed class AppHost : ApplicationContext
         Theme.Mode = _settings.Theme;
         Theme.Reevaluate();
 
-        var targets = new CheckTargets();
-        _pipeline = new StepPipeline(() => targets);
+        // Built fresh from current settings on every call rather than captured once: the
+        // pipeline already calls its targets provider at the start of every single cycle (see
+        // StepPipeline.RunCycleCoreAsync), so reading live settings here is all a step-7 endpoint
+        // added through Settings needs to take effect on the very next cycle - no extra event
+        // wiring required.
+        var defaultTargets = new CheckTargets();
+        CheckTargets BuildTargets()
+        {
+            List<EndpointConfig> endpoints = _settings.ApplicationEndpoints;
+            if (endpoints.Count == 0)
+            {
+                return defaultTargets;
+            }
+
+            return defaultTargets with
+            {
+                Targets =
+                [
+                    .. defaultTargets.Targets,
+                    .. endpoints.Where(e => e.Enabled).Select(e => new TargetEndpoint(e.Name, e.Url)),
+                ],
+            };
+        }
+
+        _pipeline = new StepPipeline(BuildTargets);
         _cadence = new CadenceController(_pipeline, () => _settings);
 
         _history = new MetricStore
@@ -62,7 +85,7 @@ public sealed class AppHost : ApplicationContext
         _changes = new ChangeDetector();
         _tracker = new IncidentTracker(_incidents, _changes);
 
-        var services = new AppServices(_settings, targets, _pipeline, _cadence, _history, _incidents);
+        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
