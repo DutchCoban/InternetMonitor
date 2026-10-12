@@ -33,6 +33,7 @@ public sealed class MetricChart : ThemedControl
     private double? _warnThreshold;
     private double? _errorThreshold;
     private bool _stateSeries;
+    private int _stateBucketCount = 1;
     private bool _compact;
 
     private DateTimeOffset _viewStart;
@@ -69,7 +70,9 @@ public sealed class MetricChart : ThemedControl
 
     protected override Color BehindColor => Theme.Current.Surface;
 
-    private int AxisLeft => Compact ? 0 : Dp(44);
+    // Wide enough for "1000 ms" at the default font - gridline labels now repeat the unit (see
+    // DrawGrid) rather than showing a bare number with no indication of what it is measured in.
+    private int AxisLeft => Compact ? 0 : Dp(56);
 
     private int AxisBottom => Compact ? 0 : Dp(20);
 
@@ -149,6 +152,17 @@ public sealed class MetricChart : ThemedControl
             {
                 window.Add(point);
             }
+        }
+
+        if (_stateSeries)
+        {
+            // Coarse, UptimeRobot-style segments rather than one per pixel - on a long healthy
+            // stretch, one-per-pixel is visually identical to a single solid bar, which is
+            // precisely the "just one thick green line" complaint this exists to fix. The bucket
+            // count is stored because DrawStateTimeline needs it again to size each segment.
+            _stateBucketCount = Math.Clamp(PlotBounds.Width / Dp(6), 16, 200);
+            _visible = Downsample.BucketState(window, _viewStart, _viewEnd, _stateBucketCount);
+            return;
         }
 
         // One point per pixel is the most any chart can show. Asking for a few more than the plot
@@ -474,9 +488,12 @@ public sealed class MetricChart : ThemedControl
             float y = ToY(value, max);
             g.DrawLine(pen, plot.Left, y, plot.Right, y);
 
+            // Every gridline repeats the unit rather than just the top one: it is the simplest,
+            // least-ambiguous way to answer "is this milliseconds?" at a glance, and the labels
+            // have room for it now that AxisLeft accounts for the extra width.
             string label = _stateSeries
                 ? LocalizationManager.Instance.Get(i == lines ? "chart.state.up" : i == 0 ? "chart.state.down" : string.Empty)
-                : $"{value:F0}";
+                : _unit.Length > 0 ? $"{value:F0} {_unit}" : $"{value:F0}";
 
             if (label.Length > 0 && !label.StartsWith('['))
             {
@@ -582,6 +599,18 @@ public sealed class MetricChart : ThemedControl
         return Math.Max(median * 4, TimeSpan.FromSeconds(30).Ticks);
     }
 
+    /// <summary>
+    /// Draws the bucketed state series as a row of distinct, rounded segments with a thin gap
+    /// between them - the familiar "uptime bar" look (UptimeRobot, status pages) - rather than one
+    /// edge-to-edge fill. A long healthy stretch used to render as a single solid rectangle with no
+    /// visible structure at all; it now reads as a sequence of individually-measured slices even
+    /// when every one of them is green.
+    ///
+    /// Segment width comes from the known, constant bucket span (<see cref="_stateBucketCount"/>
+    /// divided into the plot width), not from the distance to the next drawn point - a real gap in
+    /// the data simply has no segment in it, rather than the previous segment stretching across the
+    /// gap to reach whatever comes next.
+    /// </summary>
     private void DrawStateTimeline(Graphics g, Palette p, Rectangle plot)
     {
         if (_visible.Count == 0)
@@ -589,18 +618,24 @@ public sealed class MetricChart : ThemedControl
             return;
         }
 
-        int barHeight = Math.Max(Dp(10), plot.Height / 3);
+        int barHeight = Math.Max(Dp(14), (int)(plot.Height * 0.55f));
         float top = plot.Top + ((plot.Height - barHeight) / 2f);
+        float gap = DpF(1.5f);
+        float segmentWidth = Math.Max(DpF(2f), (plot.Width / (float)_stateBucketCount) - gap);
+        float radius = Dp(2);
 
-        for (int i = 0; i < _visible.Count; i++)
+        foreach (MetricPoint point in _visible)
         {
-            float x = ToX(_visible[i].Timestamp);
-            float next = i + 1 < _visible.Count ? ToX(_visible[i + 1].Timestamp) : plot.Right;
-            float width = Math.Max(1f, next - x);
+            float x = ToX(point.Timestamp) - (segmentWidth / 2f);
 
-            Color color = _visible[i].Value > 0.5 ? p.Ok : p.Error;
-            using var brush = new SolidBrush(color.WithAlpha(210));
-            g.FillRectangle(brush, x, top, width, barHeight);
+            Color color = point.Value switch
+            {
+                >= 0.999 => p.Ok,
+                <= 0.001 => p.Error,
+                _ => p.Warn, // a slice containing both a down and an up reading
+            };
+
+            g.FillRounded(new RectangleF(x, top, segmentWidth, barHeight), radius, color.WithAlpha(220));
         }
     }
 
@@ -685,7 +720,12 @@ public sealed class MetricChart : ThemedControl
 
         string time = point.Timestamp.ToLocalTime().ToString("dd/MM HH:mm:ss");
         string value = _stateSeries
-            ? LocalizationManager.Instance.Get(point.Value > 0.5 ? "chart.state.up" : "chart.state.down")
+            ? LocalizationManager.Instance.Get(point.Value switch
+            {
+                >= 0.999 => "chart.state.up",
+                <= 0.001 => "chart.state.down",
+                _ => "chart.state.partial", // this slice held both a down and an up reading
+            })
             : $"{point.Value:F0} {_unit}";
 
         Size timeSize = GdiExtensions.MeasureCrisp(time, Theme.Font(FontRole.Small));

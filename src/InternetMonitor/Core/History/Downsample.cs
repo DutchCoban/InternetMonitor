@@ -93,6 +93,84 @@ public static class Downsample
         return (x / count, y / count);
     }
 
+    /// <summary>
+    /// Reduces a binary state series (adapter, link - values are exactly 0 or 1) to discrete time
+    /// slices rather than a smoothed line.
+    ///
+    /// LTTB is the wrong tool for this data: it picks the points that form the largest geometric
+    /// triangle, which is a question about shape and has nothing to do with "was there ever a
+    /// problem in this slice of time" - a brief real disconnect sandwiched between long healthy
+    /// stretches is exactly the kind of point LTTB can discard, because it barely changes the
+    /// shape of an otherwise flat line. This instead divides the requested time range into
+    /// <paramref name="bucketCount"/> equal slices and aggregates each one with "any down reading
+    /// wins": a slice is reported down if even one sample in it was down, up only if every sample
+    /// was, and left out of the result entirely if it has no samples at all - a real gap in the
+    /// data (the app being closed, say) is shown as a gap, never invented as either state.
+    ///
+    /// The bucket count is deliberately coarse compared to <see cref="Lttb"/>'s roughly-one-per-
+    /// pixel target: a handful of wide, distinct segments reads as a sequence of measurements,
+    /// while one per pixel on a long healthy stretch is indistinguishable from a single solid bar.
+    /// </summary>
+    public static IReadOnlyList<MetricPoint> BucketState(
+        IReadOnlyList<MetricPoint> points, DateTimeOffset start, DateTimeOffset end, int bucketCount)
+    {
+        if (points.Count == 0 || bucketCount < 1 || end <= start)
+        {
+            return points;
+        }
+
+        long startTicks = start.UtcTicks;
+        long spanTicks = Math.Max(1, end.UtcTicks - startTicks);
+        long bucketSpanTicks = Math.Max(1, spanTicks / bucketCount);
+
+        var counts = new int[bucketCount];
+        var downCounts = new int[bucketCount];
+
+        foreach (MetricPoint point in points)
+        {
+            long offset = point.Timestamp.UtcTicks - startTicks;
+            if (offset < 0 || offset > spanTicks)
+            {
+                continue;
+            }
+
+            int index = Math.Clamp((int)(offset * bucketCount / (spanTicks + 1)), 0, bucketCount - 1);
+            counts[index]++;
+            if (point.Value <= 0.5)
+            {
+                downCounts[index]++;
+            }
+        }
+
+        var result = new List<MetricPoint>(bucketCount);
+        for (int i = 0; i < bucketCount; i++)
+        {
+            if (counts[i] == 0)
+            {
+                // No measurements fell in this slice - leave it out rather than guessing a state
+                // for it, so the chart shows a true gap instead of a claim nothing backs up.
+                continue;
+            }
+
+            // 1 = every sample in this slice was up, 0 = every sample was down, 0.5 = a mix - the
+            // slice contained both a real disconnect and a recovery, drawn as a distinct colour
+            // rather than rounded away in either direction.
+            double value = downCounts[i] == 0 ? 1.0 : downCounts[i] == counts[i] ? 0.0 : 0.5;
+
+            // The slice's own fixed midpoint, not a data-weighted centroid. An earlier version
+            // summed each point's raw tick count to average them, which overflows a 64-bit long
+            // after only a handful of points - a tick count for a date in the 2020s is already
+            // around 6*10^17, and long tops out around 9.2*10^18 - and silently dropped or
+            // misplaced whichever slice happened to be dense enough to overflow. The midpoint
+            // needs no accumulation at all and places every slice at a predictable, evenly-spaced
+            // position regardless of how its samples happen to be distributed within it.
+            long midpointTicks = startTicks + (i * bucketSpanTicks) + (bucketSpanTicks / 2);
+            result.Add(new MetricPoint(new DateTimeOffset(midpointTicks, TimeSpan.Zero), value, null));
+        }
+
+        return result;
+    }
+
     /// <summary>Min, average, max and 95th percentile of a series, for the chart's footer.</summary>
     public static (double Min, double Average, double Max, double P95)? Summarize(IReadOnlyList<MetricPoint> points)
     {

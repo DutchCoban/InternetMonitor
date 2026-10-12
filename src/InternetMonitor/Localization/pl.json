@@ -262,5 +262,6 @@
   "hop.cgnat": "W sieci dostawcy, na współdzielonym adresie CGNAT.",
   "hop.longHaul": "Tutaj ruch opuszcza {0} w stronę {1}; to tłumaczy dodatkowe {2} ms.",
   "hop.ispPrivateNetwork": "Prywatny adres, ale nie Twoja własna sieć - prawdopodobnie wewnątrz wewnętrznej sieci dostawcy.",
-  "hop.privateNetworkUnknown": "Prywatny adres (RFC 1918)."
+  "hop.privateNetworkUnknown": "Prywatny adres (RFC 1918).",
+  "chart.state.partial": "Częściowo połączono"
 }
