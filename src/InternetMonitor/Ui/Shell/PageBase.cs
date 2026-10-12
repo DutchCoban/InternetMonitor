@@ -1,3 +1,4 @@
+using InternetMonitor.App;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -21,8 +22,9 @@ public abstract class PageBase : Panel
 {
     private bool _built;
 
-    protected PageBase()
+    protected PageBase(AppServices services)
     {
+        Services = services;
         Dock = DockStyle.Fill;
         AutoScroll = true;
         BackColor = Theme.Current.Bg;
@@ -34,6 +36,8 @@ public abstract class PageBase : Panel
     public abstract string Id { get; }
 
     protected PageHeader Header { get; }
+
+    protected AppServices Services { get; }
 
     protected static LocalizationManager Loc => LocalizationManager.Instance;
 

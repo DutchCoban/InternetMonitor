@@ -1,4 +1,5 @@
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
 using InternetMonitor.Ui.Theming;
@@ -18,8 +19,11 @@ public sealed class AppHost : ApplicationContext
 {
     private readonly AppSettings _settings;
     private readonly ThemeWatcher _themeWatcher;
+    private readonly StepPipeline _pipeline;
+    private readonly CadenceController _cadence;
     private readonly TrayController _tray;
     private readonly MainWindow _window;
+    private readonly SynchronizationContext _ui;
 
     public AppHost(bool showWindowOnStart = false)
     {
@@ -35,20 +39,54 @@ public sealed class AppHost : ApplicationContext
         Theme.Mode = _settings.Theme;
         Theme.Reevaluate();
 
-        _window = new MainWindow(_settings);
+        var targets = new CheckTargets();
+        _pipeline = new StepPipeline(() => targets);
+        _cadence = new CadenceController(_pipeline, () => _settings);
 
-        // After the window: the watcher marshals theme changes onto the UI thread through it.
+        var services = new AppServices(_settings, _pipeline, _cadence);
+        _window = new MainWindow(services);
+
+        // Creating the handle now rather than on first show means the pipeline has somewhere to
+        // marshal to from its very first cycle, which starts below before any window is visible.
+        _ = _window.Handle;
+        _ui = SynchronizationContext.Current
+            ?? throw new InvalidOperationException("The WinForms synchronization context was not installed.");
+
         _themeWatcher = new ThemeWatcher(_window);
+
         _tray = new TrayController();
         _tray.OpenRequested += ShowWindow;
         _tray.SettingsRequested += ShowSettings;
         _tray.ExitRequested += Shutdown;
+
+        _pipeline.CycleCompleted += OnCycleCompleted;
+        _cadence.Start();
 
         if (showWindowOnStart)
         {
             ShowWindow();
         }
     }
+
+    /// <summary>
+    /// Keeps the tray badge in step with the pipeline. The tray is the only part of the app that
+    /// is always visible, so it reflects the real state whether or not a window is open.
+    /// </summary>
+    private void OnCycleCompleted(StepSnapshot snapshot) => _ui.Post(
+        _ =>
+        {
+            StepResult? failure = snapshot.FirstFailure;
+            Severity severity = failure is not null ? Severity.Error
+                : snapshot.AnyWarning ? Severity.Warning
+                : Severity.Ok;
+
+            string text = failure?.Headline
+                ?? snapshot.All.FirstOrDefault(r => r.State == StepState.Warning)?.Headline
+                ?? LocalizationManager.Instance.Get("hero.ok.title");
+
+            _tray.SetStatus(severity, text);
+        },
+        null);
 
     private void ShowWindow()
     {
@@ -87,8 +125,13 @@ public sealed class AppHost : ApplicationContext
     {
         if (disposing)
         {
-            // Tray first: it is the only thing the user can still interact with once teardown has
-            // started, and a visible tray icon backed by a half-disposed app is worse than none.
+            // Order matters on the way out. Stop producing work first (cadence, then pipeline),
+            // then take down what consumes it, and only then the tray - a visible tray icon backed
+            // by a half-disposed app is worse than none.
+            _cadence.Dispose();
+            _pipeline.CycleCompleted -= OnCycleCompleted;
+            _pipeline.Dispose();
+
             _tray.Dispose();
             _themeWatcher.Dispose();
 

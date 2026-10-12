@@ -219,6 +219,7 @@ public sealed class StepPipeline : IDisposable
 
         try
         {
+            await FaultSimulation.ApplyDelayAsync(check, cancellationToken).ConfigureAwait(false);
             return await check.RunAsync(context, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

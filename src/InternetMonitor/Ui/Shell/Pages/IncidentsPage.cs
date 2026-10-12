@@ -1,3 +1,4 @@
+using InternetMonitor.App;
 using InternetMonitor.Ui.Controls;
 
 namespace InternetMonitor.Ui.Shell.Pages;
@@ -6,7 +7,7 @@ namespace InternetMonitor.Ui.Shell.Pages;
 /// Recorded incidents with their timeline, evidence and plain-language explanation. Filled in by
 /// phase 5.
 /// </summary>
-public sealed class IncidentsPage : PageBase
+public sealed class IncidentsPage(AppServices services) : PageBase(services)
 {
     private UnderConstructionCard? _placeholder;
 

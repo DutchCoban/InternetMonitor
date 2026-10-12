@@ -1,3 +1,4 @@
+using InternetMonitor.App;
 using InternetMonitor.Ui.Controls;
 
 namespace InternetMonitor.Ui.Shell.Pages;
@@ -6,7 +7,7 @@ namespace InternetMonitor.Ui.Shell.Pages;
 /// On-demand tools: traceroute with per-hop ownership and gap explanations, speed test, report
 /// export, and (in Debug builds) the fault simulator. Filled in by phases 6 and 7.
 /// </summary>
-public sealed class ToolsPage : PageBase
+public sealed class ToolsPage(AppServices services) : PageBase(services)
 {
     private UnderConstructionCard? _placeholder;
 

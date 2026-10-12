@@ -81,6 +81,26 @@ public static class FaultSimulation
 
     public static void Clear() => Set([]);
 
+    /// <summary>
+    /// An artificial delay inserted before each network check, so the in-flight states can be
+    /// looked at rather than guessed at. A healthy cycle completes in under 300ms, which is good
+    /// news for the product and bad news for anyone trying to verify that the focus arrow and the
+    /// spinners render - they are on screen for a fraction of a second. Debug builds only.
+    /// </summary>
+    public static TimeSpan StepDelay { get; set; } = TimeSpan.Zero;
+
+    public static async Task ApplyDelayAsync(IStepCheck check, CancellationToken cancellationToken)
+    {
+#if DEBUG
+        if (!check.IsLocal && StepDelay > TimeSpan.Zero)
+        {
+            await Task.Delay(StepDelay, cancellationToken).ConfigureAwait(false);
+        }
+#else
+        await Task.CompletedTask.ConfigureAwait(false);
+#endif
+    }
+
     public static bool ShouldFail(StepId step)
     {
 #if DEBUG

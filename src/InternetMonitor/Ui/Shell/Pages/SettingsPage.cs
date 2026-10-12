@@ -1,3 +1,4 @@
+using InternetMonitor.App;
 using InternetMonitor.Ui.Controls;
 
 namespace InternetMonitor.Ui.Shell.Pages;
@@ -6,7 +7,7 @@ namespace InternetMonitor.Ui.Shell.Pages;
 /// Settings, in-place rather than in its own window: checks and endpoints, cadence, appearance,
 /// notifications, logging and the traceroute ownership lookup. Filled in by phase 8.
 /// </summary>
-public sealed class SettingsPage : PageBase
+public sealed class SettingsPage(AppServices services) : PageBase(services)
 {
     private UnderConstructionCard? _placeholder;
 

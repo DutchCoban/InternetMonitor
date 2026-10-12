@@ -1,3 +1,4 @@
+using InternetMonitor.App;
 using InternetMonitor.Ui.Controls;
 
 namespace InternetMonitor.Ui.Shell.Pages;
@@ -6,7 +7,7 @@ namespace InternetMonitor.Ui.Shell.Pages;
 /// The technical view: every step's raw measurements, the derived root cause, and the diagnostic
 /// report tools. Filled in by phase 7.
 /// </summary>
-public sealed class DiagnosticsPage : PageBase
+public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 {
     private UnderConstructionCard? _placeholder;
 

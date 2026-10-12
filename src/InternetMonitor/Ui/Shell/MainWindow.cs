@@ -1,3 +1,4 @@
+using InternetMonitor.App;
 using InternetMonitor.Configuration;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Controls;
@@ -26,15 +27,17 @@ public sealed class MainWindow : Form
     /// </summary>
     private const int RailCollapseWidthDp = 820;
 
+    private readonly AppServices _services;
     private readonly AppSettings _settings;
     private readonly NavRail _rail;
     private readonly Panel _content;
     private readonly Dictionary<string, PageBase> _pages = [];
     private PageBase? _activePage;
 
-    public MainWindow(AppSettings settings)
+    public MainWindow(AppServices services)
     {
-        _settings = settings;
+        _services = services;
+        _settings = services.Settings;
 
         Text = LocalizationManager.Instance.Get("app.name");
         Icon = TrayIconFactory.AppIcon.Value;
@@ -64,12 +67,12 @@ public sealed class MainWindow : Form
         _rail.AddItem(new NavRail.Item("settings", Glyph.Settings));
         _rail.SelectionChanged += ShowPage;
 
-        _pages["status"] = new StatusPage();
-        _pages["diagnostics"] = new DiagnosticsPage();
-        _pages["history"] = new HistoryPage();
-        _pages["incidents"] = new IncidentsPage();
-        _pages["tools"] = new ToolsPage();
-        _pages["settings"] = new SettingsPage();
+        _pages["status"] = new StatusPage(services);
+        _pages["diagnostics"] = new DiagnosticsPage(services);
+        _pages["history"] = new HistoryPage(services);
+        _pages["incidents"] = new IncidentsPage(services);
+        _pages["tools"] = new ToolsPage(services);
+        _pages["settings"] = new SettingsPage(services);
 
         foreach (PageBase page in _pages.Values)
         {
@@ -128,6 +131,15 @@ public sealed class MainWindow : Form
         }
 
         _rail.Collapsed = ClientSize.Width < Theme.Dp(RailCollapseWidthDp, DeviceDpi);
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+
+        // The cadence controller only needs to know whether anyone can see a result. Hiding the
+        // window drops it back to the background interval without stopping monitoring.
+        _services.Cadence.Foreground = Visible;
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

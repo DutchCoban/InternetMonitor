@@ -27,15 +27,25 @@ internal static class Program
     /// </summary>
     private const string SimulateArgument = "--simulate";
 
+    /// <summary>Milliseconds of artificial delay per network step, so in-flight UI can be observed.</summary>
+    private const string SimulateDelayArgument = "--simulate-delay";
+
     [STAThread]
     private static void Main(string[] args)
     {
+        // Applies to both the headless self-test and the real UI, so the failure screens can be
+        // looked at as well as transcribed. A no-op in Release builds.
+        FaultSimulation.Set(SelfTest.ParseSteps(TryGetArgumentValue(args, SimulateArgument)));
+        if (int.TryParse(TryGetArgumentValue(args, SimulateDelayArgument), out int delayMs) && delayMs > 0)
+        {
+            FaultSimulation.StepDelay = TimeSpan.FromMilliseconds(delayMs);
+        }
+
         if (TryGetArgumentValue(args, SelfTestArgument) is { } selfTestPath)
         {
             // Deliberately before the single-instance check: running a diagnostic cycle must work
             // while the real app is sitting in the tray, which is exactly when you want it.
             LocalizationManager.Initialize(AppSettings.Load().Language);
-            FaultSimulation.Set(SelfTest.ParseSteps(TryGetArgumentValue(args, SimulateArgument)));
             Environment.ExitCode = SelfTest.RunAsync(selfTestPath).GetAwaiter().GetResult();
             return;
         }
