@@ -263,5 +263,22 @@
   "hop.longHaul": "Tutaj ruch opuszcza {0} w stronę {1}; to tłumaczy dodatkowe {2} ms.",
   "hop.ispPrivateNetwork": "Prywatny adres, ale nie Twoja własna sieć - prawdopodobnie wewnątrz wewnętrznej sieci dostawcy.",
   "hop.privateNetworkUnknown": "Prywatny adres (RFC 1918).",
-  "chart.state.partial": "Częściowo połączono"
+  "chart.state.partial": "Częściowo połączono",
+  "diagnostics.table.title": "Kroki",
+  "diagnostics.table.subtitle": "Wybierz krok, aby zobaczyć pełne szczegóły",
+  "diagnostics.detail.title": "Szczegóły",
+  "diagnostics.copy": "Kopiuj diagnostykę",
+  "diagnostics.copy.done": "Skopiowano!",
+  "diagnostics.banner.lastCheck": "Ostatnia kontrola o {0}",
+  "diagnostics.measurements": "Pomiary",
+  "diagnostics.duration": "Trwało {0} ms",
+  "diagnostics.skippedExplanation": "Ten krok nie został sprawdzony, ponieważ wcześniejszy już zawiódł - nic tu nie zmierzono.",
+  "diagnostics.status.ok": "OK",
+  "diagnostics.status.warning": "Ostrzeżenie",
+  "diagnostics.status.failed": "Niepowodzenie",
+  "diagnostics.status.skipped": "Pominięto",
+  "report.title": "Internet Monitor - raport diagnostyczny",
+  "report.generated": "Wygenerowano: {0}",
+  "report.status": "Status: {0}",
+  "report.steps": "Kroki:"
 }

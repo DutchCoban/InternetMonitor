@@ -29,7 +29,11 @@ public sealed class StepList : ThemedControl
     private static readonly StepId[] Order =
         [StepId.Adapter, StepId.Link, StepId.IpAddress, StepId.Gateway, StepId.PublicIp, StepId.Dns, StepId.Target];
 
-    private static readonly Dictionary<StepId, Glyph> Glyphs = new()
+    /// <summary>
+    /// Internal rather than private so DiagnosticsPage's StepTable can use the same icon per step
+    /// instead of keeping a second copy of this mapping in sync with it.
+    /// </summary>
+    internal static readonly Dictionary<StepId, Glyph> Glyphs = new()
     {
         [StepId.Adapter] = Glyph.Adapter,
         [StepId.Link] = Glyph.Cable,

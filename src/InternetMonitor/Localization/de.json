@@ -263,5 +263,22 @@
   "hop.longHaul": "Hier verlässt der Verkehr {0} Richtung {1}; das erklärt die zusätzlichen {2} ms.",
   "hop.ispPrivateNetwork": "Privater Adressbereich, aber nicht Ihr eigenes Netzwerk - wahrscheinlich innerhalb des internen Netzwerks Ihres Anbieters.",
   "hop.privateNetworkUnknown": "Privater Adressbereich (RFC 1918).",
-  "chart.state.partial": "Teilweise verbunden"
+  "chart.state.partial": "Teilweise verbunden",
+  "diagnostics.table.title": "Schritte",
+  "diagnostics.table.subtitle": "Schritt wählen für alle Details",
+  "diagnostics.detail.title": "Detail",
+  "diagnostics.copy": "Diagnose kopieren",
+  "diagnostics.copy.done": "Kopiert!",
+  "diagnostics.banner.lastCheck": "Letzte Prüfung um {0}",
+  "diagnostics.measurements": "Messwerte",
+  "diagnostics.duration": "Dauerte {0} ms",
+  "diagnostics.skippedExplanation": "Dieser Schritt wurde nicht geprüft, weil ein vorheriger bereits fehlgeschlagen ist - hier wurde nichts gemessen.",
+  "diagnostics.status.ok": "OK",
+  "diagnostics.status.warning": "Warnung",
+  "diagnostics.status.failed": "Fehlgeschlagen",
+  "diagnostics.status.skipped": "Übersprungen",
+  "report.title": "Internet Monitor - Diagnosebericht",
+  "report.generated": "Erstellt: {0}",
+  "report.status": "Status: {0}",
+  "report.steps": "Schritte:"
 }

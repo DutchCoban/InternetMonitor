@@ -25,6 +25,7 @@ public enum Glyph
     Globe,
     Dns,
     Target,
+    Copy,
 }
 
 /// <summary>
@@ -228,7 +229,26 @@ internal static class Icons
                 g.DrawEllipse(pen, 8f, 8f, 8f, 8f);
                 g.FillEllipse(brush, 10.8f, 10.8f, 2.4f, 2.4f);
                 break;
+
+            case Glyph.Copy:
+                // Two overlapping rounded sheets - the back one peeking out top-left is what
+                // reads as "copy" rather than just "document".
+                g.DrawRoundedRect(pen, 2.5f, 5.5f, 13f, 15f, 2f);
+                g.DrawRoundedRect(pen, 8.5f, 2.5f, 13f, 15f, 2f);
+                break;
         }
+    }
+
+    private static void DrawRoundedRect(this Graphics g, Pen pen, float x, float y, float w, float h, float r)
+    {
+        using var path = new GraphicsPath();
+        float d = r * 2f;
+        path.AddArc(x, y, d, d, 180f, 90f);
+        path.AddArc(x + w - d, y, d, d, 270f, 90f);
+        path.AddArc(x + w - d, y + h - d, d, d, 0f, 90f);
+        path.AddArc(x, y + h - d, d, d, 90f, 90f);
+        path.CloseFigure();
+        g.DrawPath(pen, path);
     }
 
     /// <summary>

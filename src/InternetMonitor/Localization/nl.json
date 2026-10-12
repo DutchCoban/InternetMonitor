@@ -263,5 +263,22 @@
   "hop.longHaul": "Hier verlaat het verkeer {0} richting {1}; dat verklaart de extra {2} ms.",
   "hop.ispPrivateNetwork": "Privéadres, maar niet je eigen netwerk - waarschijnlijk binnen het interne netwerk van je provider.",
   "hop.privateNetworkUnknown": "Privéadres (RFC 1918).",
-  "chart.state.partial": "Deels verbonden"
+  "chart.state.partial": "Deels verbonden",
+  "diagnostics.table.title": "Stappen",
+  "diagnostics.table.subtitle": "Kies een stap voor de volledige details",
+  "diagnostics.detail.title": "Detail",
+  "diagnostics.copy": "Kopieer diagnostiek",
+  "diagnostics.copy.done": "Gekopieerd!",
+  "diagnostics.banner.lastCheck": "Laatste controle om {0}",
+  "diagnostics.measurements": "Metingen",
+  "diagnostics.duration": "Duurde {0} ms",
+  "diagnostics.skippedExplanation": "Deze stap is niet getest omdat een eerdere stap al mislukte - hier is niets gemeten.",
+  "diagnostics.status.ok": "OK",
+  "diagnostics.status.warning": "Waarschuwing",
+  "diagnostics.status.failed": "Mislukt",
+  "diagnostics.status.skipped": "Overgeslagen",
+  "report.title": "Internet Monitor - diagnoserapport",
+  "report.generated": "Gegenereerd: {0}",
+  "report.status": "Status: {0}",
+  "report.steps": "Stappen:"
 }

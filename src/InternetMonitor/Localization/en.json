@@ -263,5 +263,22 @@
   "hop.longHaul": "The traffic leaves {0} for {1} here, which is what the extra {2} ms is.",
   "hop.ispPrivateNetwork": "Private address space, but not your own LAN - likely inside your provider's internal network.",
   "hop.privateNetworkUnknown": "Private address space (RFC 1918).",
-  "chart.state.partial": "Partially connected"
+  "chart.state.partial": "Partially connected",
+  "diagnostics.table.title": "Steps",
+  "diagnostics.table.subtitle": "Select a step for its full detail",
+  "diagnostics.detail.title": "Detail",
+  "diagnostics.copy": "Copy diagnostics",
+  "diagnostics.copy.done": "Copied!",
+  "diagnostics.banner.lastCheck": "Last check at {0}",
+  "diagnostics.measurements": "Measurements",
+  "diagnostics.duration": "Took {0} ms",
+  "diagnostics.skippedExplanation": "This step was not tested because an earlier one already failed - nothing was measured here.",
+  "diagnostics.status.ok": "OK",
+  "diagnostics.status.warning": "Warning",
+  "diagnostics.status.failed": "Failed",
+  "diagnostics.status.skipped": "Skipped",
+  "report.title": "Internet Monitor - diagnostic report",
+  "report.generated": "Generated: {0}",
+  "report.status": "Status: {0}",
+  "report.steps": "Steps:"
 }
