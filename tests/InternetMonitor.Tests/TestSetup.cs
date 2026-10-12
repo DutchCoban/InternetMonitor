@@ -1,0 +1,22 @@
+using System.Runtime.CompilerServices;
+using InternetMonitor.Localization;
+
+namespace InternetMonitor.Tests;
+
+/// <summary>
+/// One-time setup for the whole test assembly.
+///
+/// Most of the diagnosis layer - HopAnnotator included - looks up its user-facing text through
+/// <see cref="LocalizationManager.Instance"/> rather than hardcoding a language, exactly like the
+/// rest of the app. That instance does not exist until <see cref="LocalizationManager.Initialize"/>
+/// is called once, so every test that exercises that code needs it to have happened first.
+///
+/// <see cref="ModuleInitializerAttribute"/> runs this exactly once, before any test in the
+/// assembly, which is the right scope: a per-test-class static constructor would work too, but
+/// would mean remembering to add one to every new test class rather than solving it here, once.
+/// </summary>
+internal static class TestSetup
+{
+    [ModuleInitializer]
+    internal static void Initialize() => LocalizationManager.Initialize("en");
+}
