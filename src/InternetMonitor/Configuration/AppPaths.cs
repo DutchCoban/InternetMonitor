@@ -9,8 +9,23 @@ namespace InternetMonitor.Configuration;
 /// </summary>
 public static class AppPaths
 {
-    public static string Root { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "InternetMonitor");
+    /// <summary>
+    /// Overrides where everything is stored. Set it to a scratch directory to exercise the app
+    /// against throwaway settings, history and incidents instead of the real ones - which matters
+    /// because testing a fault means recording an incident, and a simulated outage has no business
+    /// appearing in somebody's actual incident log.
+    /// </summary>
+    private const string DataDirectoryVariable = "INTERNETMONITOR_DATA_DIR";
+
+    public static string Root { get; } = ResolveRoot();
+
+    private static string ResolveRoot()
+    {
+        string? overridden = Environment.GetEnvironmentVariable(DataDirectoryVariable);
+        return string.IsNullOrWhiteSpace(overridden)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "InternetMonitor")
+            : overridden;
+    }
 
     /// <summary>
     /// v1's settings file. Read once by the phase-8 migration and never written by v2.

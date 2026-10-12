@@ -1,5 +1,6 @@
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.History;
+using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Steps;
 
 namespace InternetMonitor.App;
@@ -18,7 +19,8 @@ public sealed class AppServices(
     CheckTargets targets,
     StepPipeline pipeline,
     CadenceController cadence,
-    MetricStore history)
+    MetricStore history,
+    IncidentStore incidents)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -30,4 +32,6 @@ public sealed class AppServices(
     public CadenceController Cadence { get; } = cadence;
 
     public MetricStore History { get; } = history;
+
+    public IncidentStore Incidents { get; } = incidents;
 }

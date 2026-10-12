@@ -37,11 +37,21 @@ public sealed class PageHeader : ThemedControl
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.RightToLeft,
             WrapContents = false,
-            BackColor = Color.Transparent,
             Margin = Padding.Empty,
         };
         Controls.Add(_actionBar);
+        ApplyActionBarColor();
     }
+
+    /// <summary>
+    /// Keeps the action bar's BackColor equal to the page background.
+    ///
+    /// It must not be Color.Transparent: owner-drawn children ask their parent what is behind them
+    /// and fill with it, so a transparent parent means filling with alpha zero - which leaves
+    /// whatever was in the buffer and renders as black. A themed button on the header looked like
+    /// a solid black slab until this was set to a real colour.
+    /// </summary>
+    private void ApplyActionBarColor() => _actionBar.BackColor = Theme.Current.Bg;
 
     public string Title
     {
@@ -105,7 +115,11 @@ public sealed class PageHeader : ThemedControl
         }
     }
 
-    protected override void OnThemeChanged() => UpdateHeight();
+    protected override void OnThemeChanged()
+    {
+        UpdateHeight();
+        ApplyActionBarColor();
+    }
 
     protected override void OnPaint(PaintEventArgs e)
     {

@@ -1,5 +1,7 @@
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.History;
+using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
@@ -23,6 +25,9 @@ public sealed class AppHost : ApplicationContext
     private readonly StepPipeline _pipeline;
     private readonly CadenceController _cadence;
     private readonly MetricStore _history;
+    private readonly IncidentStore _incidents;
+    private readonly ChangeDetector _changes;
+    private readonly IncidentTracker _tracker;
     private readonly TrayController _tray;
     private readonly MainWindow _window;
     private readonly SynchronizationContext _ui;
@@ -53,7 +58,11 @@ public sealed class AppHost : ApplicationContext
             MinimumSampleInterval = TimeSpan.FromSeconds(_settings.BackgroundIntervalSeconds),
         };
 
-        var services = new AppServices(_settings, targets, _pipeline, _cadence, _history);
+        _incidents = new IncidentStore();
+        _changes = new ChangeDetector();
+        _tracker = new IncidentTracker(_incidents, _changes);
+
+        var services = new AppServices(_settings, targets, _pipeline, _cadence, _history, _incidents);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -70,6 +79,8 @@ public sealed class AppHost : ApplicationContext
         _tray.ExitRequested += Shutdown;
 
         _pipeline.CycleCompleted += OnCycleCompleted;
+        _pipeline.StepChanged += _tracker.NoteStepChange;
+        _incidents.Changed += OnIncidentsChanged;
         _cadence.Start();
 
         if (showWindowOnStart)
@@ -90,7 +101,11 @@ public sealed class AppHost : ApplicationContext
     private void OnCycleCompleted(StepSnapshot snapshot)
     {
         RecordHistory(snapshot);
-        UpdateTray(snapshot);
+
+        RootCauseResult diagnosis = RootCauseAnalyzer.Analyze(snapshot);
+        _tracker.Observe(snapshot, diagnosis);
+
+        UpdateTray(snapshot, diagnosis);
     }
 
     /// <summary>
@@ -118,19 +133,32 @@ public sealed class AppHost : ApplicationContext
         }
     }
 
-    private void UpdateTray(StepSnapshot snapshot) => _ui.Post(
+    private void UpdateTray(StepSnapshot snapshot, RootCauseResult diagnosis) => _ui.Post(
         _ =>
         {
-            StepResult? failure = snapshot.FirstFailure;
-            Severity severity = failure is not null ? Severity.Error
-                : snapshot.AnyWarning ? Severity.Warning
-                : Severity.Ok;
+            Ui.Theming.Severity severity = diagnosis.Severity switch
+            {
+                Core.Diagnosis.Severity.Error => Ui.Theming.Severity.Error,
+                Core.Diagnosis.Severity.Degraded => Ui.Theming.Severity.Warning,
+                _ => Ui.Theming.Severity.Ok,
+            };
 
-            string text = failure?.Headline
+            string text = snapshot.FirstFailure?.Headline
                 ?? snapshot.All.FirstOrDefault(r => r.State == StepState.Warning)?.Headline
                 ?? LocalizationManager.Instance.Get("hero.ok.title");
 
             _tray.SetStatus(severity, text);
+        },
+        null);
+
+    /// <summary>Keeps the nav rail's incident badge in step with the store.</summary>
+    private void OnIncidentsChanged() => _ui.Post(
+        _ =>
+        {
+            if (!_window.IsDisposed)
+            {
+                _window.SetIncidentBadge(_incidents.ActiveCount);
+            }
         },
         null);
 
@@ -176,6 +204,8 @@ public sealed class AppHost : ApplicationContext
             // by a half-disposed app is worse than none.
             _cadence.Dispose();
             _pipeline.CycleCompleted -= OnCycleCompleted;
+            _pipeline.StepChanged -= _tracker.NoteStepChange;
+            _incidents.Changed -= OnIncidentsChanged;
             _pipeline.Dispose();
 
             // Blocking on shutdown is acceptable and necessary: this is the final flush, and
