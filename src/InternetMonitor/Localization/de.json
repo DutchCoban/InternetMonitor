@@ -260,5 +260,7 @@
   "hop.loadBalanced": "Antworten kamen von {0} verschiedenen Adressen - der Verkehr verteilt sich auf parallele Pfade.",
   "hop.privateNetwork": "Noch innerhalb Ihres eigenen Netzwerks.",
   "hop.cgnat": "Im Netz Ihres Anbieters, auf einer gemeinsam genutzten CGNAT-Adresse.",
-  "hop.longHaul": "Hier verlässt der Verkehr {0} Richtung {1}; das erklärt die zusätzlichen {2} ms."
+  "hop.longHaul": "Hier verlässt der Verkehr {0} Richtung {1}; das erklärt die zusätzlichen {2} ms.",
+  "hop.ispPrivateNetwork": "Privater Adressbereich, aber nicht Ihr eigenes Netzwerk - wahrscheinlich innerhalb des internen Netzwerks Ihres Anbieters.",
+  "hop.privateNetworkUnknown": "Privater Adressbereich (RFC 1918)."
 }

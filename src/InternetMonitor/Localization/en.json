@@ -260,5 +260,7 @@
   "hop.loadBalanced": "Answers came from {0} different addresses - the traffic is spread across parallel paths.",
   "hop.privateNetwork": "Still inside your own network.",
   "hop.cgnat": "Inside your provider's network, on a shared carrier-grade NAT address.",
-  "hop.longHaul": "The traffic leaves {0} for {1} here, which is what the extra {2} ms is."
+  "hop.longHaul": "The traffic leaves {0} for {1} here, which is what the extra {2} ms is.",
+  "hop.ispPrivateNetwork": "Private address space, but not your own LAN - likely inside your provider's internal network.",
+  "hop.privateNetworkUnknown": "Private address space (RFC 1918)."
 }

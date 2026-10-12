@@ -95,7 +95,41 @@ public sealed class AppHost : ApplicationContext
 
         if (initialTrace is not null)
         {
-            _window.StartTraceroute(initialTrace);
+            // Fire-and-forget by design: StartInitialTraceAsync is the whole of what has to
+            // happen before the trace starts, and nothing here needs its result.
+            _ = StartInitialTraceAsync(initialTrace);
+        }
+    }
+
+    /// <summary>
+    /// Starts a command-line-requested trace once the pipeline has had a chance to complete its
+    /// first cycle, capped at a short timeout so a slow first cycle never blocks the trace from
+    /// starting at all.
+    ///
+    /// Without this, --trace used right at startup fires before <see cref="StepPipeline.LatestSnapshot"/>
+    /// exists, so the traceroute has no known local subnet to compare hops against and
+    /// HopAnnotator correctly falls back to "unknown" for every private-address hop - accurate,
+    /// but worse than the precise "your own network" / "your provider's network" distinction that
+    /// is available a few hundred milliseconds later.
+    /// </summary>
+    private async Task StartInitialTraceAsync(string target)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        try
+        {
+            while (_pipeline.LatestSnapshot is null)
+            {
+                await Task.Delay(50, timeout.Token).ConfigureAwait(true);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Timed out waiting - start the trace anyway, just without the local-subnet context.
+        }
+
+        if (!_window.IsDisposed)
+        {
+            _window.StartTraceroute(target);
         }
     }
 

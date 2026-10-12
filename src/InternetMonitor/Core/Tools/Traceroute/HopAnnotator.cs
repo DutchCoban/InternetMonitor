@@ -26,17 +26,25 @@ public static class HopAnnotator
     /// </summary>
     private const double LongHaulJumpMs = 25;
 
-    public static void Annotate(IReadOnlyList<TracerouteHop> hops, bool reachedDestination)
+    public static void Annotate(
+        IReadOnlyList<TracerouteHop> hops,
+        bool reachedDestination,
+        (IPAddress Address, IPAddress? Mask)? localNetwork = null)
     {
         LocalizationManager loc = LocalizationManager.Instance;
 
         for (int i = 0; i < hops.Count; i++)
         {
-            hops[i].Annotation = Describe(hops, i, reachedDestination, loc);
+            hops[i].Annotation = Describe(hops, i, reachedDestination, localNetwork, loc);
         }
     }
 
-    private static string? Describe(IReadOnlyList<TracerouteHop> hops, int index, bool reachedDestination, LocalizationManager loc)
+    private static string? Describe(
+        IReadOnlyList<TracerouteHop> hops,
+        int index,
+        bool reachedDestination,
+        (IPAddress Address, IPAddress? Mask)? localNetwork,
+        LocalizationManager loc)
     {
         TracerouteHop hop = hops[index];
 
@@ -108,7 +116,27 @@ public static class HopAnnotator
         IPAddress address = hop.Responders[0];
         if (IsPrivate(address))
         {
-            return loc.Get("hop.privateNetwork");
+            // RFC 1918 covers the whole of 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16 - far
+            // bigger than any one person's LAN. A hop can easily be private address space that
+            // belongs to the ISP rather than the user: several providers number their internal
+            // equipment out of 10.x the same way others use real CGNAT (100.64.0.0/10), and
+            // calling that "your own network" is simply wrong.
+            //
+            // Tri-state rather than a plain bool: when the caller could not supply the local
+            // subnet (the traceroute ran before the pipeline had completed a first cycle, say),
+            // the honest answer is "unknown", not a guess in either direction. Asserting "not your
+            // network" without evidence would be exactly the same kind of wrong claim this fix
+            // exists to remove, just pointed the other way.
+            bool? isActuallyLocal = localNetwork is { } local
+                ? IsWithinSubnet(address, local.Address, local.Mask)
+                : null;
+
+            return isActuallyLocal switch
+            {
+                true => loc.Get("hop.privateNetwork"),
+                false => loc.Get("hop.ispPrivateNetwork"),
+                null => loc.Get("hop.privateNetworkUnknown"),
+            };
         }
 
         if (IsCarrierGradeNat(address))
@@ -131,7 +159,36 @@ public static class HopAnnotator
         return null;
     }
 
-    /// <summary>RFC 1918 and link-local - still inside the user's own network.</summary>
+    /// <summary>
+    /// Whether <paramref name="address"/> falls inside the subnet described by
+    /// <paramref name="localAddress"/> and <paramref name="mask"/> - the user's own LAN, as
+    /// measured by step 3. Falls back to a /24 when no mask was available, which is the common
+    /// case and a reasonable default rather than refusing to answer.
+    /// </summary>
+    private static bool IsWithinSubnet(IPAddress address, IPAddress localAddress, IPAddress? mask)
+    {
+        if (address.AddressFamily != AddressFamily.InterNetwork || localAddress.AddressFamily != AddressFamily.InterNetwork)
+        {
+            return false;
+        }
+
+        byte[] addressBytes = address.GetAddressBytes();
+        byte[] localBytes = localAddress.GetAddressBytes();
+        byte[] maskBytes = (mask is { AddressFamily: AddressFamily.InterNetwork } m ? m : IPAddress.Parse("255.255.255.0"))
+            .GetAddressBytes();
+
+        for (int i = 0; i < 4; i++)
+        {
+            if ((addressBytes[i] & maskBytes[i]) != (localBytes[i] & maskBytes[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>RFC 1918 and link-local address space - not necessarily the user's own network, see <see cref="IsWithinSubnet"/>.</summary>
     public static bool IsPrivate(IPAddress address)
     {
         if (address.AddressFamily != AddressFamily.InterNetwork)

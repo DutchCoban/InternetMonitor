@@ -159,10 +159,17 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         var runner = new TracerouteRunner();
         var progress = new Progress<TracerouteHop>(hop => _view.AddHop(hop));
 
+        // The user's own subnet, so HopAnnotator can tell "this hop is inside your LAN" apart from
+        // "this hop is private address space the ISP happens to use internally" - both are RFC
+        // 1918 and otherwise indistinguishable.
+        IpAddressFacts? localIp = Services.Pipeline.LatestSnapshot?.FactsFor<IpAddressFacts>(StepId.IpAddress);
+        (System.Net.IPAddress Address, System.Net.IPAddress? Mask)? localNetwork =
+            localIp?.Address is { } address ? (address, localIp.SubnetMask) : null;
+
         try
         {
             TracerouteResult result = await runner
-                .RunAsync(target, progress, TracerouteRunner.Enricher(ownership), cts.Token)
+                .RunAsync(target, progress, TracerouteRunner.Enricher(ownership), cts.Token, localNetwork)
                 .ConfigureAwait(true);
 
             _view.Status = result.TargetAddress is null

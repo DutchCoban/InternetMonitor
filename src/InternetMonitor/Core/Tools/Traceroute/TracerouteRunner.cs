@@ -36,13 +36,17 @@ public sealed class TracerouteRunner
     /// <summary>
     /// Runs a trace, reporting each hop as it is resolved. <paramref name="enrich"/> is given each
     /// hop after it is reported, to fill in reverse DNS and ownership without holding up the
-    /// measurement.
+    /// measurement. <paramref name="localNetwork"/> is the caller's own address and subnet mask -
+    /// passed through to <see cref="HopAnnotator"/> so that private address space belonging to the
+    /// user's own LAN can be told apart from private address space an ISP happens to use
+    /// internally, which is otherwise indistinguishable (both are RFC 1918).
     /// </summary>
     public async Task<TracerouteResult> RunAsync(
         string target,
         IProgress<TracerouteHop>? progress,
         Func<TracerouteHop, CancellationToken, Task>? enrich,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        (IPAddress Address, IPAddress? Mask)? localNetwork = null)
     {
         DateTimeOffset started = DateTimeOffset.UtcNow;
         long startTicks = Environment.TickCount64;
@@ -97,7 +101,7 @@ public sealed class TracerouteRunner
             // exactly what happens for an address no registry knows about anyway.
         }
 
-        HopAnnotator.Annotate(hops, reached);
+        HopAnnotator.Annotate(hops, reached, localNetwork);
 
         return new TracerouteResult(
             target,
