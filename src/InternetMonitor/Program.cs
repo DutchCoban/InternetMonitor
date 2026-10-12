@@ -1,5 +1,6 @@
 using InternetMonitor.App;
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 
 namespace InternetMonitor;
@@ -14,9 +15,31 @@ internal static class Program
     /// </summary>
     private const string ShowWindowArgument = "--show";
 
+    /// <summary>
+    /// Runs one headless check cycle, writes a transcript to the path that follows, and exits.
+    /// A development and support aid - see <see cref="SelfTest"/>.
+    /// </summary>
+    private const string SelfTestArgument = "--selftest";
+
+    /// <summary>
+    /// Comma-separated step keys to force into failure, e.g. "--simulate gateway,dns". Debug
+    /// builds only - see <see cref="FaultSimulation"/>.
+    /// </summary>
+    private const string SimulateArgument = "--simulate";
+
     [STAThread]
     private static void Main(string[] args)
     {
+        if (TryGetArgumentValue(args, SelfTestArgument) is { } selfTestPath)
+        {
+            // Deliberately before the single-instance check: running a diagnostic cycle must work
+            // while the real app is sitting in the tray, which is exactly when you want it.
+            LocalizationManager.Initialize(AppSettings.Load().Language);
+            FaultSimulation.Set(SelfTest.ParseSteps(TryGetArgumentValue(args, SimulateArgument)));
+            Environment.ExitCode = SelfTest.RunAsync(selfTestPath).GetAwaiter().GetResult();
+            return;
+        }
+
         using SingleInstanceManager? instance = SingleInstanceManager.TryAcquire();
         if (instance is null)
         {
@@ -33,6 +56,28 @@ internal static class Program
 
         ApplicationConfiguration.Initialize();
         Application.Run(new AppHost(showWindow));
+    }
+
+    /// <summary>
+    /// Reads "--name value" or "--name=value" from the command line, returning null when the flag
+    /// is absent.
+    /// </summary>
+    private static string? TryGetArgumentValue(string[] args, string name)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith(name + "=", StringComparison.OrdinalIgnoreCase))
+            {
+                return args[i][(name.Length + 1)..];
+            }
+
+            if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                return args[i + 1];
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
