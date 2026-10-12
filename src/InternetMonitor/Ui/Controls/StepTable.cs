@@ -37,10 +37,19 @@ public sealed class StepTable : ThemedControl
 
     private int RowHeight => Dp(44);
 
+    /// <summary>
+    /// Applies a step's new state. Only a genuinely resolved result (Ok/Warning/Failed/Skipped)
+    /// ever changes what the row shows - the pipeline republishes every step on every cycle, and
+    /// without this a perfectly healthy row would flash its status to "waiting"/"testing..." on
+    /// every routine background refresh, several times a minute, even though nothing had changed.
+    /// </summary>
     public void Apply(StepResult result)
     {
-        _results[result.Step] = result;
-        Invalidate();
+        if (result.State.IsResolved() || !_results.TryGetValue(result.Step, out StepResult? shown) || !shown.State.IsResolved())
+        {
+            _results[result.Step] = result;
+            Invalidate();
+        }
     }
 
     public StepResult ResultFor(StepId step) => _results[step];

@@ -46,7 +46,18 @@ public sealed class StepList : ThemedControl
 
     private const int AnimationIntervalMs = 33;
 
+    // Two dictionaries, deliberately not one. _results is what gets drawn as text - the last
+    // genuinely RESOLVED result for each step - and it is only ever replaced by another resolved
+    // result. _liveState is the actual current state including the transient Pending/Running the
+    // pipeline republishes on every cycle, used purely to decide where the arrow and spinners go.
+    //
+    // Without this split, a step that has been healthy for an hour would still flash its text to
+    // "waiting"/"testing..." every time the background cycle re-ran it - which on a 3s foreground
+    // interval is several times a minute, forever, even though nothing had actually changed. The
+    // arrow and spinner already say "this is being re-checked right now"; the row's own text has
+    // no business also announcing that by briefly going blank.
     private readonly Dictionary<StepId, StepResult> _results = [];
+    private readonly Dictionary<StepId, StepState> _liveState = [];
     private readonly HashSet<StepId> _expanded = [];
     private readonly System.Windows.Forms.Timer _animation;
     private double _phase;
@@ -60,6 +71,7 @@ public sealed class StepList : ThemedControl
         foreach (StepId step in Order)
         {
             _results[step] = StepResult.Pending(step);
+            _liveState[step] = StepState.Pending;
         }
     }
 
@@ -91,10 +103,21 @@ public sealed class StepList : ThemedControl
         }
     }
 
-    /// <summary>Applies one step's new state. Called for every transition, including Running.</summary>
+    /// <summary>
+    /// Applies one step's new state. Called for every transition, including Running - but only a
+    /// genuinely resolved result (Ok/Warning/Failed/Skipped) ever changes what the row displays.
+    /// A Pending or Running update still moves the arrow/spinner; it just does not touch the text
+    /// underneath it.
+    /// </summary>
     public void Apply(StepResult result)
     {
-        _results[result.Step] = result;
+        _liveState[result.Step] = result.State;
+
+        if (result.State.IsResolved() || !_results.TryGetValue(result.Step, out StepResult? shown) || !shown.State.IsResolved())
+        {
+            _results[result.Step] = result;
+        }
+
         UpdateAnimationState();
         Invalidate();
     }
@@ -104,6 +127,7 @@ public sealed class StepList : ThemedControl
         foreach (StepId step in Order)
         {
             _results[step] = StepResult.Pending(step);
+            _liveState[step] = StepState.Pending;
         }
 
         UpdateAnimationState();
@@ -112,16 +136,17 @@ public sealed class StepList : ThemedControl
 
     /// <summary>
     /// The step the arrow is on: the lowest-numbered one still running. Null when nothing is in
-    /// flight.
+    /// flight. Reads live state, not the displayed result - the displayed result for a step
+    /// currently running is still last cycle's, by design.
     /// </summary>
     private StepId? FocusStep => Order
-        .Where(s => _results[s].State == StepState.Running)
+        .Where(s => _liveState.GetValueOrDefault(s, StepState.Pending) == StepState.Running)
         .Cast<StepId?>()
         .FirstOrDefault();
 
     private void UpdateAnimationState()
     {
-        bool anyRunning = Order.Any(s => _results[s].State == StepState.Running);
+        bool anyRunning = Order.Any(s => _liveState.GetValueOrDefault(s, StepState.Pending) == StepState.Running);
         if (anyRunning && !_animation.Enabled)
         {
             _animation.Start();
@@ -290,10 +315,11 @@ public sealed class StepList : ThemedControl
             {
                 DrawFocusArrow(g, p, arrowColumn, y);
             }
-            else if (result.State == StepState.Running)
+            else if (_liveState.GetValueOrDefault(step, StepState.Pending) == StepState.Running)
             {
                 // A second in-flight step: a spinner, not a second arrow. Both are true at once
-                // and the display should say so.
+                // and the display should say so. Live state, not the displayed result - the
+                // result is still showing last cycle's value while this one is re-checked.
                 DrawSpinner(g, p, arrowColumn, y);
             }
 

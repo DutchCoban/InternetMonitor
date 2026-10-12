@@ -124,13 +124,18 @@ public sealed class StepPipeline : IDisposable
 
         lock (_gate)
         {
+            // _current is still cleared every cycle - DrainHeldFailures relies on it holding only
+            // this cycle's own results when it checks whether a step's upstream has resolved yet.
+            // What used to follow this, an explicit Pending publish for all seven steps, is gone:
+            // both StepList and StepTable already start their own display at Pending before any
+            // event ever arrives, so re-announcing it here on every single cycle - including the
+            // thousands after the first, on a healthy connection that never changes - bought
+            // nothing except an extra StepChanged event and a repaint for every step, every few
+            // seconds, forever. That is what made the dashboard feel like it kept wiping itself
+            // clean on each refresh: each step now goes straight from last cycle's real result to
+            // Running to this cycle's real result, with nothing resetting in between.
             _current.Clear();
             _heldFailures.Clear();
-        }
-
-        foreach (StepId step in AllSteps)
-        {
-            Publish(StepResult.Pending(step));
         }
 
         StepId? localFailure = await RunLocalChecksAsync(context, cancellationToken).ConfigureAwait(false);

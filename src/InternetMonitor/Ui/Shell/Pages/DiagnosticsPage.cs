@@ -184,7 +184,13 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     private void OnStepChanged(StepResult result) => Post(() =>
     {
         _table.Apply(result);
-        if (result.Step == _table.Selected)
+
+        // Only a genuinely resolved result updates the detail panel. Without this, selecting a
+        // step and watching it would mean the detail panel blanking to "testing..." on every
+        // background refresh of that one step, which is exactly the flicker this whole change
+        // exists to remove - the panel now simply keeps showing the last real answer until there
+        // is a new one.
+        if (result.Step == _table.Selected && result.State.IsResolved())
         {
             _detail.Show(result.Step, result);
         }
