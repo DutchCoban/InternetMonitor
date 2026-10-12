@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Internet Monitor v2. During the v1 -> v2 transition both projects live in the same
+       solution so their behaviour can be compared side by side; the project file is named
+       InternetMonitorV2 only to avoid a duplicate-project-name clash in the solution, while
+       AssemblyName stays "InternetMonitor" so the shipped executable keeps its name. At
+       cutover v1 is deleted and this file is renamed to InternetMonitor.csproj. -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>InternetMonitor</RootNamespace>
+    <AssemblyName>InternetMonitor</AssemblyName>
+
+    <ApplicationIcon>..\..\Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <Version>2.0.0</Version>
+    <Product>Internet Monitor</Product>
+    <Company>Internet Monitor</Company>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- WFO1000 demands [DefaultValue]/[DesignerSerializationVisibility] on every public property
+         of a Control subclass, so the WinForms designer can serialise it into a .Designer.cs file.
+         This project has no designer files at all - every control is constructed in code, exactly
+         as in v1 - so there is nothing to serialise and the attributes would be pure noise on
+         roughly thirty properties. Scoped off here rather than suppressed at each site. -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
+
+    <!-- Only these are ever loaded (see LocalizationManager.SupportedLanguages) - this stops the
+         self-contained runtime from also bundling framework satellite resource assemblies for
+         every other language, which otherwise ship unused. -->
+    <SatelliteResourceLanguages>en;nl;de;pl</SatelliteResourceLanguages>
+
+    <!-- Self-contained/single-file publish settings stay off here so a plain "dotnet build"
+         remains framework-dependent and needs no win-x64 runtime packs restored. They are
+         supplied on the publish command line instead (see README). ReadyToRun is deliberately
+         not used: it roughly doubles framework assembly size for a faster cold start, a poor
+         trade for a tray app that starts once and runs for days. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embedded (not Content) so these ship inside the single-file publish exe rather than as
+         loose files alongside it. -->
+    <EmbeddedResource Include="Localization\en.json" LogicalName="InternetMonitor.Localization.en.json" />
+    <EmbeddedResource Include="Localization\nl.json" LogicalName="InternetMonitor.Localization.nl.json" />
+    <EmbeddedResource Include="Localization\de.json" LogicalName="InternetMonitor.Localization.de.json" />
+    <EmbeddedResource Include="Localization\pl.json" LogicalName="InternetMonitor.Localization.pl.json" />
+    <EmbeddedResource Include="..\..\Assets\app.ico" LogicalName="InternetMonitor.Assets.app.ico" />
+  </ItemGroup>
+
+</Project>

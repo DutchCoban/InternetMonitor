@@ -1,0 +1,37 @@
+{
+  "app.name": "Internet Monitor",
+
+  "tray.tooltip.checking": "Internet Monitor - sprawdzanie...",
+  "tray.tooltip.state": "Internet Monitor - {0}",
+
+  "menu.open": "Otwórz Internet Monitor",
+  "menu.checkNow": "Sprawdź teraz",
+  "menu.settings": "Ustawienia",
+  "menu.about": "O programie",
+  "menu.exit": "Zakończ",
+
+  "nav.status": "Stan",
+  "nav.diagnostics": "Diagnostyka",
+  "nav.history": "Historia",
+  "nav.incidents": "Incydenty",
+  "nav.tools": "Narzędzia",
+  "nav.settings": "Ustawienia",
+
+  "page.status.title": "Stan",
+  "page.status.subtitle": "Jak wygląda teraz Twoje połączenie",
+  "page.diagnostics.title": "Diagnostyka",
+  "page.diagnostics.subtitle": "Wszystkie pomiary stojące za diagnozą",
+  "page.history.title": "Historia",
+  "page.history.subtitle": "Jak każda kontrola zachowywała się w czasie",
+  "page.incidents.title": "Incydenty",
+  "page.incidents.subtitle": "Zapisane awarie i ich przyczyny",
+  "page.tools.title": "Narzędzia",
+  "page.tools.subtitle": "Traceroute, test prędkości i raporty diagnostyczne",
+  "page.settings.title": "Ustawienia",
+  "page.settings.subtitle": "Kontrole, wygląd i powiadomienia",
+
+  "page.underConstruction": "Ten ekran nie jest jeszcze zbudowany.",
+
+  "crash.title": "Internet Monitor",
+  "crash.message": "Wystąpił nieoczekiwany błąd. Szczegóły zapisano w:\n{0}"
+}

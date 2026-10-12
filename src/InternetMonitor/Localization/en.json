@@ -1,0 +1,37 @@
+{
+  "app.name": "Internet Monitor",
+
+  "tray.tooltip.checking": "Internet Monitor - checking...",
+  "tray.tooltip.state": "Internet Monitor - {0}",
+
+  "menu.open": "Open Internet Monitor",
+  "menu.checkNow": "Check now",
+  "menu.settings": "Settings",
+  "menu.about": "About",
+  "menu.exit": "Exit",
+
+  "nav.status": "Status",
+  "nav.diagnostics": "Diagnostics",
+  "nav.history": "History",
+  "nav.incidents": "Incidents",
+  "nav.tools": "Tools",
+  "nav.settings": "Settings",
+
+  "page.status.title": "Status",
+  "page.status.subtitle": "Where your connection stands right now",
+  "page.diagnostics.title": "Diagnostics",
+  "page.diagnostics.subtitle": "Every measurement behind the diagnosis",
+  "page.history.title": "History",
+  "page.history.subtitle": "How each check has behaved over time",
+  "page.incidents.title": "Incidents",
+  "page.incidents.subtitle": "Recorded disruptions and what caused them",
+  "page.tools.title": "Tools",
+  "page.tools.subtitle": "Traceroute, speed test and diagnostic reports",
+  "page.settings.title": "Settings",
+  "page.settings.subtitle": "Checks, appearance and notifications",
+
+  "page.underConstruction": "This screen is not built yet.",
+
+  "crash.title": "Internet Monitor",
+  "crash.message": "An unexpected error occurred. Details were written to:\n{0}"
+}

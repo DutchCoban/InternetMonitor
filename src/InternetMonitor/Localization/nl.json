@@ -1,0 +1,37 @@
+{
+  "app.name": "Internet Monitor",
+
+  "tray.tooltip.checking": "Internet Monitor - bezig met controleren...",
+  "tray.tooltip.state": "Internet Monitor - {0}",
+
+  "menu.open": "Internet Monitor openen",
+  "menu.checkNow": "Nu controleren",
+  "menu.settings": "Instellingen",
+  "menu.about": "Over",
+  "menu.exit": "Afsluiten",
+
+  "nav.status": "Status",
+  "nav.diagnostics": "Diagnostiek",
+  "nav.history": "Historie",
+  "nav.incidents": "Incidenten",
+  "nav.tools": "Hulpmiddelen",
+  "nav.settings": "Instellingen",
+
+  "page.status.title": "Status",
+  "page.status.subtitle": "Hoe je verbinding er nu voor staat",
+  "page.diagnostics.title": "Diagnostiek",
+  "page.diagnostics.subtitle": "Alle metingen achter de diagnose",
+  "page.history.title": "Historie",
+  "page.history.subtitle": "Hoe elke controle zich over tijd gedroeg",
+  "page.incidents.title": "Incidenten",
+  "page.incidents.subtitle": "Vastgelegde storingen en hun oorzaak",
+  "page.tools.title": "Hulpmiddelen",
+  "page.tools.subtitle": "Traceroute, snelheidstest en diagnoserapporten",
+  "page.settings.title": "Instellingen",
+  "page.settings.subtitle": "Controles, weergave en meldingen",
+
+  "page.underConstruction": "Dit scherm is nog niet gebouwd.",
+
+  "crash.title": "Internet Monitor",
+  "crash.message": "Er is een onverwachte fout opgetreden. De details zijn weggeschreven naar:\n{0}"
+}

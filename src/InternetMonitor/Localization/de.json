@@ -1,0 +1,37 @@
+{
+  "app.name": "Internet Monitor",
+
+  "tray.tooltip.checking": "Internet Monitor - Prüfung läuft...",
+  "tray.tooltip.state": "Internet Monitor - {0}",
+
+  "menu.open": "Internet Monitor öffnen",
+  "menu.checkNow": "Jetzt prüfen",
+  "menu.settings": "Einstellungen",
+  "menu.about": "Info",
+  "menu.exit": "Beenden",
+
+  "nav.status": "Status",
+  "nav.diagnostics": "Diagnose",
+  "nav.history": "Verlauf",
+  "nav.incidents": "Vorfälle",
+  "nav.tools": "Werkzeuge",
+  "nav.settings": "Einstellungen",
+
+  "page.status.title": "Status",
+  "page.status.subtitle": "Wie Ihre Verbindung gerade dasteht",
+  "page.diagnostics.title": "Diagnose",
+  "page.diagnostics.subtitle": "Alle Messwerte hinter der Diagnose",
+  "page.history.title": "Verlauf",
+  "page.history.subtitle": "Wie sich jede Prüfung über die Zeit verhalten hat",
+  "page.incidents.title": "Vorfälle",
+  "page.incidents.subtitle": "Aufgezeichnete Störungen und ihre Ursache",
+  "page.tools.title": "Werkzeuge",
+  "page.tools.subtitle": "Traceroute, Geschwindigkeitstest und Diagnoseberichte",
+  "page.settings.title": "Einstellungen",
+  "page.settings.subtitle": "Prüfungen, Darstellung und Benachrichtigungen",
+
+  "page.underConstruction": "Dieser Bildschirm ist noch nicht gebaut.",
+
+  "crash.title": "Internet Monitor",
+  "crash.message": "Ein unerwarteter Fehler ist aufgetreten. Die Details wurden geschrieben nach:\n{0}"
+}
