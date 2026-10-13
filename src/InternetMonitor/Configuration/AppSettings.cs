@@ -237,7 +237,7 @@ public sealed class AppSettings
     /// </summary>
     public void ExportTo(string path) => File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
 
-    /// <summary>Reads a settings file exported by <see cref="ExportTo"/> (or the regular on-disk settings.v2.json). Throws on a missing or malformed file - the caller decides how to tell the user.</summary>
+    /// <summary>Reads a settings file exported by <see cref="ExportTo"/> (or the regular on-disk settings.json). Throws on a missing or malformed file - the caller decides how to tell the user.</summary>
     public static AppSettings? ImportFrom(string path) =>
         JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json);
 

@@ -28,20 +28,13 @@ public static class AppPaths
     }
 
     /// <summary>
-    /// v1's settings file. Read once by the phase-8 migration and never written by v2.
+    /// The same settings.json v1 used. v2's model is now complete, and
+    /// <see cref="AppSettings"/>'s deserialiser already ignores properties it doesn't know (v1-only
+    /// settings v2 dropped) and defaults ones it doesn't find (v2-only settings an existing v1 file
+    /// predates), so reading v1's file here directly - with no separate migration step or
+    /// intermediate filename - is enough for an existing installation's settings to carry over.
     /// </summary>
-    public static string LegacySettingsFile => Path.Combine(Root, "settings.json");
-
-    /// <summary>
-    /// Where v2 writes settings during the v1 -> v2 transition.
-    ///
-    /// Deliberately NOT settings.json yet: the v2 model is still being filled in phase by phase,
-    /// and serialising it over the shared file would drop every v1 property it does not know about
-    /// (application endpoints, ping targets, quiet hours, logging levels) from a real
-    /// installation. Phase 8 completes the model, migrates v1's file in one pass, and makes
-    /// settings.json v2's own again.
-    /// </summary>
-    public static string SettingsFile => Path.Combine(Root, "settings.v2.json");
+    public static string SettingsFile => Path.Combine(Root, "settings.json");
 
     public static string IncidentsFile => Path.Combine(Root, "incidents.json");
 
