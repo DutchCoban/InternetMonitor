@@ -402,5 +402,7 @@
   "settings.export.settings": "Eksportuj ustawienia",
   "settings.import.settings": "Importuj ustawienia",
   "history.caption.series": "Pomiar",
-  "history.caption.range": "Zakres"
+  "history.caption.range": "Zakres",
+  "settings.lanScanVendorLookup": "Sprawdzaj producenta każdego urządzenia",
+  "lanScan.column.vendor": "Producent"
 }

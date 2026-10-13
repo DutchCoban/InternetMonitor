@@ -46,6 +46,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private NumericUpDown _foregroundInterval = null!;
     private NumericUpDown _backgroundInterval = null!;
     private Toggle _tracerouteLookup = null!;
+    private Toggle _lanScanVendorLookup = null!;
     private ComboBox _logLevel = null!;
     private Toggle _logSuccessfulChecks = null!;
     private Toggle _logDetailedMeasurements = null!;
@@ -190,6 +191,14 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             Services.Settings.Save();
         };
         AddRow(_toolsCard, "settings.tracerouteLookup", _tracerouteLookup);
+
+        _lanScanVendorLookup = new Toggle();
+        _lanScanVendorLookup.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.LanScanVendorLookup = _lanScanVendorLookup.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_toolsCard, "settings.lanScanVendorLookup", _lanScanVendorLookup);
     }
 
     // ---- Diagnostics --------------------------------------------------------------------------
@@ -921,6 +930,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _backgroundInterval.Value = settings.BackgroundIntervalSeconds;
 
         _tracerouteLookup.SetWithoutNotify(settings.TracerouteOwnerLookup);
+        _lanScanVendorLookup.SetWithoutNotify(settings.LanScanVendorLookup);
 
         _logLevel.SelectedIndexChanged -= OnLogLevelChanged;
         PopulateLogLevelItems();

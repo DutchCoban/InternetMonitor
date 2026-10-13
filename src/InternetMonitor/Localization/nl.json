@@ -402,5 +402,7 @@
   "settings.export.settings": "Exporteer instellingen",
   "settings.import.settings": "Importeer instellingen",
   "history.caption.series": "Meting",
-  "history.caption.range": "Periode"
+  "history.caption.range": "Periode",
+  "settings.lanScanVendorLookup": "Fabrikant van elk apparaat opzoeken",
+  "lanScan.column.vendor": "Merk"
 }

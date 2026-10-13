@@ -12,9 +12,9 @@ public sealed record LanScanResult(
 
 /// <summary>
 /// A simplified Advanced-IP-Scanner-style sweep of the local subnet: which addresses answer a
-/// ping, with whatever hostname and MAC address can be found for each. No manufacturer lookup (see
-/// the plan this shipped from) and no port scanning - this answers "what's on my network", not
-/// "what's running on it".
+/// ping, with whatever hostname, MAC address and manufacturer can be found for each (the last via
+/// the optional <see cref="MacVendorLookup"/>). No port scanning - this answers "what's on my
+/// network", not "what's running on it".
 ///
 /// Shaped like <see cref="Tools.Traceroute.TracerouteRunner"/>: the fast part (the ping sweep
 /// itself) runs first and in full before anything is reported, then the slower per-host
@@ -39,7 +39,8 @@ public sealed class LanScanner
         IPAddress localAddress,
         IPAddress subnetMask,
         IProgress<LanDevice>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        MacVendorLookup? vendorLookup = null)
     {
         DateTimeOffset started = DateTimeOffset.UtcNow;
         long startTicks = Environment.TickCount64;
@@ -67,7 +68,7 @@ public sealed class LanScanner
             }
 
             arp.TryGetValue(address, out string? mac);
-            enrichTasks.Add(EnrichAndReportAsync(address, outcome.RoundtripMs, mac, devices, progress, cancellationToken));
+            enrichTasks.Add(EnrichAndReportAsync(address, outcome.RoundtripMs, mac, devices, progress, vendorLookup, cancellationToken));
         }
 
         try
@@ -94,10 +95,20 @@ public sealed class LanScanner
         string? mac,
         List<LanDevice> devices,
         IProgress<LanDevice>? progress,
+        MacVendorLookup? vendorLookup,
         CancellationToken cancellationToken)
     {
-        string? hostname = await DnsResolve.TryReverseAsync(address, ReverseDnsTimeout, cancellationToken).ConfigureAwait(false);
-        var device = new LanDevice(address, hostname, mac, roundtripMs);
+        // Reverse DNS and the vendor lookup run side by side rather than one after the other -
+        // neither depends on the other's answer, and a device would otherwise wait out both
+        // lookups' latency in sequence instead of just the slower of the two.
+        Task<string?> hostnameTask = DnsResolve.TryReverseAsync(address, ReverseDnsTimeout, cancellationToken);
+        Task<string?> vendorTask = mac is not null && vendorLookup is not null
+            ? vendorLookup.LookupAsync(mac, cancellationToken)
+            : Task.FromResult<string?>(null);
+
+        await Task.WhenAll(hostnameTask, vendorTask).ConfigureAwait(false);
+
+        var device = new LanDevice(address, hostnameTask.Result, mac, roundtripMs, vendorTask.Result);
 
         lock (devices)
         {

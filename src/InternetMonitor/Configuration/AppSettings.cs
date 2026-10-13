@@ -94,6 +94,15 @@ public sealed class AppSettings
     /// </summary>
     public bool TracerouteOwnerLookup { get; set; } = true;
 
+    /// <summary>
+    /// Whether the LAN scanner looks up each device's manufacturer. Same reasoning and the same
+    /// default as <see cref="TracerouteOwnerLookup"/>: on by default because it is most of the
+    /// value of the feature, switchable because it is the only thing in the scanner that sends a
+    /// third party anything (a MAC prefix, never the full device-specific address) about the
+    /// user's own network.
+    /// </summary>
+    public bool LanScanVendorLookup { get; set; } = true;
+
     // ---- Endpoints ---------------------------------------------------------------------------
 
     /// <summary>

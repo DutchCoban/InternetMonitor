@@ -402,5 +402,7 @@
   "settings.export.settings": "Einstellungen exportieren",
   "settings.import.settings": "Einstellungen importieren",
   "history.caption.series": "Messung",
-  "history.caption.range": "Zeitraum"
+  "history.caption.range": "Zeitraum",
+  "settings.lanScanVendorLookup": "Hersteller jedes Geräts nachschlagen",
+  "lanScan.column.vendor": "Hersteller"
 }

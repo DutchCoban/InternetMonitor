@@ -286,9 +286,14 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         var scanner = new LanScanner();
         var progress = new Progress<LanDevice>(device => _lanDevices.Add(device));
 
+        // The only thing in the LAN scanner that tells a third party anything (a MAC prefix)
+        // about this network - same reasoning as RunAsync's ownership lookup for traceroute - so
+        // it only runs when the setting allows it.
+        using MacVendorLookup? vendorLookup = Services.Settings.LanScanVendorLookup ? new MacVendorLookup() : null;
+
         try
         {
-            LanScanResult result = await scanner.ScanAsync(address, mask, progress, cts.Token).ConfigureAwait(true);
+            LanScanResult result = await scanner.ScanAsync(address, mask, progress, cts.Token, vendorLookup).ConfigureAwait(true);
 
             _lanDevices.Status = result.Devices.Count == 0
                 ? Loc.Get("lanScan.none")

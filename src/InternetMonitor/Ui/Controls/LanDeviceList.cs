@@ -5,7 +5,7 @@ using InternetMonitor.Ui.Theming;
 namespace InternetMonitor.Ui.Controls;
 
 /// <summary>
-/// The LAN scanner's results: four text columns (IP, hostname, MAC, response time), nothing per-row
+/// The LAN scanner's results: five text columns (IP, hostname, MAC, vendor, response time), nothing per-row
 /// interactive - unlike <see cref="EndpointList"/>, there is no edit or remove action here, so this
 /// does not need child controls per row, just text. Self-scrolling like
 /// <see cref="TracerouteView"/> rather than relying on the page around it, since a full /24 sweep
@@ -62,8 +62,8 @@ public sealed class LanDeviceList : ThemedControl
         Invalidate();
     }
 
-    /// <summary>Column left edges, as a fraction of the available width - IP, hostname, MAC, then response time (right-aligned, so no left edge of its own).</summary>
-    private (int Ip, int Hostname, int Mac, int Right) Columns()
+    /// <summary>Column left edges, as a fraction of the available width - IP, hostname, MAC, vendor, then response time (right-aligned, so no left edge of its own).</summary>
+    private (int Ip, int Hostname, int Mac, int Vendor, int Right) Columns()
     {
         int left = Sp(2);
         int right = Width - Sp(2);
@@ -71,8 +71,9 @@ public sealed class LanDeviceList : ThemedControl
 
         return (
             left,
-            left + (available * 20 / 100),
-            left + (available * 55 / 100),
+            left + (available * 15 / 100),
+            left + (available * 45 / 100),
+            left + (available * 70 / 100),
             right);
     }
 
@@ -94,7 +95,7 @@ public sealed class LanDeviceList : ThemedControl
             return;
         }
 
-        (int ipX, int hostX, int macX, int right) = Columns();
+        (int ipX, int hostX, int macX, int vendorX, int right) = Columns();
         int msWidth = Dp(60);
 
         int y = Sp(1) - _scrollOffset;
@@ -103,7 +104,8 @@ public sealed class LanDeviceList : ThemedControl
         {
             DrawHeaderCell(g, p, loc.Get("lanScan.column.ip"), ipX, y, hostX - ipX);
             DrawHeaderCell(g, p, loc.Get("lanScan.column.hostname"), hostX, y, macX - hostX);
-            DrawHeaderCell(g, p, loc.Get("lanScan.column.mac"), macX, y, right - msWidth - macX);
+            DrawHeaderCell(g, p, loc.Get("lanScan.column.mac"), macX, y, vendorX - macX);
+            DrawHeaderCell(g, p, loc.Get("lanScan.column.vendor"), vendorX, y, right - msWidth - vendorX);
             DrawHeaderCell(g, p, loc.Get("lanScan.column.responseTime"), right - msWidth, y, msWidth, TextFormatFlags.Right);
         }
 
@@ -120,7 +122,7 @@ public sealed class LanDeviceList : ThemedControl
         {
             if (y + RowHeight > 0 && y < Height)
             {
-                DrawRow(g, p, device, ipX, hostX, macX, right, msWidth, y);
+                DrawRow(g, p, device, ipX, hostX, macX, vendorX, right, msWidth, y);
             }
 
             y += RowHeight;
@@ -137,7 +139,7 @@ public sealed class LanDeviceList : ThemedControl
             new Rectangle(x, y, Math.Max(0, width), HeaderHeight),
             extra | TextFormatFlags.VerticalCenter);
 
-    private void DrawRow(Graphics g, Palette p, LanDevice device, int ipX, int hostX, int macX, int right, int msWidth, int y)
+    private void DrawRow(Graphics g, Palette p, LanDevice device, int ipX, int hostX, int macX, int vendorX, int right, int msWidth, int y)
     {
         g.DrawTextCrisp(
             device.Address.ToString(),
@@ -157,7 +159,14 @@ public sealed class LanDeviceList : ThemedControl
             device.MacAddress ?? "-",
             Theme.Font(FontRole.Small),
             device.MacAddress is null ? p.TextMuted : p.TextSecondary,
-            new Rectangle(macX, y, Math.Max(0, right - msWidth - macX), RowHeight),
+            new Rectangle(macX, y, Math.Max(0, vendorX - macX), RowHeight),
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+
+        g.DrawTextCrisp(
+            device.Vendor ?? "-",
+            Theme.Font(FontRole.Small),
+            device.Vendor is null ? p.TextMuted : p.TextSecondary,
+            new Rectangle(vendorX, y, Math.Max(0, right - msWidth - vendorX), RowHeight),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 
         g.DrawTextCrisp(
