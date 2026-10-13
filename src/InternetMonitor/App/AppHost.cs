@@ -2,6 +2,7 @@ using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
+using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
@@ -26,6 +27,7 @@ public sealed class AppHost : ApplicationContext
     private readonly CadenceController _cadence;
     private readonly MetricStore _history;
     private readonly IncidentStore _incidents;
+    private readonly KumaPusher _kuma;
     private readonly ChangeDetector _changes;
     private readonly IncidentTracker _tracker;
     private readonly TrayController _tray;
@@ -65,7 +67,11 @@ public sealed class AppHost : ApplicationContext
                 Targets =
                 [
                     .. defaultTargets.Targets,
-                    .. endpoints.Where(e => e.Enabled).Select(e => new TargetEndpoint(e.Name, e.Url)),
+                    .. endpoints.Where(e => e.Enabled).Select(e => e.Kind switch
+                    {
+                        EndpointKind.TcpPort => new TargetEndpoint(e.Name, Url: "", TargetKind.TcpPort, Host: e.Host, Port: e.Port),
+                        _ => new TargetEndpoint(e.Name, e.Url, TargetKind.Url, ExpectedStatusCode: e.ExpectedStatusCode),
+                    }),
                 ],
             };
         }
@@ -82,10 +88,13 @@ public sealed class AppHost : ApplicationContext
         };
 
         _incidents = new IncidentStore();
+
+        _kuma = new KumaPusher();
+        _kuma.Reconfigure(_settings.KumaPushUrl, _settings.KumaIntervalSeconds);
         _changes = new ChangeDetector();
         _tracker = new IncidentTracker(_incidents, _changes);
 
-        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents);
+        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -273,6 +282,7 @@ public sealed class AppHost : ApplicationContext
             // Blocking on shutdown is acceptable and necessary: this is the final flush, and
             // letting the process exit without it loses up to two minutes of recorded history.
             _history.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _kuma.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
             _tray.Dispose();
             _themeWatcher.Dispose();

@@ -1,6 +1,7 @@
 using InternetMonitor.App;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.History;
+using InternetMonitor.Core.Monitors;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -29,6 +30,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Card _generalCard = null!;
     private Card _cadenceCard = null!;
     private Card _toolsCard = null!;
+    private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
 
     private ComboBox _language = null!;
@@ -37,6 +39,10 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private NumericUpDown _foregroundInterval = null!;
     private NumericUpDown _backgroundInterval = null!;
     private Toggle _tracerouteLookup = null!;
+    private TextBox _kumaUrl = null!;
+    private NumericUpDown _kumaInterval = null!;
+    private Label _kumaError = null!;
+    private AppButton _kumaAbout = null!;
     private EndpointList _endpoints = null!;
     private AppButton _addEndpoint = null!;
 
@@ -55,11 +61,15 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _toolsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Tools };
         BuildToolsRows();
 
+        _integrationsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Globe };
+        BuildIntegrationsRows();
+
         _endpointsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Target };
         BuildEndpointsSection();
 
         // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge.
         Controls.Add(_endpointsCard);
+        Controls.Add(_integrationsCard);
         Controls.Add(_toolsCard);
         Controls.Add(_cadenceCard);
         Controls.Add(_generalCard);
@@ -136,6 +146,66 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             Services.Settings.Save();
         };
         AddRow(_toolsCard, "settings.tracerouteLookup", _tracerouteLookup);
+    }
+
+    // ---- Integrations ---------------------------------------------------------------------------
+
+    private void BuildIntegrationsRows()
+    {
+        _kumaUrl = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(200), Font = Theme.Font(FontRole.Body) };
+        _kumaUrl.Leave += OnKumaSettingsChanged;
+        AddRow(_integrationsCard, "settings.kuma.pushUrl", _kumaUrl);
+
+        _kumaInterval = MakeIntervalField(KumaPusher.MinimumIntervalSeconds, 86400);
+        _kumaInterval.ValueChanged += OnKumaSettingsChanged;
+        AddRow(_integrationsCard, "settings.kuma.interval", _kumaInterval);
+
+        _kumaError = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+            Text = string.Empty,
+        };
+        _integrationsCard.Controls.Add(_kumaError);
+
+        _kumaAbout = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Globe, Text = Loc.Get("settings.kuma.about") };
+        _kumaAbout.SizeToContent();
+        _kumaAbout.Click += (_, _) => OpenUptimeKumaProjectPage();
+        _integrationsCard.Controls.Add(_kumaAbout);
+    }
+
+    private static void OpenUptimeKumaProjectPage()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/louislam/uptime-kuma") { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // No default browser configured, or the shell call otherwise failed - not worth
+            // surfacing for an informational link the user can open themselves.
+        }
+    }
+
+    private void OnKumaSettingsChanged(object? sender, EventArgs e)
+    {
+        string url = _kumaUrl.Text.Trim();
+
+        // Empty is valid - it means the integration is off. Otherwise require a well-formed https
+        // URL, the same standard endpoint targets enforce, so a typo or plaintext http:// URL
+        // doesn't silently reach KumaPusher.
+        if (url.Length > 0 && (!Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed) || parsed.Scheme != Uri.UriSchemeHttps))
+        {
+            _kumaError.Text = Loc.Get("settings.kuma.url.error");
+            return;
+        }
+
+        _kumaError.Text = string.Empty;
+        Services.Settings.KumaPushUrl = url;
+        Services.Settings.KumaIntervalSeconds = (int)_kumaInterval.Value;
+        Services.Settings.Save();
+        Services.Kuma.Reconfigure(Services.Settings.KumaPushUrl, Services.Settings.KumaIntervalSeconds);
     }
 
     // ---- Endpoints ----------------------------------------------------------------------------
@@ -259,6 +329,17 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         LayoutCardRows(_generalCard);
         LayoutCardRows(_cadenceCard);
         LayoutCardRows(_toolsCard);
+        LayoutCardRows(_integrationsCard);
+
+        // LayoutCardRows sized the card to its two label/field rows; the error label and the
+        // "about" link sit below those, in the space the row layout does not know about.
+        Rectangle integrationsContent = _integrationsCard.DisplayRectangle;
+        int integrationsY = _integrationsCard.Height - _integrationsCard.Inset;
+        _kumaError.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
+        integrationsY += Dp(18);
+        _kumaAbout.Location = new Point(integrationsContent.Left, integrationsY);
+        integrationsY += _kumaAbout.Height;
+        _integrationsCard.Height = integrationsY + _integrationsCard.Inset;
 
         Rectangle content = _endpointsCard.DisplayRectangle;
         _addEndpoint.Width = content.Width;
@@ -297,6 +378,13 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _backgroundInterval.Value = settings.BackgroundIntervalSeconds;
 
         _tracerouteLookup.SetWithoutNotify(settings.TracerouteOwnerLookup);
+
+        _kumaUrl.Leave -= OnKumaSettingsChanged;
+        _kumaInterval.ValueChanged -= OnKumaSettingsChanged;
+        _kumaUrl.Text = settings.KumaPushUrl;
+        _kumaInterval.Value = Math.Clamp(settings.KumaIntervalSeconds, KumaPusher.MinimumIntervalSeconds, 86400);
+        _kumaUrl.Leave += OnKumaSettingsChanged;
+        _kumaInterval.ValueChanged += OnKumaSettingsChanged;
 
         RefreshEndpoints();
     }
@@ -386,6 +474,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _cadenceCard.Title = Loc.Get("settings.section.cadence");
         _cadenceCard.Subtitle = Loc.Get("settings.section.cadence.subtitle");
         _toolsCard.Title = Loc.Get("settings.section.tools");
+        _integrationsCard.Title = Loc.Get("settings.section.integrations");
+        _integrationsCard.Subtitle = Loc.Get("settings.section.integrations.subtitle");
         _endpointsCard.Title = Loc.Get("settings.section.endpoints");
         _endpointsCard.Subtitle = Loc.Get("settings.section.endpoints.subtitle");
 
@@ -406,6 +496,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         _addEndpoint.Text = Loc.Get("settings.endpoint.add");
         _addEndpoint.SizeToContent();
+
+        _kumaAbout.Text = Loc.Get("settings.kuma.about");
+        _kumaAbout.SizeToContent();
 
         RefreshEndpoints();
         ApplyControlColors();
@@ -431,11 +524,16 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             box.FlatStyle = FlatStyle.Flat;
         }
 
-        foreach (NumericUpDown field in new[] { _foregroundInterval, _backgroundInterval })
+        foreach (NumericUpDown field in new[] { _foregroundInterval, _backgroundInterval, _kumaInterval })
         {
             field.BackColor = p.SurfaceAlt;
             field.ForeColor = p.TextPrimary;
         }
+
+        _kumaUrl.BackColor = p.SurfaceAlt;
+        _kumaUrl.ForeColor = p.TextPrimary;
+        _kumaError.BackColor = p.Surface;
+        _kumaError.ForeColor = p.Error;
     }
 
     /// <summary>A combo-box entry carrying both the stored key and the text shown to the user.</summary>

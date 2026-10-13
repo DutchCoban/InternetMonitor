@@ -1,6 +1,7 @@
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
+using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
 
 namespace InternetMonitor.App;
@@ -20,7 +21,8 @@ public sealed class AppServices(
     StepPipeline pipeline,
     CadenceController cadence,
     MetricStore history,
-    IncidentStore incidents)
+    IncidentStore incidents,
+    KumaPusher kuma)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -34,4 +36,6 @@ public sealed class AppServices(
     public MetricStore History { get; } = history;
 
     public IncidentStore Incidents { get; } = incidents;
+
+    public KumaPusher Kuma { get; } = kuma;
 }

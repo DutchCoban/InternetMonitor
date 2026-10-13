@@ -195,8 +195,9 @@ public sealed class EndpointList : ThemedControl
                 textColor,
                 new Rectangle(textLeft, y + Dp(4), Math.Max(0, textRight - textLeft), Dp(16)));
 
+            string subtitle = endpoint.Kind == EndpointKind.TcpPort ? $"{endpoint.Host}:{endpoint.Port}" : endpoint.Url;
             g.DrawTextCrisp(
-                endpoint.Url,
+                subtitle,
                 Theme.Font(FontRole.Small),
                 p.TextMuted,
                 new Rectangle(textLeft, y + Dp(20), Math.Max(0, textRight - textLeft), Dp(14)));

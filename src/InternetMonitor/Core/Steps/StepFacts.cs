@@ -81,13 +81,23 @@ public sealed record DnsFacts(
 
 public sealed record TargetEndpointResult(
     string Name,
+    Configuration.TargetKind Kind,
     string Url,
     bool Reachable,
     int? StatusCode,
+    int? ExpectedStatusCode,
     HttpStage FailedStage,
     string? Error,
     HttpTimings? Timings,
-    IPAddress? RemoteAddress);
+    IPAddress? RemoteAddress,
+
+    // Set only for a TcpPort target: HttpTimings is an HTTP-shaped record that does not fit a bare
+    // connect, so its one meaningful number - the time to connect - is carried separately instead.
+    double? ConnectMs)
+{
+    /// <summary>True when a URL target answered with something other than the one status code it was configured to expect.</summary>
+    public bool StatusMismatch => Reachable && ExpectedStatusCode is { } expected && StatusCode != expected;
+}
 
 public sealed record TargetFacts(IReadOnlyList<TargetEndpointResult> Endpoints) : StepFacts
 {

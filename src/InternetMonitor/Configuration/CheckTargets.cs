@@ -2,8 +2,26 @@ using System.Net;
 
 namespace InternetMonitor.Configuration;
 
-/// <summary>What a configured endpoint for step 7 looks like.</summary>
-public sealed record TargetEndpoint(string Name, string Url);
+/// <summary>What kind of check a step-7 target performs - mirrors <see cref="EndpointKind"/>.</summary>
+public enum TargetKind
+{
+    Url,
+    TcpPort,
+}
+
+/// <summary>
+/// What a configured endpoint for step 7 looks like. <see cref="Url"/> stays the second positional
+/// parameter, and <see cref="Kind"/> defaults to <see cref="TargetKind.Url"/>, so every existing
+/// two-argument <c>new TargetEndpoint(name, url)</c> call - including the built-in default below -
+/// keeps compiling and keeps meaning exactly what it used to.
+/// </summary>
+public sealed record TargetEndpoint(
+    string Name,
+    string Url,
+    TargetKind Kind = TargetKind.Url,
+    string Host = "",
+    int Port = 0,
+    int? ExpectedStatusCode = null);
 
 /// <summary>
 /// What the network steps aim at, and how long each is allowed to take.

@@ -87,6 +87,23 @@ public sealed class AppSettings
     /// </summary>
     public List<EndpointConfig> ApplicationEndpoints { get; set; } = [];
 
+    // ---- Integrations -------------------------------------------------------------------------
+
+    private int _kumaIntervalSeconds = Core.Monitors.KumaPusher.MinimumIntervalSeconds;
+
+    /// <summary>
+    /// An Uptime Kuma push-monitor URL. Empty means the integration is off - there is deliberately
+    /// no separate enabled flag, matching <see cref="Core.Monitors.KumaPusher"/>'s own definition
+    /// of "active".
+    /// </summary>
+    public string KumaPushUrl { get; set; } = string.Empty;
+
+    public int KumaIntervalSeconds
+    {
+        get => _kumaIntervalSeconds;
+        set => _kumaIntervalSeconds = Math.Max(Core.Monitors.KumaPusher.MinimumIntervalSeconds, value);
+    }
+
     // ---- Persistence --------------------------------------------------------------------------
 
     public static AppSettings Load()
