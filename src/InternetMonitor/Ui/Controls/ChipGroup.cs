@@ -145,7 +145,11 @@ public sealed class ChipGroup : ThemedControl
             var rect = new RectangleF(bounds.X + 0.5f, bounds.Y + 0.5f, bounds.Width - 1, bounds.Height - 1);
 
             g.FillRounded(rect, bounds.Height, selected ? p.Accent : hovered ? p.SurfaceHover : p.SurfaceAlt);
-            if (!selected)
+
+            // A resting chip leans on its fill alone rather than a border too - with a whole row
+            // of them, a border on every single one is what reads as "busy". The border comes
+            // back only on hover, as feedback that this one is about to be clicked.
+            if (hovered && !selected)
             {
                 g.DrawRounded(rect, bounds.Height, p.Border);
             }

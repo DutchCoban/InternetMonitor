@@ -400,5 +400,7 @@
   "settings.export.plain": "Daten exportieren (ohne KI-Anweisungen)",
   "incidents.export": "Vorfall exportieren",
   "settings.export.settings": "Einstellungen exportieren",
-  "settings.import.settings": "Einstellungen importieren"
+  "settings.import.settings": "Einstellungen importieren",
+  "history.caption.series": "Messung",
+  "history.caption.range": "Zeitraum"
 }

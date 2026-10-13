@@ -27,7 +27,10 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
 
     private Card _card = null!;
     private MetricChart _chart = null!;
+    private Label _stepsCaption = null!;
     private ChipGroup _steps = null!;
+    private Panel _chipGroupSpacer = null!;
+    private Label _rangesCaption = null!;
     private ChipGroup _ranges = null!;
     private StepId _selectedStep = StepId.PublicIp;
     private TimeSpan? _selectedRange = TimeSpan.FromHours(1);
@@ -44,6 +47,12 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
             _selectedRange = Ranges.FirstOrDefault(r => r.Id == id).Range;
             _chart.SetRange(_selectedRange);
         };
+        _rangesCaption = MakeCaption("history.caption.range");
+
+        // A plain gap rather than another control - the two chip rows otherwise stack directly
+        // on top of each other with nothing but their own captions between them, which still read
+        // as one dense block at a glance.
+        _chipGroupSpacer = new Panel { Dock = DockStyle.Top, Height = Sp(3) };
 
         _steps = new ChipGroup { Dock = DockStyle.Top };
         _steps.SelectionChanged += id =>
@@ -51,14 +60,46 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
             _selectedStep = Enum.GetValues<StepId>().First(s => s.Key() == id);
             LoadSeries();
         };
+        _stepsCaption = MakeCaption("history.caption.series");
 
         _card = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.History };
 
-        // Reverse visual order again: later Top siblings sit nearer the top edge.
+        // Reverse visual order again: later Top siblings sit nearer the top edge, so this adds
+        // (bottom to top) the chart, then the range group (caption above its chips), a spacer,
+        // then the series group - ending with its caption nearest the card's own header.
         _card.Controls.Add(_chart);
         _card.Controls.Add(_ranges);
+        _card.Controls.Add(_rangesCaption);
+        _card.Controls.Add(_chipGroupSpacer);
         _card.Controls.Add(_steps);
+        _card.Controls.Add(_stepsCaption);
         Controls.Add(_card);
+    }
+
+    private Label MakeCaption(string key) => new()
+    {
+        AutoSize = false,
+        Dock = DockStyle.Top,
+        Height = Dp(18),
+        TextAlign = ContentAlignment.BottomLeft,
+        Font = Theme.Font(FontRole.SmallStrong),
+        ForeColor = Theme.Current.TextMuted,
+        BackColor = Theme.Current.Surface,
+        Tag = key,
+    };
+
+    protected override void OnThemeChanged()
+    {
+        if (_stepsCaption is null)
+        {
+            return;
+        }
+
+        foreach (Label caption in new[] { _stepsCaption, _rangesCaption })
+        {
+            caption.ForeColor = Theme.Current.TextMuted;
+            caption.BackColor = Theme.Current.Surface;
+        }
     }
 
     public override void ApplyLocalization()
@@ -72,6 +113,9 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
 
         _card.Title = Loc.Get("history.card.title");
         _card.Subtitle = Loc.Get("history.card.subtitle");
+
+        _stepsCaption.Text = Loc.Get((string)_stepsCaption.Tag!);
+        _rangesCaption.Text = Loc.Get((string)_rangesCaption.Tag!);
 
         _steps.SetChips(
             SeriesNames.Chartable.Select(s => new ChipGroup.Chip(s.Key(), Loc.Get($"step.{s.Key()}.name"))),

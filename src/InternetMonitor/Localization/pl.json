@@ -400,5 +400,7 @@
   "settings.export.plain": "Eksportuj dane (bez instrukcji dla AI)",
   "incidents.export": "Eksportuj incydent",
   "settings.export.settings": "Eksportuj ustawienia",
-  "settings.import.settings": "Importuj ustawienia"
+  "settings.import.settings": "Importuj ustawienia",
+  "history.caption.series": "Pomiar",
+  "history.caption.range": "Zakres"
 }
