@@ -62,7 +62,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
     private void BuildToolSwitcher()
     {
-        _toolSwitcher = new ChipGroup { Dock = DockStyle.Top };
+        _toolSwitcher = new ChipGroup { Dock = DockStyle.Top, Variant = ChipGroupVariant.Menu };
         _toolSwitcher.SelectionChanged += ShowTool;
     }
 
@@ -284,7 +284,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         LayoutLanBar();
 
         var scanner = new LanScanner();
-        var progress = new Progress<LanDevice>(device => _lanDevices.Add(device));
+        var progress = new Progress<LanDevice>(device => _lanDevices.Upsert(device));
 
         // The only thing in the LAN scanner that tells a third party anything (a MAC prefix)
         // about this network - same reasoning as RunAsync's ownership lookup for traceroute - so
@@ -300,6 +300,12 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
                 : result.Truncated
                     ? Loc.Format("lanScan.doneTruncated", result.Devices.Count, result.AddressesScanned)
                     : Loc.Format("lanScan.done", result.Devices.Count, result.AddressesScanned);
+
+            // The scan itself (ping + hostnames) is done and already shown above - manufacturer
+            // names are still trickling in through `progress` at this point. Waiting for them here
+            // keeps `vendorLookup` alive (so its cache gets saved) and the Stop button active until
+            // every lookup has reported, without delaying the status line or the rows above.
+            await result.VendorResolutionComplete.ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {

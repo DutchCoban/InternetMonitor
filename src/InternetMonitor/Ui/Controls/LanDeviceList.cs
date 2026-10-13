@@ -1,3 +1,5 @@
+using System.Drawing.Drawing2D;
+using System.Linq;
 using InternetMonitor.Core.Tools.LanScan;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Theming;
@@ -13,10 +15,20 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class LanDeviceList : ThemedControl
 {
+    private const int AnimationIntervalMs = 33;
+
     private readonly List<LanDevice> _devices = [];
+    private readonly System.Windows.Forms.Timer _animation;
+    private double _phase;
     private int _scrollOffset;
     private int _contentHeight;
     private string _status = string.Empty;
+
+    public LanDeviceList()
+    {
+        _animation = new System.Windows.Forms.Timer { Interval = AnimationIntervalMs };
+        _animation.Tick += OnAnimationTick;
+    }
 
     protected override Color BehindColor => Theme.Current.Surface;
 
@@ -40,13 +52,63 @@ public sealed class LanDeviceList : ThemedControl
     {
         _devices.Clear();
         _scrollOffset = 0;
+        UpdateAnimationState();
         Invalidate();
     }
 
-    public void Add(LanDevice device)
+    /// <summary>
+    /// Adds a newly-seen device, or - if one with the same <see cref="LanDevice.Address"/> is
+    /// already shown - replaces it in place. The scanner reports every device twice when a vendor
+    /// lookup is pending: once right away (<see cref="LanDevice.VendorPending"/> true) and again
+    /// once the manufacturer is known, and the second report must update that same row rather than
+    /// add a duplicate.
+    /// </summary>
+    public void Upsert(LanDevice device)
     {
-        _devices.Add(device);
+        int index = _devices.FindIndex(d => d.Address.Equals(device.Address));
+        if (index >= 0)
+        {
+            _devices[index] = device;
+        }
+        else
+        {
+            _devices.Add(device);
+        }
+
+        UpdateAnimationState();
         Invalidate();
+    }
+
+    private void UpdateAnimationState()
+    {
+        bool anyPending = _devices.Any(d => d.VendorPending);
+        if (anyPending && !_animation.Enabled)
+        {
+            _animation.Start();
+        }
+        else if (!anyPending && _animation.Enabled)
+        {
+            // Nothing is moving, so nothing needs repainting - same reasoning as StepList's own
+            // animation gate, an idle window must cost no CPU.
+            _animation.Stop();
+        }
+    }
+
+    private void OnAnimationTick(object? sender, EventArgs e)
+    {
+        _phase = (_phase + 0.055) % 1.0;
+        Invalidate();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _animation.Tick -= OnAnimationTick;
+            _animation.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -162,12 +224,19 @@ public sealed class LanDeviceList : ThemedControl
             new Rectangle(macX, y, Math.Max(0, vendorX - macX), RowHeight),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 
-        g.DrawTextCrisp(
-            device.Vendor ?? "-",
-            Theme.Font(FontRole.Small),
-            device.Vendor is null ? p.TextMuted : p.TextSecondary,
-            new Rectangle(vendorX, y, Math.Max(0, right - msWidth - vendorX), RowHeight),
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        if (device.VendorPending)
+        {
+            DrawSpinner(g, p, vendorX, y);
+        }
+        else
+        {
+            g.DrawTextCrisp(
+                device.Vendor ?? "-",
+                Theme.Font(FontRole.Small),
+                device.Vendor is null ? p.TextMuted : p.TextSecondary,
+                new Rectangle(vendorX, y, Math.Max(0, right - msWidth - vendorX), RowHeight),
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
 
         g.DrawTextCrisp(
             device.RoundtripMs is { } ms ? $"{ms:F0} ms" : "-",
@@ -175,5 +244,18 @@ public sealed class LanDeviceList : ThemedControl
             p.TextMuted,
             new Rectangle(right - msWidth, y, msWidth, RowHeight),
             TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+    }
+
+    /// <summary>Same indeterminate track-plus-arc spinner as <see cref="StepList"/>'s, drawn in the vendor cell while a device's manufacturer lookup is still in flight.</summary>
+    private void DrawSpinner(Graphics g, Palette p, int x, int y)
+    {
+        int size = Dp(13);
+        var bounds = new RectangleF(x + Dp(1), y + ((RowHeight - size) / 2f), size, size);
+
+        using var track = new Pen(p.Accent.WithAlpha(45), DpF(2f));
+        g.DrawEllipse(track, bounds);
+
+        using var arc = new Pen(p.Accent.WithAlpha(190), DpF(2f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        g.DrawArc(arc, bounds, (float)(_phase * 360), 90f);
     }
 }

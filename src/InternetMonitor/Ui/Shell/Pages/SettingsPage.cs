@@ -38,6 +38,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
     private Card _exportCard = null!;
+    private Card _settingsBackupCard = null!;
 
     private ComboBox _language = null!;
     private ComboBox _theme = null!;
@@ -68,6 +69,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private AppButton _exportSettings = null!;
     private AppButton _importSettings = null!;
     private readonly List<AppButton> _exportButtons = [];
+    private readonly List<AppButton> _settingsBackupButtons = [];
 
     private readonly List<(Label Label, Control Field)> _rows = [];
 
@@ -99,9 +101,16 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
         BuildExportSection();
 
-        // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge. Export is
-        // added first - and so ends up lowest - because it is an occasional action, not something
-        // that belongs among the frequently-changed settings above it.
+        _settingsBackupCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
+        BuildSettingsBackupSection();
+
+        // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge. Export and
+        // the configuration backup card are added first - and so end up lowest - because they are
+        // occasional actions, not something that belongs among the frequently-changed settings
+        // above them. The configuration backup card sits right below Export, added even earlier so
+        // it ends up even lower, since the two are closely related but deliberately kept apart - one
+        // exports the monitor's *data*, the other its *configuration*.
+        Controls.Add(_settingsBackupCard);
         Controls.Add(_exportCard);
         Controls.Add(_endpointsCard);
         Controls.Add(_integrationsCard);
@@ -552,19 +561,27 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
     private void BuildExportSection()
     {
-        _exportAll = AddExportButton(ExportAllData);
-        _exportAi = AddExportButton(ExportForAi);
-        _exportPlain = AddExportButton(ExportPlainData);
-        _exportSettings = AddExportButton(ExportSettings);
-        _importSettings = AddExportButton(ImportSettings);
+        _exportAll = AddExportButton(_exportCard, _exportButtons, ExportAllData);
+        _exportAi = AddExportButton(_exportCard, _exportButtons, ExportForAi);
+        _exportPlain = AddExportButton(_exportCard, _exportButtons, ExportPlainData);
     }
 
-    private AppButton AddExportButton(Action onClick)
+    /// <summary>
+    /// The configuration backup/restore pair, kept in its own card - see the comment on
+    /// <see cref="Build"/> for why this is deliberately separate from <see cref="BuildExportSection"/>.
+    /// </summary>
+    private void BuildSettingsBackupSection()
+    {
+        _exportSettings = AddExportButton(_settingsBackupCard, _settingsBackupButtons, ExportSettings);
+        _importSettings = AddExportButton(_settingsBackupCard, _settingsBackupButtons, ImportSettings);
+    }
+
+    private static AppButton AddExportButton(Card card, List<AppButton> buttons, Action onClick)
     {
         var button = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
         button.Click += (_, _) => onClick();
-        _exportCard.Controls.Add(button);
-        _exportButtons.Add(button);
+        card.Controls.Add(button);
+        buttons.Add(button);
         return button;
     }
 
@@ -831,19 +848,19 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     }
 
     /// <summary>
-    /// Wraps the export buttons left-to-right, same wrap-on-overflow approach as
-    /// <see cref="ChipGroup"/> - with up to five of them now (full export, AI export, plain export,
-    /// settings export, settings import) and labels long enough to vary a lot by language, a fixed
-    /// side-by-side row would overflow a narrower window.
+    /// Wraps a card's export/import buttons left-to-right, same wrap-on-overflow approach as
+    /// <see cref="ChipGroup"/> - labels long enough to vary a lot by language, a fixed side-by-side
+    /// row would overflow a narrower window. Shared by <see cref="_exportCard"/> (three data
+    /// exports) and <see cref="_settingsBackupCard"/> (configuration export/import).
     /// </summary>
-    private void LayoutExportButtons()
+    private void LayoutExportButtons(Card card, List<AppButton> buttons)
     {
-        Rectangle content = _exportCard.DisplayRectangle;
+        Rectangle content = card.DisplayRectangle;
         int rowHeight = Dp(32);
         int x = content.Left;
         int y = content.Top;
 
-        foreach (AppButton button in _exportButtons)
+        foreach (AppButton button in buttons)
         {
             if (x > content.Left && x + button.Width > content.Right)
             {
@@ -855,7 +872,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             x += button.Width + Sp(2);
         }
 
-        _exportCard.Height = y + rowHeight + _exportCard.Inset;
+        card.Height = y + rowHeight + card.Inset;
     }
 
     private void LayoutCards()
@@ -896,7 +913,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         int contentHeight = _addEndpoint.Height + Sp(2) + _endpoints.Height;
         _endpointsCard.Height = content.Top + contentHeight + _endpointsCard.Inset;
 
-        LayoutExportButtons();
+        LayoutExportButtons(_exportCard, _exportButtons);
+        LayoutExportButtons(_settingsBackupCard, _settingsBackupButtons);
     }
 
     protected override void OnResize(EventArgs e)
@@ -1069,6 +1087,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _endpointsCard.Subtitle = Loc.Get("settings.section.endpoints.subtitle");
         _exportCard.Title = Loc.Get("settings.section.export");
         _exportCard.Subtitle = Loc.Get("settings.section.export.subtitle");
+        _settingsBackupCard.Title = Loc.Get("settings.section.configBackup");
+        _settingsBackupCard.Subtitle = Loc.Get("settings.section.configBackup.subtitle");
 
         foreach ((Label label, _) in _rows)
         {

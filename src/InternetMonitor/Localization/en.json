@@ -404,5 +404,7 @@
   "history.caption.series": "Series",
   "history.caption.range": "Range",
   "settings.lanScanVendorLookup": "Look up each device's manufacturer",
-  "lanScan.column.vendor": "Vendor"
+  "lanScan.column.vendor": "Vendor",
+  "settings.section.configBackup": "Configuration",
+  "settings.section.configBackup.subtitle": "Export or restore this app's own settings - not the monitored data."
 }

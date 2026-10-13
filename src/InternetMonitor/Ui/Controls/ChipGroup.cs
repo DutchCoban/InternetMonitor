@@ -10,6 +10,20 @@ namespace InternetMonitor.Ui.Controls;
 /// the app rather than like Win32. Hit-testing a list of rectangles is less code than keeping a
 /// dozen child controls aligned.
 /// </summary>
+/// <summary>
+/// <see cref="ChipGroup.Filter"/> is the compact look used for picking a chart range or series -
+/// many of these can sit in a row, so each stays small. <see cref="ChipGroup.Menu"/> is for when
+/// the chips themselves ARE the navigation (switching between whole tools, say) rather than a
+/// filter alongside other content, and reads more like a pair of tab/menu buttons: bigger, bolder
+/// text, and a visible border at rest so each option is recognisable as clickable even before
+/// hovering it.
+/// </summary>
+public enum ChipGroupVariant
+{
+    Filter,
+    Menu,
+}
+
 public sealed class ChipGroup : ThemedControl
 {
     public sealed record Chip(string Id, string Label);
@@ -24,6 +38,9 @@ public sealed class ChipGroup : ThemedControl
         Cursor = Cursors.Hand;
         Height = Dp(30);
     }
+
+    /// <summary>Set once at construction, like <see cref="Card.HeaderGlyph"/> - a chip group does not switch look after it's built.</summary>
+    public ChipGroupVariant Variant { get; init; } = ChipGroupVariant.Filter;
 
     public event Action<string>? SelectionChanged;
 
@@ -65,13 +82,16 @@ public sealed class ChipGroup : ThemedControl
     private void Relayout()
     {
         _bounds.Clear();
-        int chipHeight = Dp(26);
+        bool menu = Variant == ChipGroupVariant.Menu;
+        int chipHeight = menu ? Dp(34) : Dp(26);
+        int horizontalPad = menu ? Sp(5) : Sp(3);
+        FontRole font = menu ? FontRole.Body : FontRole.Small;
         int x = 0;
         int y = 0;
 
         foreach (Chip chip in _chips)
         {
-            int width = GdiExtensions.MeasureCrisp(chip.Label, Theme.Font(FontRole.Small)).Width + (Sp(3) * 2);
+            int width = GdiExtensions.MeasureCrisp(chip.Label, Theme.Font(font)).Width + (horizontalPad * 2);
             if (x > 0 && x + width > Width)
             {
                 x = 0;
@@ -135,6 +155,10 @@ public sealed class ChipGroup : ThemedControl
         Graphics g = e.Graphics;
         g.UseHighQuality();
         Palette p = Theme.Current;
+        bool menu = Variant == ChipGroupVariant.Menu;
+        float radius = Theme.RadiusControl(DeviceDpi);
+        FontRole font = menu ? FontRole.Body : FontRole.Small;
+        FontRole fontSelected = menu ? FontRole.BodyStrong : FontRole.SmallStrong;
 
         for (int i = 0; i < _chips.Count && i < _bounds.Count; i++)
         {
@@ -144,19 +168,21 @@ public sealed class ChipGroup : ThemedControl
 
             var rect = new RectangleF(bounds.X + 0.5f, bounds.Y + 0.5f, bounds.Width - 1, bounds.Height - 1);
 
-            g.FillRounded(rect, bounds.Height, selected ? p.Accent : hovered ? p.SurfaceHover : p.SurfaceAlt);
+            g.FillRounded(rect, radius, selected ? p.Accent : hovered ? p.SurfaceHover : p.SurfaceAlt);
 
-            // A resting chip leans on its fill alone rather than a border too - with a whole row
-            // of them, a border on every single one is what reads as "busy". The border comes
-            // back only on hover, as feedback that this one is about to be clicked.
-            if (hovered && !selected)
+            // A resting Filter chip leans on its fill alone rather than a border too - with a whole
+            // row of them, a border on every single one is what reads as "busy", so the border
+            // comes back only on hover, as feedback that this one is about to be clicked. A Menu
+            // chip IS the navigation rather than a filter alongside other content, so each option
+            // keeps its border at rest too, to read as a clickable button even before hovering it.
+            if ((menu && !selected) || (hovered && !selected))
             {
-                g.DrawRounded(rect, bounds.Height, p.Border);
+                g.DrawRounded(rect, radius, p.Border);
             }
 
             g.DrawTextCrisp(
                 _chips[i].Label,
-                selected ? Theme.Font(FontRole.SmallStrong) : Theme.Font(FontRole.Small),
+                selected ? Theme.Font(fontSelected) : Theme.Font(font),
                 selected ? p.AccentText : p.TextSecondary,
                 bounds,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);

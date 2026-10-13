@@ -404,5 +404,7 @@
   "history.caption.series": "Messung",
   "history.caption.range": "Zeitraum",
   "settings.lanScanVendorLookup": "Hersteller jedes Geräts nachschlagen",
-  "lanScan.column.vendor": "Hersteller"
+  "lanScan.column.vendor": "Hersteller",
+  "settings.section.configBackup": "Konfiguration",
+  "settings.section.configBackup.subtitle": "Die eigenen Einstellungen dieser App exportieren oder wiederherstellen - nicht die überwachten Daten."
 }

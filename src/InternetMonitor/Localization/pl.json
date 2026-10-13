@@ -404,5 +404,7 @@
   "history.caption.series": "Pomiar",
   "history.caption.range": "Zakres",
   "settings.lanScanVendorLookup": "Sprawdzaj producenta każdego urządzenia",
-  "lanScan.column.vendor": "Producent"
+  "lanScan.column.vendor": "Producent",
+  "settings.section.configBackup": "Konfiguracja",
+  "settings.section.configBackup.subtitle": "Eksportuj lub przywróć ustawienia samej aplikacji - nie monitorowane dane."
 }
