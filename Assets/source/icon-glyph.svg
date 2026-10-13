@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Original artwork (not derived from any third-party asset): a clipboard holding a report with
-     a pulse/ECG line - a line-icon style (stroke only, no fills besides the white "knockouts"
-     where the clip overlaps the body) rather than the filled-shape style of earlier drafts of
-     this icon. Matches what this app actually produces: a diagnostic report with a connectivity
-     reading on it.
+     a pulse/ECG line - a line-icon style (stroke only, besides the body's own white fill and the
+     white "knockouts" where the clip overlaps it) rather than the filled-shape style of earlier
+     drafts of this icon. Matches what this app actually produces: a diagnostic report with a
+     connectivity reading on it. The corners outside the clipboard shape are transparent - there
+     is deliberately no background square behind it, unlike earlier versions of this file.
 
      Stroke widths here are deliberately much heavier than they would be in a poster-sized version
      of this same drawing (13 units on this 200-unit grid, where ~7 would look "right" at a glance
@@ -25,16 +26,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
     <style>
-      .bg { fill: #FFFFFF; }
       .ink { fill: none; stroke: #276BA4; stroke-linecap: round; stroke-linejoin: round; }
       .knockout { fill: #FFFFFF; stroke: #276BA4; }
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="200" height="200" rx="34"/>
-
-  <!-- Clipboard body -->
-  <rect class="ink" x="44" y="50" width="112" height="136" rx="13" stroke-width="13"/>
+  <!-- Clipboard body - its own white fill now, rather than relying on a separate background
+       square behind it, so the corners around it can be transparent instead of white. -->
+  <rect x="44" y="50" width="112" height="136" rx="13" fill="#FFFFFF" stroke="#276BA4" stroke-linecap="round" stroke-linejoin="round" stroke-width="13"/>
 
   <!-- Clip, overlapping the body's top edge, plus its rivet -->
   <rect class="knockout" x="77" y="34" width="46" height="30" rx="15" stroke-width="13"/>
