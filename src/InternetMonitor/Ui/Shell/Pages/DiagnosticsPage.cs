@@ -36,6 +36,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
     private Card _networkHealthSummaryCard = null!;
     private Label _networkHealthDisabledLabel = null!;
+    private Label _networkHealthUpdatedLabel = null!;
     private readonly List<SummaryRow> _networkHealthRows = [];
 
     private Card _tableCard = null!;
@@ -105,6 +106,15 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _networkHealthRows.Add(MakeSummaryRow("ttlExceeded"));
         _networkHealthRows.Add(MakeSummaryRow("rogueDhcp"));
 
+        _networkHealthUpdatedLabel = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+            ForeColor = Theme.Current.TextMuted,
+        };
+        _networkHealthSummaryCard.Controls.Add(_networkHealthUpdatedLabel);
+
         ApplyNetworkHealthColors();
     }
 
@@ -120,11 +130,24 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
             ForeColor = Theme.Current.TextMuted,
         };
 
+        // Second, optional line for a condition that has more to say than a bare count - so far
+        // only rogue-DHCP uses it (the detected server addresses), shown only while its incident
+        // is open.
+        var detail = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+            ForeColor = Theme.Current.TextMuted,
+            Visible = false,
+        };
+
         _networkHealthSummaryCard.Controls.Add(pill);
         _networkHealthSummaryCard.Controls.Add(name);
         _networkHealthSummaryCard.Controls.Add(value);
+        _networkHealthSummaryCard.Controls.Add(detail);
 
-        return new SummaryRow(key, pill, name, value);
+        return new SummaryRow(key, pill, name, value, detail);
     }
 
     /// <summary>
@@ -135,6 +158,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     {
         Rectangle content = _networkHealthSummaryCard.DisplayRectangle;
         int rowHeight = Dp(26);
+        int detailHeight = Dp(16);
         bool enabled = Services.Settings.NetworkHealthMonitoringEnabled;
 
         _networkHealthDisabledLabel.Visible = !enabled;
@@ -146,26 +170,41 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
             y += rowHeight;
         }
 
+        int pillSize = Dp(14);
+        int nameLeft = content.Left + pillSize + Sp(2);
+
         foreach (SummaryRow row in _networkHealthRows)
         {
             row.Pill.Visible = enabled;
             row.Name.Visible = enabled;
             row.Value.Visible = enabled;
+            row.Detail.Visible = enabled && row.Detail.Visible;
 
             if (!enabled)
             {
                 continue;
             }
 
-            int pillSize = Dp(14);
             row.Pill.Bounds = new Rectangle(content.Left, y + ((rowHeight - pillSize) / 2), pillSize, pillSize);
 
-            int nameLeft = content.Left + pillSize + Sp(2);
             int valueWidth = Dp(130);
             row.Name.Bounds = new Rectangle(nameLeft, y, Math.Max(0, content.Width - (nameLeft - content.Left) - valueWidth - Sp(2)), rowHeight);
             row.Value.Bounds = new Rectangle(content.Right - valueWidth, y, valueWidth, rowHeight);
 
             y += rowHeight;
+
+            if (row.Detail.Visible)
+            {
+                row.Detail.Bounds = new Rectangle(nameLeft, y, Math.Max(0, content.Width - (nameLeft - content.Left)), detailHeight);
+                y += detailHeight;
+            }
+        }
+
+        _networkHealthUpdatedLabel.Visible = enabled;
+        if (enabled)
+        {
+            _networkHealthUpdatedLabel.Bounds = new Rectangle(content.Left, y, content.Width, detailHeight);
+            y += detailHeight;
         }
 
         _networkHealthSummaryCard.Height = y + _networkHealthSummaryCard.Inset;
@@ -186,7 +225,23 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         {
             rogueDhcpRow.Value.Text = Loc.Get("diagnostics.networkHealth.unavailable");
             rogueDhcpRow.Pill.Severity = UiSeverity.Idle;
+            rogueDhcpRow.Detail.Visible = false;
         }
+        else if (status.RogueDhcp.Enabled && status.RogueDhcp.IncidentOpen && status.RogueDhcpServers.Count > 0)
+        {
+            rogueDhcpRow.Detail.Text = Loc.Format(
+                "diagnostics.networkHealth.rogueDhcp.found",
+                string.Join(", ", status.RogueDhcpServers));
+            rogueDhcpRow.Detail.Visible = true;
+        }
+        else
+        {
+            rogueDhcpRow.Detail.Visible = false;
+        }
+
+        _networkHealthUpdatedLabel.Text = status.LastUpdatedUtc is { } updated
+            ? Loc.Format("diagnostics.networkHealth.lastUpdated", updated.ToLocalTime().ToString("HH:mm:ss"))
+            : string.Empty;
 
         LayoutNetworkHealthSummary();
     }
@@ -301,6 +356,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         Palette p = Theme.Current;
         _networkHealthDisabledLabel.BackColor = p.Surface;
         _networkHealthDisabledLabel.ForeColor = p.TextMuted;
+        _networkHealthUpdatedLabel.BackColor = p.Surface;
+        _networkHealthUpdatedLabel.ForeColor = p.TextMuted;
 
         foreach (SummaryRow row in _networkHealthRows)
         {
@@ -308,6 +365,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
             row.Name.ForeColor = p.TextSecondary;
             row.Value.BackColor = p.Surface;
             row.Value.ForeColor = p.TextMuted;
+            row.Detail.BackColor = p.Surface;
+            row.Detail.ForeColor = p.TextMuted;
         }
     }
 
@@ -461,5 +520,5 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     }
 
     /// <summary>One network-health condition's row in the summary card.</summary>
-    private sealed record SummaryRow(string Key, StatusPill Pill, Label Name, Label Value);
+    private sealed record SummaryRow(string Key, StatusPill Pill, Label Name, Label Value, Label Detail);
 }

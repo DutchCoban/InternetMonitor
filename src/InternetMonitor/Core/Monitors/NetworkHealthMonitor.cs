@@ -16,7 +16,9 @@ public sealed record NetworkHealthStatus(
     NetworkHealthConditionStatus PacketLoss,
     NetworkHealthConditionStatus TtlExceeded,
     NetworkHealthConditionStatus RogueDhcp,
-    DhcpProbeStatus LastRogueDhcpProbeStatus);
+    DhcpProbeStatus LastRogueDhcpProbeStatus,
+    IReadOnlyList<IPAddress> RogueDhcpServers,
+    DateTimeOffset? LastUpdatedUtc);
 
 /// <summary>
 /// Watches for packet-level trouble that the step pipeline never looks at: TCP retransmissions, ICMP
@@ -63,6 +65,8 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     private long? _lastTcpRetransmissions;
     private long? _lastTtlExceeded;
     private DhcpProbeStatus _lastDhcpProbeStatus = DhcpProbeStatus.Ok;
+    private IReadOnlyList<IPAddress> _rogueDhcpServers = [];
+    private DateTimeOffset? _lastUpdatedUtc;
     private bool _enabled;
 
     private CancellationTokenSource? _counterLoopCts;
@@ -86,7 +90,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     public event Action<NetworkHealthStatus>? StatusChanged;
 
     public NetworkHealthStatus CurrentStatus { get; private set; } =
-        new(false, DisabledCondition, DisabledCondition, DisabledCondition, DisabledCondition, DhcpProbeStatus.Ok);
+        new(false, DisabledCondition, DisabledCondition, DisabledCondition, DisabledCondition, DhcpProbeStatus.Ok, [], null);
 
     /// <summary>
     /// Applies settings and starts/stops/restarts the loops as needed. Idempotent, matching
@@ -269,6 +273,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
 
         if (result.Status != DhcpProbeStatus.Ok || !_rogueDhcp.Threshold.Enabled)
         {
+            _rogueDhcpServers = [];
             PublishStatus();
             return;
         }
@@ -278,10 +283,13 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
 
         // No known gateway yet (e.g. the pipeline has not completed its first cycle) - never call
         // a server rogue without something known-good to compare it against.
-        int rogueCount = gateway is null ? 0 : result.Offers.Count(o => !o.Server.Equals(gateway));
+        IReadOnlyList<IPAddress> rogueServers = gateway is null
+            ? []
+            : [.. result.Offers.Select(o => o.Server).Where(s => !s.Equals(gateway)).Distinct()];
+        _rogueDhcpServers = rogueServers;
 
         _rogueDhcp.Samples.Clear();
-        _rogueDhcp.Samples.Add((now, rogueCount));
+        _rogueDhcp.Samples.Add((now, rogueServers.Count));
         EvaluateCondition(_rogueDhcp, now);
         PublishStatus();
     }
@@ -363,13 +371,17 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
 
     private void PublishStatus()
     {
+        _lastUpdatedUtc = DateTimeOffset.UtcNow;
+
         var status = new NetworkHealthStatus(
             _enabled,
             ToStatus(_tcpRetransmissions),
             ToStatus(_packetLoss),
             ToStatus(_ttlExceeded),
             ToStatus(_rogueDhcp),
-            _lastDhcpProbeStatus);
+            _lastDhcpProbeStatus,
+            _rogueDhcpServers,
+            _lastUpdatedUtc);
 
         CurrentStatus = status;
         StatusChanged?.Invoke(status);

@@ -394,5 +394,7 @@
   "settings.export.ai": "Eksportuj do analizy AI",
   "hero.stat.networkHealth": "Kondycja sieci",
   "hero.stat.networkHealth.ok": "OK",
-  "hero.stat.networkHealth.open": "{0} ostrzeżenie(a)"
+  "hero.stat.networkHealth.open": "{0} ostrzeżenie(a)",
+  "diagnostics.networkHealth.rogueDhcp.found": "znaleziono: {0}",
+  "diagnostics.networkHealth.lastUpdated": "Ostatnia aktualizacja o {0}"
 }

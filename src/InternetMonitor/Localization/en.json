@@ -394,5 +394,7 @@
   "settings.export.ai": "Export for AI analysis",
   "hero.stat.networkHealth": "Network health",
   "hero.stat.networkHealth.ok": "OK",
-  "hero.stat.networkHealth.open": "{0} warning(s)"
+  "hero.stat.networkHealth.open": "{0} warning(s)",
+  "diagnostics.networkHealth.rogueDhcp.found": "found: {0}",
+  "diagnostics.networkHealth.lastUpdated": "Last updated at {0}"
 }
