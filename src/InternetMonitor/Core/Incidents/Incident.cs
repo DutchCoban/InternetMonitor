@@ -9,7 +9,12 @@ public enum IncidentStatus
     Resolved,
 }
 
-/// <summary>One step's state at one moment, flattened for storage.</summary>
+/// <summary>
+/// One step's state at one moment, flattened for storage. <see cref="Headline"/>/<see cref="Detail"/>
+/// are English - see <see cref="StepResult.EnglishHeadline"/> - even though the step that produced
+/// them was reporting in whatever language the screen showed at the time, since this is exactly
+/// the kind of text that gets permanently frozen into an incident.
+/// </summary>
 public sealed record StepSnapshotEntry(
     StepId Step,
     StepState State,
@@ -20,8 +25,8 @@ public sealed record StepSnapshotEntry(
     public static StepSnapshotEntry From(StepResult result) => new(
         result.Step,
         result.State,
-        result.Headline,
-        result.Detail,
+        result.EnglishHeadline(),
+        result.EnglishDetail(),
         result.Measurements.ToDictionary(m => m.Label, m => m.Value));
 }
 

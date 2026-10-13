@@ -219,7 +219,11 @@ public sealed class StepPipeline : IDisposable
                 TimeSpan.Zero,
                 DateTimeOffset.UtcNow,
                 [],
-                null);
+                null)
+            {
+                HeadlineKey = "step.simulated",
+                DetailKey = "step.simulated.detail",
+            };
         }
 
         try
@@ -233,6 +237,10 @@ public sealed class StepPipeline : IDisposable
         }
         catch (Exception ex)
         {
+            // ex.Message has no HeadlineKey/DetailKey equivalent - it is whatever the framework or
+            // a library produced, not one of this app's own translated strings - so only the
+            // headline (a fixed, translated sentence) gets one; the detail falls back to the live
+            // (untranslated either way) exception text wherever it ends up frozen.
             return new StepResult(
                 check.Id,
                 StepState.Failed,
@@ -242,7 +250,10 @@ public sealed class StepPipeline : IDisposable
                 TimeSpan.Zero,
                 DateTimeOffset.UtcNow,
                 [],
-                null);
+                null)
+            {
+                HeadlineKey = "step.error.unexpected",
+            };
         }
     }
 
@@ -306,9 +317,20 @@ public sealed class StepPipeline : IDisposable
     private static StepResult AsSkipped(StepResult result, StepId blockedBy)
     {
         LocalizationManager loc = LocalizationManager.Instance;
+        string blockerNameKey = $"step.{blockedBy.Key()}.name";
+        bool resultFailed = result.State.IsFailure();
+
+        // The skip detail reuses the blocking result's own headline verbatim (see below), so its
+        // English reconstruction reuses that result's HeadlineKey/Args too, rather than needing a
+        // key of its own - EnglishDetail() resolving "step.adapter.disabled" is exactly the same
+        // operation as EnglishHeadline() would have done on the original result.
         return result.AsSkipped(
-            loc.Format("step.skipped", loc.Get($"step.{blockedBy.Key()}.name")),
-            result.State.IsFailure() ? result.Headline : null);
+            loc.Format("step.skipped", loc.Get(blockerNameKey)),
+            resultFailed ? result.Headline : null,
+            headlineKey: "step.skipped",
+            headlineArgs: [LocalizationManager.GetEnglish(blockerNameKey)],
+            detailKey: resultFailed ? result.HeadlineKey : null,
+            detailArgs: resultFailed ? result.HeadlineArgs : null);
     }
 
     private void Publish(StepResult result)

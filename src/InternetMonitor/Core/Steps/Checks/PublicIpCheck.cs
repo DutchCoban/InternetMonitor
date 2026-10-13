@@ -57,16 +57,24 @@ public sealed class PublicIpCheck : IStepCheck
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 measurements,
-                facts);
+                facts)
+            {
+                HeadlineKey = "step.publicIp.none",
+                DetailKey = "step.publicIp.none.detail",
+            };
         }
 
         StepState state = LatencyClassifier.Classify(best, context.Targets);
         bool partial = facts.ReachableCount < endpoints.Count;
+        string bestText = best?.ToString("F0") ?? "?";
+
+        string? detailKey = partial ? "step.publicIp.partial.detail" : state == StepState.Warning ? "step.latency.high" : null;
+        object[] detailArgs = partial ? [facts.ReachableCount, endpoints.Count] : [];
 
         return new StepResult(
             Id,
             state,
-            loc.Format("step.publicIp.ok", best?.ToString("F0") ?? "?"),
+            loc.Format("step.publicIp.ok", bestText),
             partial
                 ? loc.Format("step.publicIp.partial.detail", facts.ReachableCount, endpoints.Count)
                 : state == StepState.Warning ? loc.Get("step.latency.high") : null,
@@ -74,6 +82,12 @@ public sealed class PublicIpCheck : IStepCheck
             watch.Elapsed,
             DateTimeOffset.UtcNow,
             measurements,
-            facts);
+            facts)
+        {
+            HeadlineKey = "step.publicIp.ok",
+            HeadlineArgs = [bestText],
+            DetailKey = detailKey,
+            DetailArgs = detailArgs,
+        };
     }
 }

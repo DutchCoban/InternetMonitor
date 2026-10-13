@@ -43,7 +43,11 @@ public sealed class GatewayCheck : IStepCheck
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 [],
-                new GatewayFacts(null, false, null, null, null));
+                new GatewayFacts(null, false, null, null, null))
+            {
+                HeadlineKey = "step.gateway.none",
+                DetailKey = "step.gateway.none.detail",
+            };
         }
 
         TimeSpan timeout = context.Targets.GatewayTimeout;
@@ -101,19 +105,30 @@ public sealed class GatewayCheck : IStepCheck
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 measurements,
-                facts);
+                facts)
+            {
+                HeadlineKey = "step.gateway.unreachable",
+                HeadlineArgs = [gateway],
+                DetailKey = "step.gateway.unreachable.detail",
+            };
         }
 
         StepState state = LatencyClassifier.Classify(latency, context.Targets);
+        string latencyText = latency?.ToString("F0") ?? "?";
         return new StepResult(
             Id,
             state,
-            loc.Format("step.gateway.ok", gateway, latency?.ToString("F0") ?? "?"),
+            loc.Format("step.gateway.ok", gateway, latencyText),
             state == StepState.Warning ? loc.Get("step.latency.high") : null,
             latency,
             watch.Elapsed,
             DateTimeOffset.UtcNow,
             measurements,
-            facts);
+            facts)
+        {
+            HeadlineKey = "step.gateway.ok",
+            HeadlineArgs = [gateway, latencyText],
+            DetailKey = state == StepState.Warning ? "step.latency.high" : null,
+        };
     }
 }

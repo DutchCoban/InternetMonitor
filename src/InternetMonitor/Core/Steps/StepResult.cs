@@ -1,3 +1,5 @@
+using InternetMonitor.Localization;
+
 namespace InternetMonitor.Core.Steps;
 
 /// <summary>One labelled measurement, for the diagnostics table and the incident evidence.</summary>
@@ -24,6 +26,29 @@ public sealed record StepResult(
     IReadOnlyList<Measurement> Measurements,
     StepFacts? Facts)
 {
+    /// <summary>
+    /// The localization key and arguments <see cref="Headline"/> was built from, if the check
+    /// provided them - optional, and null for every call site that has not been updated yet.
+    /// Lets an incident being frozen (see <c>StepSnapshotEntry.From</c>) reconstruct the headline
+    /// in a fixed language instead of permanently keeping whatever language was active when the
+    /// cycle ran, without the live UI (which keeps reading <see cref="Headline"/> itself) having
+    /// to change at all.
+    /// </summary>
+    public string? HeadlineKey { get; init; }
+
+    public object[]? HeadlineArgs { get; init; }
+
+    /// <summary>Same idea as <see cref="HeadlineKey"/>, for <see cref="Detail"/>.</summary>
+    public string? DetailKey { get; init; }
+
+    public object[]? DetailArgs { get; init; }
+
+    /// <summary>The headline in English, reconstructed from <see cref="HeadlineKey"/> when a check provided one, else the live (possibly non-English) <see cref="Headline"/> as a graceful fallback.</summary>
+    public string EnglishHeadline() => HeadlineKey is { } key ? LocalizationManager.FormatEnglish(key, HeadlineArgs ?? []) : Headline;
+
+    /// <summary>Same as <see cref="EnglishHeadline"/>, for <see cref="Detail"/>.</summary>
+    public string? EnglishDetail() => DetailKey is { } key ? LocalizationManager.FormatEnglish(key, DetailArgs ?? []) : Detail;
+
     public static StepResult Pending(StepId step) => new(
         step, StepState.Pending, string.Empty, null, null, TimeSpan.Zero, DateTimeOffset.UtcNow, [], null);
 
@@ -34,9 +59,28 @@ public sealed record StepResult(
     /// Re-labels a failed result as skipped, keeping everything that was measured. Used when a
     /// step turns out to have been doomed by an earlier failure: the numbers are still worth
     /// having in the incident evidence, they just should not be presented as a second problem.
+    ///
+    /// The optional key/args replace rather than preserve whatever this result's own
+    /// <see cref="HeadlineKey"/>/<see cref="DetailKey"/> were - the skip headline/detail are new
+    /// text, not the original result's own, so keeping its old key would resolve to the wrong
+    /// English sentence if this ever gets frozen into an incident.
     /// </summary>
-    public StepResult AsSkipped(string headline, string? detail) =>
-        this with { State = StepState.Skipped, Headline = headline, Detail = detail };
+    public StepResult AsSkipped(
+        string headline,
+        string? detail,
+        string? headlineKey = null,
+        object[]? headlineArgs = null,
+        string? detailKey = null,
+        object[]? detailArgs = null) => this with
+        {
+            State = StepState.Skipped,
+            Headline = headline,
+            Detail = detail,
+            HeadlineKey = headlineKey,
+            HeadlineArgs = headlineArgs,
+            DetailKey = detailKey,
+            DetailArgs = detailArgs,
+        };
 }
 
 /// <summary>

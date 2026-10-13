@@ -20,6 +20,7 @@ namespace InternetMonitor.Tests.Core.Tools.Traceroute;
 /// gateway. <see cref="Annotate_does_not_guess_ownership_when_the_local_subnet_is_unknown"/> pins
 /// down the fix for that: no local subnet means "unknown", not a guess in either direction.
 /// </summary>
+[Collection("Localization")]
 public sealed class HopAnnotatorTests
 {
     [Theory]

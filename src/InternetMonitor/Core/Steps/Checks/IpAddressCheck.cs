@@ -42,7 +42,11 @@ public sealed class IpAddressCheck : IStepCheck
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 [],
-                new IpAddressFacts(null, null, false, false, [], null)));
+                new IpAddressFacts(null, null, false, false, [], null))
+            {
+                HeadlineKey = "step.ip.none",
+                DetailKey = "step.ip.none.detail",
+            });
         }
 
         UnicastIPAddressInformation? unicast = properties.UnicastAddresses
@@ -100,23 +104,30 @@ public sealed class IpAddressCheck : IStepCheck
             loc.Get("measure.dhcp"),
             loc.Get(dhcpEnabled ? "measure.dhcp.on" : "measure.dhcp.off")));
 
-        (StepState state, string headline, string? detail) = address switch
+        (StepState state, string headlineKey, string? detailKey) = address switch
         {
-            null => (StepState.Failed, loc.Get("step.ip.none"), loc.Get("step.ip.none.detail")),
-            _ when isApipa => (StepState.Failed, loc.Format("step.ip.apipa", address), loc.Get("step.ip.apipa.detail")),
-            _ => (StepState.Ok, loc.Format("step.ip.ok", address), (string?)null),
+            null => (StepState.Failed, "step.ip.none", "step.ip.none.detail"),
+            _ when isApipa => (StepState.Failed, "step.ip.apipa", "step.ip.apipa.detail"),
+            _ => (StepState.Ok, "step.ip.ok", (string?)null),
         };
+
+        object[] headlineArgs = address is null ? [] : [address];
 
         return Task.FromResult(new StepResult(
             Id,
             state,
-            headline,
-            detail,
+            address is null ? loc.Get(headlineKey) : loc.Format(headlineKey, address),
+            detailKey is null ? null : loc.Get(detailKey),
             null,
             watch.Elapsed,
             DateTimeOffset.UtcNow,
             measurements,
-            facts));
+            facts)
+        {
+            HeadlineKey = headlineKey,
+            HeadlineArgs = headlineArgs,
+            DetailKey = detailKey,
+        });
     }
 
     /// <summary>

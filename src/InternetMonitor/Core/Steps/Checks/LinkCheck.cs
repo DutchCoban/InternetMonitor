@@ -38,7 +38,10 @@ public sealed class LinkCheck : IStepCheck
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 [],
-                new LinkFacts(PhysicalLinkState.Unknown, null, false, null)));
+                new LinkFacts(PhysicalLinkState.Unknown, null, false, null))
+            {
+                HeadlineKey = "step.link.noAdapter",
+            });
         }
 
         InterfaceLinkInfo info = IfTable.Query(adapter);
@@ -66,24 +69,28 @@ public sealed class LinkCheck : IStepCheck
             measurements.Add(new Measurement(loc.Get("measure.linkSpeed"), $"{speed / 1_000_000} Mbit/s"));
         }
 
-        (StepState state, string headline, string? detail) = (connected, connecting, wireless) switch
+        (StepState state, string headlineKey, string? detailKey) = (connected, connecting, wireless) switch
         {
-            (true, _, true) => (StepState.Ok, loc.Get("step.link.wifiAssociated"), null),
-            (true, _, false) => (StepState.Ok, loc.Get("step.link.connected"), null),
-            (false, true, _) => (StepState.Warning, loc.Get("step.link.connecting"), (string?)null),
-            (false, false, true) => (StepState.Failed, loc.Get("step.link.wifiNotAssociated"), loc.Get("step.link.wifiNotAssociated.detail")),
-            _ => (StepState.Failed, loc.Get("step.link.disconnected"), loc.Get("step.link.disconnected.detail")),
+            (true, _, true) => (StepState.Ok, "step.link.wifiAssociated", null),
+            (true, _, false) => (StepState.Ok, "step.link.connected", null),
+            (false, true, _) => (StepState.Warning, "step.link.connecting", (string?)null),
+            (false, false, true) => (StepState.Failed, "step.link.wifiNotAssociated", "step.link.wifiNotAssociated.detail"),
+            _ => (StepState.Failed, "step.link.disconnected", "step.link.disconnected.detail"),
         };
 
         return Task.FromResult(new StepResult(
             Id,
             state,
-            headline,
-            detail,
+            loc.Get(headlineKey),
+            detailKey is null ? null : loc.Get(detailKey),
             connected ? 1 : 0,
             watch.Elapsed,
             DateTimeOffset.UtcNow,
             measurements,
-            facts));
+            facts)
+        {
+            HeadlineKey = headlineKey,
+            DetailKey = detailKey,
+        });
     }
 }

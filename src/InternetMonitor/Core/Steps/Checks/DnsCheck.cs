@@ -49,17 +49,23 @@ public sealed class DnsCheck : IStepCheck
 
             var okFacts = new DnsFacts(hostname, outcome.Addresses, outcome.ElapsedMs, context.DnsServers, null);
             StepState state = LatencyClassifier.Classify(outcome.ElapsedMs, context.Targets);
+            string elapsedText = outcome.ElapsedMs.ToString("F0");
 
             return new StepResult(
                 Id,
                 state,
-                loc.Format("step.dns.ok", hostname, outcome.ElapsedMs.ToString("F0")),
+                loc.Format("step.dns.ok", hostname, elapsedText),
                 state == StepState.Warning ? loc.Get("step.dns.slow") : null,
                 outcome.ElapsedMs,
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 measurements,
-                okFacts);
+                okFacts)
+            {
+                HeadlineKey = "step.dns.ok",
+                HeadlineArgs = [hostname, elapsedText],
+                DetailKey = state == StepState.Warning ? "step.dns.slow" : null,
+            };
         }
 
         bool publicResolversWorked = await AnyPublicResolverAnswersAsync(context, hostname, cancellationToken)
@@ -70,6 +76,10 @@ public sealed class DnsCheck : IStepCheck
             loc.Get(publicResolversWorked ? "measure.publicResolvers.ok" : "measure.publicResolvers.failed")));
 
         var facts = new DnsFacts(hostname, [], outcome.ElapsedMs, context.DnsServers, publicResolversWorked);
+
+        string headlineKey = publicResolversWorked ? "step.dns.ownResolverFailed" : "step.dns.failed";
+        string detailKey = publicResolversWorked ? "step.dns.ownResolverFailed.detail" : "step.dns.failed.detail";
+        object[] headlineArgs = publicResolversWorked ? [] : [hostname];
 
         return new StepResult(
             Id,
@@ -84,7 +94,12 @@ public sealed class DnsCheck : IStepCheck
             watch.Elapsed,
             DateTimeOffset.UtcNow,
             measurements,
-            facts);
+            facts)
+        {
+            HeadlineKey = headlineKey,
+            HeadlineArgs = headlineArgs,
+            DetailKey = detailKey,
+        };
     }
 
     /// <summary>

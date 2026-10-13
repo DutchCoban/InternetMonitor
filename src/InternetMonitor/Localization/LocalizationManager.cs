@@ -89,6 +89,35 @@ public sealed class LocalizationManager
         }
     }
 
+    /// <summary>
+    /// Resolves a key in English specifically, independent of <see cref="Instance"/>'s active
+    /// language - for text that is about to be permanently persisted (an incident record).
+    /// Incidents happen in whatever language the screen was showing at the time; without this,
+    /// a user who normally runs the app in Polish but switched to Dutch for a moment would have
+    /// that one incident frozen in Dutch forever, indistinguishable from every other incident
+    /// except by when it happened. Recording everything in one fixed language instead keeps the
+    /// whole history, and anything exported from it, consistent regardless of what the screen
+    /// happened to say when it occurred.
+    ///
+    /// Reuses <see cref="FallbackStrings"/> - already loaded for the missing-key fallback above,
+    /// so this adds no extra I/O.
+    /// </summary>
+    public static string GetEnglish(string key) =>
+        FallbackStrings.Value.TryGetValue(key, out string? value) ? value : $"[{key}]";
+
+    public static string FormatEnglish(string key, params object[] args)
+    {
+        string template = GetEnglish(key);
+        try
+        {
+            return string.Format(template, args);
+        }
+        catch (FormatException)
+        {
+            return template;
+        }
+    }
+
     private static Dictionary<string, string> LoadLanguageFile(string languageCode)
     {
         string resourceName = $"InternetMonitor.Localization.{languageCode}.json";

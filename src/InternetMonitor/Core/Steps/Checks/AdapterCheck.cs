@@ -41,7 +41,11 @@ public sealed class AdapterCheck : IStepCheck
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 [],
-                new AdapterFacts(false, false, null, null, null, null, null, false, false, candidates.Count)));
+                new AdapterFacts(false, false, null, null, null, null, null, false, false, candidates.Count))
+            {
+                HeadlineKey = "step.adapter.none",
+                DetailKey = "step.adapter.none.detail",
+            });
         }
 
         context.Adapter = adapter;
@@ -97,7 +101,12 @@ public sealed class AdapterCheck : IStepCheck
             watch.Elapsed,
             DateTimeOffset.UtcNow,
             measurements,
-            facts));
+            facts)
+        {
+            HeadlineKey = disabled ? "step.adapter.disabled" : "step.adapter.ok",
+            HeadlineArgs = [adapter.Name],
+            DetailKey = disabled ? "step.adapter.disabled.detail" : null,
+        });
     }
 
     private static IPInterfaceProperties? TryGetIpProperties(NetworkInterface adapter)

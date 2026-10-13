@@ -26,14 +26,30 @@ public static class PlainLanguage
     public static Explanation Describe(RootCause cause, StepSnapshot snapshot)
     {
         LocalizationManager loc = LocalizationManager.Instance;
-        string variant = Variant(cause, snapshot);
-        string prefix = $"explain.{cause.Key()}{variant}";
+        string prefix = Prefix(cause, snapshot);
 
         return new Explanation(
             loc.Get($"{prefix}.what"),
             loc.Format($"{prefix}.cause", Arguments(cause, snapshot)),
             loc.Get($"{prefix}.todo"));
     }
+
+    /// <summary>
+    /// Same as <see cref="Describe"/>, resolved in English regardless of the active language - for
+    /// an incident's <see cref="Incidents.Incident.Explanation"/>, which is recorded once and
+    /// should not read differently depending on what the screen happened to show that moment.
+    /// </summary>
+    public static Explanation DescribeEnglish(RootCause cause, StepSnapshot snapshot)
+    {
+        string prefix = Prefix(cause, snapshot);
+
+        return new Explanation(
+            LocalizationManager.GetEnglish($"{prefix}.what"),
+            LocalizationManager.FormatEnglish($"{prefix}.cause", Arguments(cause, snapshot)),
+            LocalizationManager.GetEnglish($"{prefix}.todo"));
+    }
+
+    private static string Prefix(RootCause cause, StepSnapshot snapshot) => $"explain.{cause.Key()}{Variant(cause, snapshot)}";
 
     /// <summary>
     /// Picks the sub-case within a root cause, as a key suffix. Empty means the general case.

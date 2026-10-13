@@ -1,7 +1,18 @@
 using System.Runtime.CompilerServices;
 using InternetMonitor.Localization;
+using Xunit;
 
 namespace InternetMonitor.Tests;
+
+/// <summary>
+/// Groups every test class that reads or changes <see cref="LocalizationManager.Instance"/>'s
+/// active language. xUnit runs different collections in parallel but serializes tests within one,
+/// which is what a shared, process-wide static needs - without this, a test that temporarily
+/// switches the active language (see EnglishRecordingTests) can flip it out from under another
+/// test reading localized text concurrently on a different thread.
+/// </summary>
+[CollectionDefinition("Localization")]
+public sealed class LocalizationCollection;
 
 /// <summary>
 /// One-time setup for the whole test assembly.

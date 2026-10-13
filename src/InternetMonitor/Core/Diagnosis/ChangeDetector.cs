@@ -14,14 +14,19 @@ public enum ChangeKind
 
 public sealed record EnvironmentChange(ChangeKind Kind, string? From, string? To, DateTimeOffset AtUtc)
 {
+    private string Key => $"change.{char.ToLowerInvariant(Kind.ToString()[0])}{Kind.ToString()[1..]}";
+
     public string Describe()
     {
         LocalizationManager loc = LocalizationManager.Instance;
-        return loc.Format(
-            $"change.{char.ToLowerInvariant(Kind.ToString()[0])}{Kind.ToString()[1..]}",
-            From ?? loc.Get("change.none"),
-            To ?? loc.Get("change.none"));
+        return loc.Format(Key, From ?? loc.Get("change.none"), To ?? loc.Get("change.none"));
     }
+
+    /// <summary>Same as <see cref="Describe"/>, resolved in English - see <see cref="LocalizationManager.FormatEnglish"/> for why.</summary>
+    public string DescribeEnglish() => LocalizationManager.FormatEnglish(
+        Key,
+        From ?? LocalizationManager.GetEnglish("change.none"),
+        To ?? LocalizationManager.GetEnglish("change.none"));
 }
 
 /// <summary>

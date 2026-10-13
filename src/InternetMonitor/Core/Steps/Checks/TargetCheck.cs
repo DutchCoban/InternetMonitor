@@ -54,7 +54,10 @@ public sealed class TargetCheck : IStepCheck
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 [],
-                new TargetFacts([]));
+                new TargetFacts([]))
+            {
+                HeadlineKey = "step.target.noneConfigured",
+            };
         }
 
         TargetEndpointResult[] results = await Task.WhenAll(
@@ -76,18 +79,28 @@ public sealed class TargetCheck : IStepCheck
         if (facts.AllUnreachable)
         {
             TargetEndpointResult first = results[0];
+            string stageKey = $"httpStage.{first.FailedStage.ToString().ToLowerInvariant()}";
+
+            string headlineKey = results.Length == 1 ? "step.target.failed" : "step.target.allFailed";
+            object[] headlineArgs = results.Length == 1 ? [first.Name] : [results.Length];
+            object[] detailArgs = [loc.Get(stageKey), first.Error ?? "-"];
+
             return new StepResult(
                 Id,
                 StepState.Failed,
-                results.Length == 1
-                    ? loc.Format("step.target.failed", first.Name)
-                    : loc.Format("step.target.allFailed", results.Length),
-                loc.Format("step.target.failed.detail", loc.Get($"httpStage.{first.FailedStage.ToString().ToLowerInvariant()}"), first.Error ?? "-"),
+                loc.Format(headlineKey, headlineArgs),
+                loc.Format("step.target.failed.detail", detailArgs),
                 null,
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 measurements,
-                facts);
+                facts)
+            {
+                HeadlineKey = headlineKey,
+                HeadlineArgs = headlineArgs,
+                DetailKey = "step.target.failed.detail",
+                DetailArgs = [LocalizationManager.GetEnglish(stageKey), first.Error ?? "-"],
+            };
         }
 
         int failed = results.Count(r => !r.Reachable);
@@ -101,40 +114,50 @@ public sealed class TargetCheck : IStepCheck
             state = StepState.Warning;
         }
 
-        string headline = results.Length == 1
-            ? HeadlineFor(results[0], slowest, loc)
-            : loc.Format("step.target.okMany", results.Length - failed, results.Length);
+        (string headlineKey2, object[] headlineArgs2) = results.Length == 1
+            ? HeadlineFor(results[0], slowest)
+            : ("step.target.okMany", [results.Length - failed, results.Length]);
 
-        string? detail = failed > 0
-            ? loc.Format("step.target.someFailed.detail", string.Join(", ", results.Where(r => !r.Reachable).Select(r => r.Name)))
+        (string? detailKey, object[] detailArgs2) = failed > 0
+            ? ("step.target.someFailed.detail", [string.Join(", ", results.Where(r => !r.Reachable).Select(r => r.Name))])
             : anyStatusMismatch
-                ? FormatMismatch(results.First(r => r.StatusMismatch), loc)
+                ? MismatchDetail(results.First(r => r.StatusMismatch))
                 : anyServerError
-                    ? loc.Get("step.target.serverError.detail")
-                    : state == StepState.Warning ? loc.Get("step.latency.high") : null;
+                    ? ("step.target.serverError.detail", [])
+                    : state == StepState.Warning ? ("step.latency.high", []) : (null, []);
 
         return new StepResult(
             Id,
             state,
-            headline,
-            detail,
+            loc.Format(headlineKey2, headlineArgs2),
+            detailKey is null ? null : loc.Format(detailKey, detailArgs2),
             slowest,
             watch.Elapsed,
             DateTimeOffset.UtcNow,
             measurements,
-            facts);
+            facts)
+        {
+            HeadlineKey = headlineKey2,
+            HeadlineArgs = headlineArgs2,
+            DetailKey = detailKey,
+            DetailArgs = detailArgs2,
+        };
     }
 
     private static double? ElapsedMsOf(TargetEndpointResult r) => r.Timings?.Total.TotalMilliseconds ?? r.ConnectMs;
 
-    private static string FormatMismatch(TargetEndpointResult r, LocalizationManager loc) =>
-        loc.Format("step.target.statusMismatch.detail", r.StatusCode!.Value, r.ExpectedStatusCode!.Value);
+    private static (string? Key, object[] Args) MismatchDetail(TargetEndpointResult r) =>
+        ("step.target.statusMismatch.detail", [r.StatusCode!.Value, r.ExpectedStatusCode!.Value]);
 
-    private static string HeadlineFor(TargetEndpointResult r, double? ms, LocalizationManager loc) => r.Kind switch
+    private static (string Key, object[] Args) HeadlineFor(TargetEndpointResult r, double? ms)
     {
-        TargetKind.TcpPort => loc.Format("step.target.ok.tcp", r.Name, r.Url, ms?.ToString("F0") ?? "?"),
-        _ => loc.Format("step.target.ok", r.Name, r.StatusCode ?? 0, ms?.ToString("F0") ?? "?"),
-    };
+        string msText = ms?.ToString("F0") ?? "?";
+        return r.Kind switch
+        {
+            TargetKind.TcpPort => ("step.target.ok.tcp", [r.Name, r.Url, msText]),
+            _ => ("step.target.ok", [r.Name, r.StatusCode ?? 0, msText]),
+        };
+    }
 
     private static string DescribeResult(TargetEndpointResult r, LocalizationManager loc)
     {

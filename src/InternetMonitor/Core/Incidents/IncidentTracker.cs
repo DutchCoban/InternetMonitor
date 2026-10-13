@@ -55,7 +55,6 @@ public sealed class IncidentTracker
 
     public void Observe(StepSnapshot snapshot, RootCauseResult diagnosis)
     {
-        LocalizationManager loc = LocalizationManager.Instance;
         _changes.Observe(snapshot);
 
         if (diagnosis.IsProblem)
@@ -71,10 +70,12 @@ public sealed class IncidentTracker
             {
                 // The problem changed character while open - a dead gateway became a dead link,
                 // say. That is one incident evolving, not two incidents, and the timeline is
-                // where that belongs.
+                // where that belongs. Recorded in English - see LocalizationManager.FormatEnglish.
                 active.Timeline.Add(new TimelineEntry(
                     snapshot.TakenUtc,
-                    loc.Format("incident.timeline.causeChanged", loc.Get($"cause.{diagnosis.Cause.Key()}"))));
+                    LocalizationManager.FormatEnglish(
+                        "incident.timeline.causeChanged",
+                        LocalizationManager.GetEnglish($"cause.{diagnosis.Cause.Key()}"))));
 
                 // The incident keeps the cause it opened with. An outage that starts as a dead
                 // gateway and becomes a dead link is one event whose story is in the timeline;
@@ -101,9 +102,12 @@ public sealed class IncidentTracker
 
     private void Open(StepSnapshot snapshot, RootCauseResult diagnosis)
     {
-        LocalizationManager loc = LocalizationManager.Instance;
         StepResult? failure = snapshot.FirstFailure;
 
+        // Everything stored on the incident itself is resolved in English, regardless of the
+        // language the screen happens to be showing right now - see
+        // LocalizationManager.FormatEnglish for why. The live UI is unaffected: it keeps reading
+        // StepResult.Headline/Detail directly, which are still in whatever language is active.
         var incident = new Incident
         {
             Id = _store.NextId(snapshot.TakenUtc),
@@ -114,16 +118,16 @@ public sealed class IncidentTracker
             // understate every duration by one interval.
             StartUtc = snapshot.TakenUtc,
             Status = IncidentStatus.Active,
-            Headline = failure?.Headline ?? loc.Get($"cause.{diagnosis.Cause.Key()}"),
-            Explanation = PlainLanguage.Describe(diagnosis.Cause, snapshot),
+            Headline = failure?.EnglishHeadline() ?? LocalizationManager.GetEnglish($"cause.{diagnosis.Cause.Key()}"),
+            Explanation = PlainLanguage.DescribeEnglish(diagnosis.Cause, snapshot),
             AffectedSteps = diagnosis.AffectedSteps,
             StepsAtStart = [.. snapshot.All.OrderBy(r => (int)r.Step).Select(StepSnapshotEntry.From)],
-            RecentChanges = [.. _changes.Recent(snapshot.TakenUtc).Select(c => $"{c.AtUtc.ToLocalTime():HH:mm:ss}  {c.Describe()}")],
+            RecentChanges = [.. _changes.Recent(snapshot.TakenUtc).Select(c => $"{c.AtUtc.ToLocalTime():HH:mm:ss}  {c.DescribeEnglish()}")],
         };
 
         incident.Timeline.Add(new TimelineEntry(
             snapshot.TakenUtc,
-            loc.Format("incident.timeline.opened", incident.Headline)));
+            LocalizationManager.FormatEnglish("incident.timeline.opened", incident.Headline)));
 
         _active = incident;
         _store.Add(incident);
@@ -137,9 +141,9 @@ public sealed class IncidentTracker
             return;
         }
 
-        active.Headline = snapshot.FirstFailure?.Headline ?? active.Headline;
+        active.Headline = snapshot.FirstFailure?.EnglishHeadline() ?? active.Headline;
         active.AffectedSteps = diagnosis.AffectedSteps;
-        active.Explanation = PlainLanguage.Describe(diagnosis.Cause, snapshot);
+        active.Explanation = PlainLanguage.DescribeEnglish(diagnosis.Cause, snapshot);
         _store.Update(active);
     }
 
@@ -150,14 +154,12 @@ public sealed class IncidentTracker
             return;
         }
 
-        LocalizationManager loc = LocalizationManager.Instance;
-
         active.EndUtc = snapshot.TakenUtc;
         active.Status = IncidentStatus.Resolved;
         active.StepsAtResolution = [.. snapshot.All.OrderBy(r => (int)r.Step).Select(StepSnapshotEntry.From)];
         active.Timeline.Add(new TimelineEntry(
             snapshot.TakenUtc,
-            loc.Format("incident.timeline.resolved", FormatDuration(active.Duration))));
+            LocalizationManager.FormatEnglish("incident.timeline.resolved", FormatDuration(active.Duration))));
 
         _store.Update(active);
         _active = null;
@@ -198,14 +200,14 @@ public sealed class IncidentTracker
                 return;
             }
 
-            LocalizationManager loc = LocalizationManager.Instance;
-            string stepName = loc.Get($"step.{result.Step.Key()}.name");
+            string stepName = LocalizationManager.GetEnglish($"step.{result.Step.Key()}.name");
+            string headline = result.EnglishHeadline();
 
             string text = result.State switch
             {
-                StepState.Ok => loc.Format("incident.timeline.stepRecovered", stepName, result.Headline),
-                StepState.Failed => loc.Format("incident.timeline.stepFailed", stepName, result.Headline),
-                StepState.Warning => loc.Format("incident.timeline.stepDegraded", stepName, result.Headline),
+                StepState.Ok => LocalizationManager.FormatEnglish("incident.timeline.stepRecovered", stepName, headline),
+                StepState.Failed => LocalizationManager.FormatEnglish("incident.timeline.stepFailed", stepName, headline),
+                StepState.Warning => LocalizationManager.FormatEnglish("incident.timeline.stepDegraded", stepName, headline),
                 _ => string.Empty,
             };
 
