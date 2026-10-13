@@ -131,7 +131,18 @@ public abstract class PageBase : Panel
         }
 
         BackColor = Theme.Current.Bg;
-        OnThemeChanged();
+
+        // A page's own fields do not exist until Build() has run, which is deferred to its first
+        // Activate() (see the class comment) - a page nobody has opened yet has nothing of its own
+        // to re-colour. Skipping OnThemeChanged() here, rather than guarding it in every override,
+        // is also what makes the guard impossible to forget on a future page: Build() already runs
+        // after the current theme is resolved, so a freshly built page opens with the right colours
+        // without ever needing OnThemeChanged called on its behalf.
+        if (_built)
+        {
+            OnThemeChanged();
+        }
+
         Invalidate(true);
     }
 
