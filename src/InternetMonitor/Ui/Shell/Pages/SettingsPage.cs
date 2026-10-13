@@ -86,7 +86,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _diagnosticsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Diagnostics };
         BuildDiagnosticsRows();
 
-        _networkHealthCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Warning };
+        _networkHealthCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Pulse };
         BuildNetworkHealthRows();
 
         _integrationsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Globe };

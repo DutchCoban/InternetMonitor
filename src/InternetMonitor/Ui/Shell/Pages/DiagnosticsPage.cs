@@ -60,12 +60,12 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _table = new StepTable { Dock = DockStyle.Fill };
         _table.SelectionChanged += OnTableSelectionChanged;
 
-        _tableCard = new Card { Dock = DockStyle.Left, HeaderGlyph = Glyph.Diagnostics };
+        _tableCard = new Card { Dock = DockStyle.Left, HeaderGlyph = Glyph.Steps };
         _tableCard.Width = Dp(300);
         _tableCard.Controls.Add(_table);
 
         _detail = new StepDetailPanel { Dock = DockStyle.Fill };
-        _detailCard = new Card { Dock = DockStyle.Fill };
+        _detailCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Search };
         _detailCard.Controls.Add(_detail);
 
         _checkNow = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Refresh };
@@ -88,7 +88,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
     private void BuildNetworkHealthSummary()
     {
-        _networkHealthSummaryCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Warning };
+        _networkHealthSummaryCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Pulse };
         _networkHealthSummaryCard.Height = Dp(28);
         _networkHealthSummaryCard.Resize += (_, _) => LayoutNetworkHealthSummary();
 
@@ -267,13 +267,13 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _bannerHeadline = new Label
         {
             AutoSize = false,
-            TextAlign = ContentAlignment.BottomLeft,
+            TextAlign = ContentAlignment.MiddleLeft,
             Font = Theme.Font(FontRole.BodyStrong),
         };
         _bannerMeta = new Label
         {
             AutoSize = false,
-            TextAlign = ContentAlignment.TopLeft,
+            TextAlign = ContentAlignment.MiddleLeft,
             Font = Theme.Font(FontRole.Small),
             ForeColor = Theme.Current.TextMuted,
         };
@@ -284,7 +284,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         // without borrowing its stat row, which would be redundant here (the steps table below
         // already is the detail view).
         _bannerCard = new Card { Dock = DockStyle.Top };
-        _bannerCard.Height = Dp(72);
+        _bannerCard.Height = Dp(88);
         _bannerCard.Controls.Add(_bannerAccent);
         _bannerCard.Controls.Add(_bannerChip);
         _bannerCard.Controls.Add(_bannerHeadline);
@@ -307,8 +307,19 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
         int textLeft = _bannerChip.Right + Sp(3);
         int textWidth = Math.Max(0, area.Width - (textLeft - area.Left));
-        _bannerHeadline.Bounds = new Rectangle(textLeft, area.Top + Dp(6), textWidth, area.Height / 2);
-        _bannerMeta.Bounds = new Rectangle(textLeft, area.Top + (area.Height / 2), textWidth, (area.Height / 2) - Dp(6));
+
+        // Fixed, generous row heights for the two text lines, vertically centered as a block -
+        // not a blind half-and-half split of whatever height the card happens to have, which is
+        // what let the headline and the meta line run into each other at the card's original
+        // height.
+        int headlineHeight = Dp(24);
+        int metaHeight = Dp(18);
+        int textGap = Dp(2);
+        int textBlockHeight = headlineHeight + textGap + metaHeight;
+        int textTop = area.Top + ((area.Height - textBlockHeight) / 2);
+
+        _bannerHeadline.Bounds = new Rectangle(textLeft, textTop, textWidth, headlineHeight);
+        _bannerMeta.Bounds = new Rectangle(textLeft, textTop + headlineHeight + textGap, textWidth, metaHeight);
     }
 
     public override void ApplyLocalization()

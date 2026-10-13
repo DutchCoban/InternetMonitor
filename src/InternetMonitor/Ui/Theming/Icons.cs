@@ -26,6 +26,9 @@ public enum Glyph
     Dns,
     Target,
     Copy,
+    Pulse,
+    Steps,
+    Search,
 }
 
 /// <summary>
@@ -235,6 +238,34 @@ internal static class Icons
                 // reads as "copy" rather than just "document".
                 g.DrawRoundedRect(pen, 2.5f, 5.5f, 13f, 15f, 2f);
                 g.DrawRoundedRect(pen, 8.5f, 2.5f, 13f, 15f, 2f);
+                break;
+
+            case Glyph.Pulse:
+                // A heartbeat/ECG trace: flat, a sharp spike, a deep dip, a smaller peak, flat.
+                g.DrawLines(pen, new[]
+                {
+                    new PointF(2f, 12f), new PointF(8f, 12f), new PointF(10f, 5f),
+                    new PointF(12f, 19f), new PointF(14f, 9f), new PointF(16f, 12f), new PointF(22f, 12f),
+                });
+                break;
+
+            case Glyph.Steps:
+                // Three nodes on a line, the last filled solid rather than outlined - a
+                // simplified version of the reference "progress stepper" (which checkmarks the
+                // first three and fills the fourth): at an 18dp card-header size there is no room
+                // for a legible checkmark inside a node this small, so the fill/outline contrast
+                // alone carries the "done versus current" distinction.
+                g.DrawLine(pen, 7.8f, 12f, 9.2f, 12f);
+                g.DrawLine(pen, 14.8f, 12f, 16.2f, 12f);
+
+                g.DrawEllipse(pen, 2.2f, 9.2f, 5.6f, 5.6f);
+                g.DrawEllipse(pen, 9.2f, 9.2f, 5.6f, 5.6f);
+                g.FillEllipse(brush, 16.2f, 9.2f, 5.6f, 5.6f);
+                break;
+
+            case Glyph.Search:
+                g.DrawEllipse(pen, 3.5f, 3.5f, 13f, 13f);
+                g.DrawLine(pen, 14.7f, 14.7f, 20.5f, 20.5f);
                 break;
         }
     }

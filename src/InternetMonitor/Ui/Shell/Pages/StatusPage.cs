@@ -42,7 +42,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _steps = new StepList { Dock = DockStyle.Fill };
         _steps.HeightChanged += ResizeStepsCard;
 
-        _stepsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Status };
+        _stepsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Steps };
         _stepsCard.Controls.Add(_steps);
 
         _latencyChart = new MetricChart { Dock = DockStyle.Fill, Compact = true };
