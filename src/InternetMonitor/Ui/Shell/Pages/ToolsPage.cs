@@ -1,5 +1,6 @@
 using InternetMonitor.App;
 using InternetMonitor.Core.Steps;
+using InternetMonitor.Core.Tools.LanScan;
 using InternetMonitor.Core.Tools.Traceroute;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -7,15 +8,22 @@ using InternetMonitor.Ui.Theming;
 namespace InternetMonitor.Ui.Shell.Pages;
 
 /// <summary>
-/// On-demand tools. Traceroute today; the speed test and report export join it in phase 7.
+/// On-demand tools: traceroute and a simplified LAN scanner, switched with a chip row rather than
+/// being on separate nav pages - both are "point this at something and watch it run" tools used
+/// the same way, and neither is reached for often enough to earn its own place in the rail.
 ///
-/// The traceroute runs on the page rather than in a modal dialog, so it can be left open and
+/// Each tool runs on its own page rather than in a modal dialog, so it can be left open and
 /// compared against the status page while a problem is happening - which is the moment anyone
-/// actually wants a traceroute.
+/// actually wants either of these.
 /// </summary>
 public sealed class ToolsPage(AppServices services) : PageBase(services)
 {
-    private Card _card = null!;
+    private const string TracerouteChipId = "traceroute";
+    private const string LanScanChipId = "lanScan";
+
+    private ChipGroup _toolSwitcher = null!;
+
+    private Card _tracerouteCard = null!;
     private TracerouteView _view = null!;
     private TextBox _target = null!;
     private AppButton _run = null!;
@@ -23,9 +31,50 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
     private CancellationTokenSource? _running;
 
+    private Card _lanScanCard = null!;
+    private LanDeviceList _lanDevices = null!;
+    private AppButton _scan = null!;
+    private AppButton _exportCsv = null!;
+    private Panel _lanBar = null!;
+
+    private CancellationTokenSource? _scanning;
+
     public override string Id => "tools";
 
     protected override void Build()
+    {
+        BuildToolSwitcher();
+        BuildTracerouteCard();
+        BuildLanScanCard();
+
+        // Fill before Top, matching DiagnosticsPage: WinForms docks siblings in the order they are
+        // added, so the two filled cards have to come first to get what the switcher leaves below
+        // it. The two cards occupy the exact same area and ShowTool toggles which one is Visible.
+        Controls.Add(_lanScanCard);
+        Controls.Add(_tracerouteCard);
+        Controls.Add(_toolSwitcher);
+
+        ApplyBarColors();
+        LayoutBar();
+        LayoutLanBar();
+        ShowTool(TracerouteChipId);
+    }
+
+    private void BuildToolSwitcher()
+    {
+        _toolSwitcher = new ChipGroup { Dock = DockStyle.Top };
+        _toolSwitcher.SelectionChanged += ShowTool;
+    }
+
+    private void ShowTool(string id)
+    {
+        _tracerouteCard.Visible = id == TracerouteChipId;
+        _lanScanCard.Visible = id == LanScanChipId;
+    }
+
+    // ---- Traceroute -----------------------------------------------------------------------------
+
+    private void BuildTracerouteCard()
     {
         _view = new TracerouteView { Dock = DockStyle.Fill };
 
@@ -52,52 +101,9 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _bar.Controls.Add(_run);
         _bar.Resize += (_, _) => LayoutBar();
 
-        _card = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Tools };
-        _card.Controls.Add(_view);
-        _card.Controls.Add(_bar);
-        Controls.Add(_card);
-
-        ApplyBarColors();
-        LayoutBar();
-    }
-
-    public override void ApplyLocalization()
-    {
-        base.ApplyLocalization();
-
-        if (_card is null)
-        {
-            return;
-        }
-
-        _card.Title = Loc.Get("traceroute.title");
-        _card.Subtitle = Loc.Get("traceroute.subtitle");
-        _run.Text = Loc.Get(_running is null ? "traceroute.run" : "traceroute.stop");
-        _run.SizeToContent();
-        LayoutBar();
-        _view.Status = Loc.Get("traceroute.idle");
-    }
-
-    protected override void OnThemeChanged() => ApplyBarColors();
-
-    private void ApplyBarColors()
-    {
-        _bar.BackColor = Theme.Current.Surface;
-        _target.BackColor = Theme.Current.SurfaceAlt;
-        _target.ForeColor = Theme.Current.TextPrimary;
-    }
-
-    private void LayoutBar()
-    {
-        if (_bar is null)
-        {
-            return;
-        }
-
-        _target.Top = (_bar.Height - _target.Height) / 2;
-        _target.Left = 0;
-        _run.Top = (_bar.Height - _run.Height) / 2;
-        _run.Left = _target.Right + Sp(2);
+        _tracerouteCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Tools };
+        _tracerouteCard.Controls.Add(_view);
+        _tracerouteCard.Controls.Add(_bar);
     }
 
     /// <summary>
@@ -115,6 +121,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     /// <summary>Starts a trace against a given target, as if the user had typed it and pressed the button.</summary>
     public void StartTrace(string target)
     {
+        _toolSwitcher.Select(TracerouteChipId);
         _target.Text = target;
         if (_running is null)
         {
@@ -199,13 +206,199 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         }
     }
 
-    protected override void OnDeactivated() => _running?.Cancel();
+    private void LayoutBar()
+    {
+        if (_bar is null)
+        {
+            return;
+        }
+
+        _target.Top = (_bar.Height - _target.Height) / 2;
+        _target.Left = 0;
+        _run.Top = (_bar.Height - _run.Height) / 2;
+        _run.Left = _target.Right + Sp(2);
+    }
+
+    // ---- LAN scan -------------------------------------------------------------------------------
+
+    private void BuildLanScanCard()
+    {
+        _lanDevices = new LanDeviceList { Dock = DockStyle.Fill };
+
+        _scan = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Gateway };
+        _scan.Click += (_, _) => StartOrCancelScan();
+
+        _exportCsv = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
+        _exportCsv.Click += (_, _) => ExportCsv();
+
+        _lanBar = new Panel { Dock = DockStyle.Top, Height = Dp(40) };
+        _lanBar.Controls.Add(_scan);
+        _lanBar.Controls.Add(_exportCsv);
+        _lanBar.Resize += (_, _) => LayoutLanBar();
+
+        _lanScanCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Gateway, Visible = false };
+        _lanScanCard.Controls.Add(_lanDevices);
+        _lanScanCard.Controls.Add(_lanBar);
+    }
+
+    private void LayoutLanBar()
+    {
+        if (_lanBar is null)
+        {
+            return;
+        }
+
+        _scan.Top = (_lanBar.Height - _scan.Height) / 2;
+        _scan.Left = 0;
+        _exportCsv.Top = (_lanBar.Height - _exportCsv.Height) / 2;
+        _exportCsv.Left = _scan.Right + Sp(2);
+    }
+
+    private void StartOrCancelScan()
+    {
+        if (_scanning is not null)
+        {
+            _scanning.Cancel();
+            return;
+        }
+
+        _ = RunScanAsync();
+    }
+
+    private async Task RunScanAsync()
+    {
+        IpAddressFacts? local = Services.Pipeline.LatestSnapshot?.FactsFor<IpAddressFacts>(StepId.IpAddress);
+        if (local?.Address is not { } address || local.SubnetMask is not { } mask)
+        {
+            _lanDevices.Status = Loc.Get("lanScan.noLocalAddress");
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _scanning = cts;
+
+        _lanDevices.Clear();
+        _lanDevices.Status = Loc.Get("lanScan.scanning");
+        _scan.Text = Loc.Get("lanScan.stop");
+        _scan.SizeToContent();
+        LayoutLanBar();
+
+        var scanner = new LanScanner();
+        var progress = new Progress<LanDevice>(device => _lanDevices.Add(device));
+
+        try
+        {
+            LanScanResult result = await scanner.ScanAsync(address, mask, progress, cts.Token).ConfigureAwait(true);
+
+            _lanDevices.Status = result.Devices.Count == 0
+                ? Loc.Get("lanScan.none")
+                : result.Truncated
+                    ? Loc.Format("lanScan.doneTruncated", result.Devices.Count, result.AddressesScanned)
+                    : Loc.Format("lanScan.done", result.Devices.Count, result.AddressesScanned);
+        }
+        catch (OperationCanceledException)
+        {
+            _lanDevices.Status = Loc.Get("lanScan.cancelled");
+        }
+        finally
+        {
+            _scanning = null;
+            cts.Dispose();
+
+            if (!IsDisposed)
+            {
+                _scan.Text = Loc.Get("lanScan.scan");
+                _scan.SizeToContent();
+                LayoutLanBar();
+            }
+        }
+    }
+
+    private void ExportCsv()
+    {
+        if (_lanDevices.Devices.Count == 0)
+        {
+            return;
+        }
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = $"netwerkscan-{DateTime.Now:yyyy-MM-dd}.csv",
+        };
+
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, LanScanCsvBuilder.Build(_lanDevices.Devices));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not worth surfacing further for a manual export the user can just retry.
+        }
+    }
+
+    // ---- Shared -----------------------------------------------------------------------------------
+
+    public override void ApplyLocalization()
+    {
+        base.ApplyLocalization();
+
+        if (_tracerouteCard is null)
+        {
+            return;
+        }
+
+        _toolSwitcher.SetChips(
+            [
+                new ChipGroup.Chip(TracerouteChipId, Loc.Get("tools.chip.traceroute")),
+                new ChipGroup.Chip(LanScanChipId, Loc.Get("tools.chip.lanScan")),
+            ],
+            _toolSwitcher.SelectedId ?? TracerouteChipId);
+
+        _tracerouteCard.Title = Loc.Get("traceroute.title");
+        _tracerouteCard.Subtitle = Loc.Get("traceroute.subtitle");
+        _run.Text = Loc.Get(_running is null ? "traceroute.run" : "traceroute.stop");
+        _run.SizeToContent();
+        LayoutBar();
+        _view.Status = Loc.Get("traceroute.idle");
+
+        _lanScanCard.Title = Loc.Get("lanScan.title");
+        _lanScanCard.Subtitle = Loc.Get("lanScan.subtitle");
+        _scan.Text = Loc.Get(_scanning is null ? "lanScan.scan" : "lanScan.stop");
+        _scan.SizeToContent();
+        _exportCsv.Text = Loc.Get("lanScan.export");
+        _exportCsv.SizeToContent();
+        LayoutLanBar();
+        _lanDevices.Status = Loc.Get("lanScan.idle");
+    }
+
+    protected override void OnThemeChanged() => ApplyBarColors();
+
+    private void ApplyBarColors()
+    {
+        _bar.BackColor = Theme.Current.Surface;
+        _target.BackColor = Theme.Current.SurfaceAlt;
+        _target.ForeColor = Theme.Current.TextPrimary;
+        _lanBar.BackColor = Theme.Current.Surface;
+    }
+
+    protected override void OnDeactivated()
+    {
+        _running?.Cancel();
+        _scanning?.Cancel();
+    }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
             _running?.Cancel();
+            _scanning?.Cancel();
         }
 
         base.Dispose(disposing);
