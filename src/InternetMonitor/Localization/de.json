@@ -322,5 +322,20 @@
   "settings.kuma.about": "Über Uptime Kuma",
   "settings.kuma.url.error": "Bitte eine gültige https://-URL eingeben, oder das Feld leer lassen, um dies zu deaktivieren.",
   "settings.endpoint.headers": "Headers (optional)",
-  "settings.endpoint.headers.add": "Header hinzufügen"
+  "settings.endpoint.headers.add": "Header hinzufügen",
+  "settings.section.diagnostics": "Protokollierung",
+  "settings.section.diagnostics.subtitle": "Was zur Fehlerbehebung in eine Protokolldatei geschrieben wird.",
+  "settings.diagnostics.level": "Stufe",
+  "settings.diagnostics.level.off": "Aus",
+  "settings.diagnostics.level.basic": "Einfach",
+  "settings.diagnostics.level.extended": "Erweitert",
+  "settings.diagnostics.level.full": "Vollständig",
+  "settings.diagnostics.logSuccesses": "Erfolgreiche Prüfungen auch protokollieren",
+  "settings.diagnostics.logDetails": "Detaillierte Messwerte protokollieren",
+  "settings.diagnostics.directory": "Protokollordner",
+  "settings.diagnostics.browse": "Durchsuchen...",
+  "settings.diagnostics.openFolder": "Ordner öffnen",
+  "settings.diagnostics.resetDirectory": "Standard",
+  "settings.showIncidentPopups": "Pop-up bei einer Störung anzeigen",
+  "incident.toast.title": "Verbindungsproblem"
 }

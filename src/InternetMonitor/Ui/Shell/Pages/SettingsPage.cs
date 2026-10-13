@@ -1,5 +1,6 @@
 using InternetMonitor.App;
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Localization;
@@ -30,15 +31,24 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Card _generalCard = null!;
     private Card _cadenceCard = null!;
     private Card _toolsCard = null!;
+    private Card _diagnosticsCard = null!;
     private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
 
     private ComboBox _language = null!;
     private ComboBox _theme = null!;
     private Toggle _autoStart = null!;
+    private Toggle _showIncidentPopups = null!;
     private NumericUpDown _foregroundInterval = null!;
     private NumericUpDown _backgroundInterval = null!;
     private Toggle _tracerouteLookup = null!;
+    private ComboBox _logLevel = null!;
+    private Toggle _logSuccessfulChecks = null!;
+    private Toggle _logDetailedMeasurements = null!;
+    private TextBox _logDirectory = null!;
+    private AppButton _browseLogDirectory = null!;
+    private AppButton _openLogFolder = null!;
+    private AppButton _resetLogDirectory = null!;
     private TextBox _kumaUrl = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
@@ -61,6 +71,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _toolsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Tools };
         BuildToolsRows();
 
+        _diagnosticsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Diagnostics };
+        BuildDiagnosticsRows();
+
         _integrationsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Globe };
         BuildIntegrationsRows();
 
@@ -70,6 +83,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge.
         Controls.Add(_endpointsCard);
         Controls.Add(_integrationsCard);
+        Controls.Add(_diagnosticsCard);
         Controls.Add(_toolsCard);
         Controls.Add(_cadenceCard);
         Controls.Add(_generalCard);
@@ -98,6 +112,14 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _autoStart = new Toggle();
         _autoStart.CheckedChanged += OnAutoStartChanged;
         AddRow(_generalCard, "settings.autoStart", _autoStart);
+
+        _showIncidentPopups = new Toggle();
+        _showIncidentPopups.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.ShowIncidentPopups = _showIncidentPopups.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_generalCard, "settings.showIncidentPopups", _showIncidentPopups);
     }
 
     // ---- Cadence ------------------------------------------------------------------------------
@@ -147,6 +169,105 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         };
         AddRow(_toolsCard, "settings.tracerouteLookup", _tracerouteLookup);
     }
+
+    // ---- Diagnostics --------------------------------------------------------------------------
+
+    private void BuildDiagnosticsRows()
+    {
+        _logLevel = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
+        _logLevel.SelectedIndexChanged += OnLogLevelChanged;
+        AddRow(_diagnosticsCard, "settings.diagnostics.level", _logLevel);
+
+        _logSuccessfulChecks = new Toggle();
+        _logSuccessfulChecks.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.LogSuccessfulChecks = _logSuccessfulChecks.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_diagnosticsCard, "settings.diagnostics.logSuccesses", _logSuccessfulChecks);
+
+        _logDetailedMeasurements = new Toggle();
+        _logDetailedMeasurements.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.LogDetailedMeasurements = _logDetailedMeasurements.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_diagnosticsCard, "settings.diagnostics.logDetails", _logDetailedMeasurements);
+
+        _logDirectory = new TextBox
+        {
+            BorderStyle = BorderStyle.FixedSingle,
+            Width = Dp(200),
+            Font = Theme.Font(FontRole.Body),
+            ReadOnly = true,
+        };
+        AddRow(_diagnosticsCard, "settings.diagnostics.directory", _logDirectory);
+
+        _browseLogDirectory = new AppButton { Variant = ButtonVariant.Secondary, Text = Loc.Get("settings.diagnostics.browse") };
+        _browseLogDirectory.SizeToContent();
+        _browseLogDirectory.Click += OnBrowseLogDirectoryClicked;
+        _diagnosticsCard.Controls.Add(_browseLogDirectory);
+
+        _openLogFolder = new AppButton { Variant = ButtonVariant.Ghost, Text = Loc.Get("settings.diagnostics.openFolder") };
+        _openLogFolder.SizeToContent();
+        _openLogFolder.Click += (_, _) => OpenLogFolder();
+        _diagnosticsCard.Controls.Add(_openLogFolder);
+
+        _resetLogDirectory = new AppButton { Variant = ButtonVariant.Ghost, Text = Loc.Get("settings.diagnostics.resetDirectory") };
+        _resetLogDirectory.SizeToContent();
+        _resetLogDirectory.Click += (_, _) =>
+        {
+            Services.Settings.DiagnosticLogDirectory = string.Empty;
+            Services.Settings.Save();
+            RefreshLogDirectoryText();
+        };
+        _diagnosticsCard.Controls.Add(_resetLogDirectory);
+    }
+
+    private void OnLogLevelChanged(object? sender, EventArgs e)
+    {
+        if (_logLevel.SelectedItem is not ComboItem item || !Enum.TryParse(item.Key, out DiagnosticLogLevel level))
+        {
+            return;
+        }
+
+        Services.Settings.DiagnosticLogLevel = level;
+        Services.Settings.Save();
+    }
+
+    private void OnBrowseLogDirectoryClicked(object? sender, EventArgs e)
+    {
+        using var dialog = new FolderBrowserDialog
+        {
+            SelectedPath = Services.DiagnosticLog.ResolvedDirectory(),
+            Description = Loc.Get("settings.diagnostics.browse"),
+        };
+
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        Services.Settings.DiagnosticLogDirectory = dialog.SelectedPath;
+        Services.Settings.Save();
+        RefreshLogDirectoryText();
+    }
+
+    private void OpenLogFolder()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Services.DiagnosticLog.ResolvedDirectory()) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // The folder does not exist yet (nothing has logged there) or no shell handler is
+            // registered - not worth surfacing for a convenience shortcut the user can open
+            // themselves via Explorer.
+        }
+    }
+
+    private void RefreshLogDirectoryText() => _logDirectory.Text = Services.DiagnosticLog.ResolvedDirectory();
 
     // ---- Integrations ---------------------------------------------------------------------------
 
@@ -329,7 +450,19 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         LayoutCardRows(_generalCard);
         LayoutCardRows(_cadenceCard);
         LayoutCardRows(_toolsCard);
+        LayoutCardRows(_diagnosticsCard);
         LayoutCardRows(_integrationsCard);
+
+        // LayoutCardRows sized the card to its three label/field rows; the directory buttons sit
+        // below those, in the space the row layout does not know about - same pattern as the Kuma
+        // extras just below.
+        Rectangle diagnosticsContent = _diagnosticsCard.DisplayRectangle;
+        int diagnosticsY = _diagnosticsCard.Height - _diagnosticsCard.Inset;
+        _browseLogDirectory.Location = new Point(diagnosticsContent.Right - _browseLogDirectory.Width, diagnosticsY);
+        _openLogFolder.Location = new Point(_browseLogDirectory.Left - Sp(2) - _openLogFolder.Width, diagnosticsY);
+        _resetLogDirectory.Location = new Point(_openLogFolder.Left - Sp(2) - _resetLogDirectory.Width, diagnosticsY);
+        diagnosticsY += Math.Max(_browseLogDirectory.Height, Math.Max(_openLogFolder.Height, _resetLogDirectory.Height));
+        _diagnosticsCard.Height = diagnosticsY + _diagnosticsCard.Inset;
 
         // LayoutCardRows sized the card to its two label/field rows; the error label and the
         // "about" link sit below those, in the space the row layout does not know about.
@@ -374,10 +507,21 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _autoStart.SetWithoutNotify(App.AutoStart.IsEnabled());
         _autoStart.CheckedChanged += OnAutoStartChanged;
 
+        _showIncidentPopups.SetWithoutNotify(settings.ShowIncidentPopups);
+
         _foregroundInterval.Value = settings.ForegroundIntervalSeconds;
         _backgroundInterval.Value = settings.BackgroundIntervalSeconds;
 
         _tracerouteLookup.SetWithoutNotify(settings.TracerouteOwnerLookup);
+
+        _logLevel.SelectedIndexChanged -= OnLogLevelChanged;
+        PopulateLogLevelItems();
+        SelectComboItem(_logLevel, settings.DiagnosticLogLevel.ToString());
+        _logLevel.SelectedIndexChanged += OnLogLevelChanged;
+
+        _logSuccessfulChecks.SetWithoutNotify(settings.LogSuccessfulChecks);
+        _logDetailedMeasurements.SetWithoutNotify(settings.LogDetailedMeasurements);
+        RefreshLogDirectoryText();
 
         _kumaUrl.Leave -= OnKumaSettingsChanged;
         _kumaInterval.ValueChanged -= OnKumaSettingsChanged;
@@ -396,6 +540,16 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _theme.Items.Add(new ComboItem(nameof(ThemeMode.System), loc.Get("settings.theme.system")));
         _theme.Items.Add(new ComboItem(nameof(ThemeMode.Light), loc.Get("settings.theme.light")));
         _theme.Items.Add(new ComboItem(nameof(ThemeMode.Dark), loc.Get("settings.theme.dark")));
+    }
+
+    private void PopulateLogLevelItems()
+    {
+        LocalizationManager loc = LocalizationManager.Instance;
+        _logLevel.Items.Clear();
+        _logLevel.Items.Add(new ComboItem(nameof(DiagnosticLogLevel.Off), loc.Get("settings.diagnostics.level.off")));
+        _logLevel.Items.Add(new ComboItem(nameof(DiagnosticLogLevel.Basic), loc.Get("settings.diagnostics.level.basic")));
+        _logLevel.Items.Add(new ComboItem(nameof(DiagnosticLogLevel.Extended), loc.Get("settings.diagnostics.level.extended")));
+        _logLevel.Items.Add(new ComboItem(nameof(DiagnosticLogLevel.Full), loc.Get("settings.diagnostics.level.full")));
     }
 
     private static void SelectComboItem(ComboBox box, string key)
@@ -474,6 +628,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _cadenceCard.Title = Loc.Get("settings.section.cadence");
         _cadenceCard.Subtitle = Loc.Get("settings.section.cadence.subtitle");
         _toolsCard.Title = Loc.Get("settings.section.tools");
+        _diagnosticsCard.Title = Loc.Get("settings.section.diagnostics");
+        _diagnosticsCard.Subtitle = Loc.Get("settings.section.diagnostics.subtitle");
         _integrationsCard.Title = Loc.Get("settings.section.integrations");
         _integrationsCard.Subtitle = Loc.Get("settings.section.integrations.subtitle");
         _endpointsCard.Title = Loc.Get("settings.section.endpoints");
@@ -489,13 +645,24 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         string previousLanguage = (_language.SelectedItem as ComboItem)?.Key ?? Services.Settings.Language;
         string previousTheme = (_theme.SelectedItem as ComboItem)?.Key ?? Services.Settings.Theme.ToString();
+        string previousLogLevel = (_logLevel.SelectedItem as ComboItem)?.Key ?? Services.Settings.DiagnosticLogLevel.ToString();
 
         PopulateThemeItems();
         SelectComboItem(_theme, previousTheme);
         SelectComboItem(_language, previousLanguage);
 
+        PopulateLogLevelItems();
+        SelectComboItem(_logLevel, previousLogLevel);
+
         _addEndpoint.Text = Loc.Get("settings.endpoint.add");
         _addEndpoint.SizeToContent();
+
+        _browseLogDirectory.Text = Loc.Get("settings.diagnostics.browse");
+        _browseLogDirectory.SizeToContent();
+        _openLogFolder.Text = Loc.Get("settings.diagnostics.openFolder");
+        _openLogFolder.SizeToContent();
+        _resetLogDirectory.Text = Loc.Get("settings.diagnostics.resetDirectory");
+        _resetLogDirectory.SizeToContent();
 
         _kumaAbout.Text = Loc.Get("settings.kuma.about");
         _kumaAbout.SizeToContent();
@@ -517,7 +684,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             label.BackColor = p.Surface;
         }
 
-        foreach (ComboBox box in new[] { _language, _theme })
+        foreach (ComboBox box in new[] { _language, _theme, _logLevel })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;
@@ -529,6 +696,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             field.BackColor = p.SurfaceAlt;
             field.ForeColor = p.TextPrimary;
         }
+
+        _logDirectory.BackColor = p.SurfaceAlt;
+        _logDirectory.ForeColor = p.TextPrimary;
 
         _kumaUrl.BackColor = p.SurfaceAlt;
         _kumaUrl.ForeColor = p.TextPrimary;

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Ui.Theming;
 
 namespace InternetMonitor.Configuration;
@@ -34,6 +35,13 @@ public sealed class AppSettings
     public ThemeMode Theme { get; set; } = ThemeMode.System;
 
     public bool AutoStartWithWindows { get; set; }
+
+    /// <summary>
+    /// A brief pop-up when a new incident opens. On by default, matching v1's equivalent
+    /// (ShowOutagePopups) - a connectivity tool that stays silent about a connectivity problem
+    /// defeats its own purpose.
+    /// </summary>
+    public bool ShowIncidentPopups { get; set; } = true;
 
     // ---- Cadence -----------------------------------------------------------------------------
 
@@ -103,6 +111,27 @@ public sealed class AppSettings
         get => _kumaIntervalSeconds;
         set => _kumaIntervalSeconds = Math.Max(Core.Monitors.KumaPusher.MinimumIntervalSeconds, value);
     }
+
+    // ---- Diagnostics ----------------------------------------------------------------------------
+
+    /// <summary>Off by default - this is troubleshooting output, not something a monitor needs running to do its job.</summary>
+    public DiagnosticLogLevel DiagnosticLogLevel { get; set; } = DiagnosticLogLevel.Off;
+
+    public bool LogSuccessfulChecks { get; set; }
+
+    public bool LogDetailedMeasurements { get; set; }
+
+    public int MaxDiagnosticLogFiles { get; set; } = 5;
+
+    public long MaxDiagnosticLogFileSizeBytes { get; set; } = 5 * 1024 * 1024;
+
+    /// <summary>
+    /// Where diagnostics.log is written. Empty means "use the default logs folder" - the same
+    /// empty-means-default convention WindowWidth/WindowHeight already use, kept distinct from
+    /// AppPaths.Root (settings/incidents/history/cache all stay put regardless of this setting;
+    /// only the diagnostic log moves).
+    /// </summary>
+    public string DiagnosticLogDirectory { get; set; } = string.Empty;
 
     // ---- Persistence --------------------------------------------------------------------------
 

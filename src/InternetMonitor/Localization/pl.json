@@ -322,5 +322,20 @@
   "settings.kuma.about": "O Uptime Kuma",
   "settings.kuma.url.error": "Podaj prawidłowy adres https://, albo pozostaw pole puste, aby wyłączyć tę funkcję.",
   "settings.endpoint.headers": "Nagłówki (opcjonalnie)",
-  "settings.endpoint.headers.add": "Dodaj nagłówek"
+  "settings.endpoint.headers.add": "Dodaj nagłówek",
+  "settings.section.diagnostics": "Dziennik",
+  "settings.section.diagnostics.subtitle": "Co jest zapisywane do pliku dziennika, do celów diagnostycznych.",
+  "settings.diagnostics.level": "Poziom",
+  "settings.diagnostics.level.off": "Wyłączony",
+  "settings.diagnostics.level.basic": "Podstawowy",
+  "settings.diagnostics.level.extended": "Rozszerzony",
+  "settings.diagnostics.level.full": "Pełny",
+  "settings.diagnostics.logSuccesses": "Zapisuj też udane sprawdzenia",
+  "settings.diagnostics.logDetails": "Zapisuj szczegółowe pomiary",
+  "settings.diagnostics.directory": "Folder dziennika",
+  "settings.diagnostics.browse": "Przeglądaj...",
+  "settings.diagnostics.openFolder": "Otwórz folder",
+  "settings.diagnostics.resetDirectory": "Domyślny",
+  "settings.showIncidentPopups": "Pokaż powiadomienie przy wystąpieniu problemu",
+  "incident.toast.title": "Problem z połączeniem"
 }

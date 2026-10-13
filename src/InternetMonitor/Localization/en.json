@@ -322,5 +322,20 @@
   "settings.kuma.about": "About Uptime Kuma",
   "settings.kuma.url.error": "Enter a valid https:// URL, or leave the field empty to disable this.",
   "settings.endpoint.headers": "Headers (optional)",
-  "settings.endpoint.headers.add": "Add header"
+  "settings.endpoint.headers.add": "Add header",
+  "settings.section.diagnostics": "Logging",
+  "settings.section.diagnostics.subtitle": "What gets written to a log file, for troubleshooting.",
+  "settings.diagnostics.level": "Level",
+  "settings.diagnostics.level.off": "Off",
+  "settings.diagnostics.level.basic": "Basic",
+  "settings.diagnostics.level.extended": "Extended",
+  "settings.diagnostics.level.full": "Full",
+  "settings.diagnostics.logSuccesses": "Also log successful checks",
+  "settings.diagnostics.logDetails": "Log detailed measurements",
+  "settings.diagnostics.directory": "Log folder",
+  "settings.diagnostics.browse": "Browse...",
+  "settings.diagnostics.openFolder": "Open folder",
+  "settings.diagnostics.resetDirectory": "Default",
+  "settings.showIncidentPopups": "Show a pop-up when a problem is detected",
+  "incident.toast.title": "Connection problem"
 }

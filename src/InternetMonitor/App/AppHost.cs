@@ -7,6 +7,7 @@ using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
 using InternetMonitor.Ui.Theming;
+using InternetMonitor.Ui.Windows;
 
 namespace InternetMonitor.App;
 
@@ -28,6 +29,7 @@ public sealed class AppHost : ApplicationContext
     private readonly MetricStore _history;
     private readonly IncidentStore _incidents;
     private readonly KumaPusher _kuma;
+    private readonly DiagnosticLogger _diagnosticLog;
     private readonly ChangeDetector _changes;
     private readonly IncidentTracker _tracker;
     private readonly TrayController _tray;
@@ -91,10 +93,11 @@ public sealed class AppHost : ApplicationContext
 
         _kuma = new KumaPusher();
         _kuma.Reconfigure(_settings.KumaPushUrl, _settings.KumaIntervalSeconds);
+        _diagnosticLog = new DiagnosticLogger(_settings);
         _changes = new ChangeDetector();
         _tracker = new IncidentTracker(_incidents, _changes);
 
-        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma);
+        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -113,6 +116,8 @@ public sealed class AppHost : ApplicationContext
         _pipeline.CycleCompleted += OnCycleCompleted;
         _pipeline.StepChanged += _tracker.NoteStepChange;
         _incidents.Changed += OnIncidentsChanged;
+        _tracker.IncidentOpened += OnIncidentOpened;
+        _tracker.IncidentClosed += _diagnosticLog.LogIncidentResolved;
         _cadence.Start();
 
         if (showWindowOnStart)
@@ -175,8 +180,30 @@ public sealed class AppHost : ApplicationContext
 
         RootCauseResult diagnosis = RootCauseAnalyzer.Analyze(snapshot);
         _tracker.Observe(snapshot, diagnosis);
+        _diagnosticLog.LogCycle(snapshot, diagnosis, _tracker.ActiveIncident?.Id);
 
         UpdateTray(snapshot, diagnosis);
+    }
+
+    /// <summary>
+    /// The one place an incident opening fans out to everything that cares: the diagnostics log
+    /// (always, when logging is on) and a brief on-screen pop-up (only when the user has not turned
+    /// that off in Settings). Marshalled to the UI thread because IncidentTracker fires this from
+    /// the pipeline's background thread, and IncidentToast is a Form.
+    /// </summary>
+    private void OnIncidentOpened(Incident incident)
+    {
+        _diagnosticLog.LogIncidentOpened(incident);
+
+        _ui.Post(
+            _ =>
+            {
+                if (_settings.ShowIncidentPopups)
+                {
+                    IncidentToast.ShowFor(incident);
+                }
+            },
+            null);
     }
 
     /// <summary>
@@ -277,6 +304,8 @@ public sealed class AppHost : ApplicationContext
             _pipeline.CycleCompleted -= OnCycleCompleted;
             _pipeline.StepChanged -= _tracker.NoteStepChange;
             _incidents.Changed -= OnIncidentsChanged;
+            _tracker.IncidentOpened -= OnIncidentOpened;
+            _tracker.IncidentClosed -= _diagnosticLog.LogIncidentResolved;
             _pipeline.Dispose();
 
             // Blocking on shutdown is acceptable and necessary: this is the final flush, and

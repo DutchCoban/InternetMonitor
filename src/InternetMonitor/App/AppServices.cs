@@ -1,4 +1,5 @@
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Monitors;
@@ -22,7 +23,8 @@ public sealed class AppServices(
     CadenceController cadence,
     MetricStore history,
     IncidentStore incidents,
-    KumaPusher kuma)
+    KumaPusher kuma,
+    DiagnosticLogger diagnosticLog)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -38,4 +40,6 @@ public sealed class AppServices(
     public IncidentStore Incidents { get; } = incidents;
 
     public KumaPusher Kuma { get; } = kuma;
+
+    public DiagnosticLogger DiagnosticLog { get; } = diagnosticLog;
 }

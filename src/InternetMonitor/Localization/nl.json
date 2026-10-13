@@ -322,5 +322,20 @@
   "settings.kuma.about": "Over Uptime Kuma",
   "settings.kuma.url.error": "Vul een geldige https://-URL in, of laat het veld leeg om uit te schakelen.",
   "settings.endpoint.headers": "Headers (optioneel)",
-  "settings.endpoint.headers.add": "Header toevoegen"
+  "settings.endpoint.headers.add": "Header toevoegen",
+  "settings.section.diagnostics": "Logboek",
+  "settings.section.diagnostics.subtitle": "Wat er naar een logbestand wordt geschreven, voor foutopsporing.",
+  "settings.diagnostics.level": "Niveau",
+  "settings.diagnostics.level.off": "Uit",
+  "settings.diagnostics.level.basic": "Basis",
+  "settings.diagnostics.level.extended": "Uitgebreid",
+  "settings.diagnostics.level.full": "Volledig",
+  "settings.diagnostics.logSuccesses": "Geslaagde controles ook loggen",
+  "settings.diagnostics.logDetails": "Gedetailleerde metingen loggen",
+  "settings.diagnostics.directory": "Logmap",
+  "settings.diagnostics.browse": "Bladeren...",
+  "settings.diagnostics.openFolder": "Open map",
+  "settings.diagnostics.resetDirectory": "Standaard",
+  "settings.showIncidentPopups": "Pop-up tonen bij een verstoring",
+  "incident.toast.title": "Verbindingsprobleem"
 }
