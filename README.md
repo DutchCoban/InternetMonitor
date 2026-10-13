@@ -10,10 +10,12 @@ branding are built into it. Any application-specific checks (an internal API, a 
 website, ...) are added by the user through Settings. It's an independent open-source project,
 not affiliated with or endorsed by any company.
 
-Version 2.0 is a ground-up rewrite of the original (v1 remains in this repository under
-`InternetMonitor/` for reference) - same purpose and the same settings/history/incidents on
-disk, but a redesigned interface, an adaptive check cadence, and several checks that no longer
-exist as separate steps (see [What changed from v1](#what-changed-from-v1)).
+This repository went through a ground-up rewrite: v1 (still kept under `InternetMonitor/` for
+reference) was the original; **v2** (`src/InternetMonitor/`, what the rest of this README
+describes, and what ships from here on) replaced it with a redesigned interface and an adaptive
+check cadence, and is still under **active development** rather than a one-time port - most of
+v1's functionality is back or improved on, a handful of pieces aren't (yet, or possibly at all) -
+see [Project status](#project-status) for exactly what and why.
 
 ## What it checks
 
@@ -62,16 +64,28 @@ whether you happen to have the window open.
   regardless of the active display language, so an exported incident reads the same no matter who
   opens it later.
 - **Tools**: a live-filling **Traceroute** (each hop optionally annotated with who owns it - your
-  own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings) and a
-  **Network scan** of the local subnet (which devices answer a ping, with hostname, MAC address,
+  own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings - and,
+  when ICMP doesn't reach the destination at all, a plain TCP connect to the destination to tell
+  "ICMP is blocked" apart from "it's actually down" - see [Known limitations](#known-limitations));
+  a **Network scan** of the local subnet (which devices answer a ping, with hostname, MAC address,
   and manufacturer - looked up via two free, alternating MAC-vendor APIs, toggleable in Settings -
-  for each).
+  for each; addresses that don't answer a ping also get a TCP-port sweep, toggleable, so a device
+  that ignores ICMP but has an open port still shows up); and a **Speed test** (see below).
 
 ## Network health monitoring
 
 Off by default (Settings → Network health). When enabled, flags packet-level conditions that sit
 below what the seven steps measure: TCP retransmissions, packet loss, TTL-exceeded responses, and
 an unexpected (rogue) DHCP server on the network - each with its own threshold and time window.
+
+## Speed test
+
+The Tools page's third tab runs a [LibreSpeed](https://librespeed.org/) test (ping, jitter,
+download, upload) against a fixed public server - no server picker, to keep this feature's
+configuration surface small. "Run now" is always available; Settings → Tools also has an optional
+automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default). Either way, a result is
+recorded into History (as two series, download and upload) and included in "Export all data" -
+there is no separate speed-test-only export.
 
 ## Exporting data
 
@@ -144,19 +158,38 @@ and how to set up a push monitor to get a URL from.
 - **Theme** (General) - follows Windows, or forced light/dark.
 - **Incident pop-ups** (General) - a brief on-screen notice when a new incident opens.
 
-## What changed from v1
+## Project status
 
-v2 is a from-scratch rewrite rather than an incremental update, with a redesigned interface and
-an adaptive (3s/15s) check cadence instead of a fixed 15-second cycle. Settings, incident history,
-and per-check history all carry over automatically from an existing v1 installation - nothing
-needs to be reconfigured.
+v2 is a from-scratch rewrite, not an incremental update, and it's still being actively built out -
+this section exists so that's never a surprise. Settings, incident history, and per-check history
+all carry over automatically from an existing v1 installation regardless of what's below; nothing
+here affects that.
 
-A few v1 features were deliberately left out rather than ported as-is, because they measured
-something a general-purpose rewrite shouldn't assume every user wants running by default:
-continuous named ping targets with their own latency graphs, the Wi-Fi signal row, the Speed Test
-(LibreSpeed) check, quiet hours, and the SLA/uptime report. Configurable history retention was
-also dropped in favor of a fixed 30 days. The GitHub update check carries over and now also offers
-an optional fully automatic self-update (see above) that v1 never had.
+**Already in v2, beyond what v1 had**: an adaptive (3s/15s, both configurable) check cadence
+instead of a fixed 15-second cycle; network-health monitoring (TCP retransmissions, packet loss,
+TTL errors, rogue DHCP); traceroute hop ownership; LAN-scan manufacturer lookup and a TCP fallback
+for devices that ignore ICMP (plus the same TCP fallback for traceroute, see
+[Known limitations](#known-limitations)); four export formats plus a settings backup; and a fully
+automatic self-update option (v1 only ever linked to the release page).
+
+**Back in v2 after initially being left out**: the Speed Test (LibreSpeed) check - manual and
+automatic, see [Speed test](#speed-test) above. Its return is the precedent for the rest of this
+list: "not yet in v2" has not meant "gone for good" so far, and there's no reason to assume it
+always will.
+
+**Not currently in v2** - each was left out of the initial rewrite because it measured something a
+general-purpose tool shouldn't assume every user wants running by default, not because it was
+rejected outright. Whether any of these come back depends on whether anyone (including future me)
+decides it's worth the added settings-surface and maintenance:
+
+- Continuous named ping targets with their own per-target latency graphs.
+- The Wi-Fi signal row (SSID/BSSID/signal quality/link speed/PHY type).
+- Quiet hours (suppressing incident pop-ups during a configured daily window).
+- The SLA/uptime report (percentage uptime over 7/30/90 days, with exclusions).
+- Configurable history retention - v1 offered 15 minutes to 32 days; v2 is a fixed 30 days.
+
+If you're relying on one of these in v1 and it matters to you whether/when it returns, open an
+issue - that's a better signal than silence either way.
 
 ## Project structure
 
@@ -180,10 +213,12 @@ For a new contributor, the call chain from startup to a diagnosis on screen is:
 
 Besides the main cycle, a handful of things run on their own schedule: `Core/Monitors/KumaPusher.cs`
 (the heartbeat push), `Core/Monitors/NetworkHealthMonitor.cs` (packet-level conditions),
-`Core/Updates/UpdateChecker.cs` (the daily GitHub check) - all three follow the same
-`Reconfigure(...)`-driven live-restart shape, so a Settings change takes effect immediately
-without restarting the app. Traceroute (`Core/Tools/Traceroute/`) and the LAN scanner
-(`Core/Tools/LanScan/`) are the two genuinely on-demand tools, triggered only from the Tools page.
+`Core/Updates/UpdateChecker.cs` (the daily GitHub check), `Core/Monitors/SpeedTestScheduler.cs`
+(the optional automatic Speed Test) - all four follow the same `Reconfigure(...)`-driven
+live-restart shape, so a Settings change takes effect immediately without restarting the app.
+Traceroute (`Core/Tools/Traceroute/`), the LAN scanner (`Core/Tools/LanScan/`) and the Speed Test
+itself (`Core/Tools/SpeedTest/`) are the genuinely on-demand tools, triggered only from the Tools
+page (the Speed Test's own client is also what the scheduler above calls headlessly).
 
 All user-facing text (including diagnosis headlines/explanations) goes through
 `Localization/LocalizationManager.cs`, loading `Localization/{en,nl,de,pl}.json` - four languages,
@@ -244,6 +279,13 @@ None of these live inside the application directory, so the app itself can be re
 - The self-update feature assumes the GitHub release it finds has exactly one asset named
   `InternetMonitor.exe` (falling back to the first `.exe`-named asset otherwise) - the shape every
   release has had so far.
+- Traceroute does not fall back to a real TCP-based traceroute when ICMP is blocked. A genuine
+  per-hop TCP traceroute needs a raw socket to catch the ICMP "Time Exceeded" replies a TCP probe
+  provokes, and raw sockets need administrator rights on Windows - more than this app's deliberately
+  unelevated (`asInvoker`) model is worth changing for one tool. Instead, when the ICMP trace
+  doesn't reach the destination, one plain TCP connect straight to the destination (port 443, then
+  80) tells you whether it's ICMP that's blocked or the destination that's actually unreachable -
+  not which routers are in between.
 
 ## Security notes
 
@@ -259,13 +301,17 @@ None of these live inside the application directory, so the app itself can be re
   off for such endpoints. The Uptime Kuma push URL is handled separately and is never logged.
 - **TLS validation is never bypassed.** Every HTTPS check uses .NET's default certificate
   validation with no custom callback.
-- **Three features send third parties something about your network, each with its own
+- **Several features send third parties something about your network, each with its own
   off switch.** Traceroute's hop-ownership lookup sends hop IP addresses to Team Cymru and the
   regional internet registries (toggleable in Settings → Tools); the LAN scanner's manufacturer
   lookup sends each device's MAC prefix - never the full address - to macvendorlookup.com and
   macvendors.com (same toggle group); and the update checker sends nothing but a plain request to
   GitHub's public release API. All three are on by default except where noted, and every one is
   switchable.
+- **Speed Test moves real data to a third-party server.** Unlike every other check, a speed test
+  (manual or automatic) transfers real download/upload traffic to a public LibreSpeed server, not
+  just small probe packets. It never runs unless "Run now" is clicked or the automatic interval is
+  explicitly turned on in Settings, and the automatic interval can't be set below 1 hour.
 - The app runs unelevated (`asInvoker`, see `app.manifest`) and only ever talks outbound over
   the network - it opens no listening ports and requires no special permissions, except that the
   optional self-update feature replaces its own executable file on disk.
