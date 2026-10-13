@@ -10,80 +10,96 @@ branding are built into it. Any application-specific checks (an internal API, a 
 website, ...) are added by the user through Settings. It's an independent open-source project,
 not affiliated with or endorsed by any company.
 
+Version 2.0 is a ground-up rewrite of the original (v1 remains in this repository under
+`InternetMonitor/` for reference) - same purpose and the same settings/history/incidents on
+disk, but a redesigned interface, an adaptive check cadence, and several checks that no longer
+exist as separate steps (see [What changed from v1](#what-changed-from-v1)).
+
 ## What it checks
 
-Every 15 seconds, a set of independent probes run and their results are combined into a single
-diagnosis, working outward through the network stack so a single failure is attributed to its
-most likely cause instead of being reported as a generic "internet is down":
+Every few seconds (3s while a window is open, 15s in the background - see
+[Adaptive cadence](#adaptive-cadence)), seven independent probes run and their results are
+combined into a single diagnosis, working outward through the network stack so a single failure
+is attributed to its most likely cause instead of being reported as a generic "internet is down":
 
 1. **Network adapter** - is an adapter present, operational, and actually carrying traffic?
-2. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
-3. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
-4. **Internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1`. A single unreachable endpoint doesn't mean internet is down; the diagnosis only escalates once none of the three respond.
-5. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved? On failure, also
-   cross-checked against public resolvers to see if it's your configured DNS server specifically
-   (see Known limitations below).
-6. **General HTTPS** - a full DNS → TCP → TLS → HTTP request to a general site, timed at every stage.
-7. **Application endpoints** - any HTTPS or TCP/UDP port endpoints you've configured in Settings.
-8. **Time synchronization** - how far the system clock has drifted from `pool.ntp.org` (a minimal SNTP client; .NET has no built-in NTP support).
+2. **Cable / link** - does the adapter report a physical link at all?
+3. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
+4. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
+5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1`. A single unreachable endpoint doesn't mean internet is down; the diagnosis only escalates once none of the three respond.
+6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved? On failure, also
+   cross-checked against the same three public resolvers to see if it's your configured DNS
+   server specifically (see Known limitations below).
+7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request.
 
 Because a network firewall can block ICMP without blocking real traffic, the diagnosis engine
-specifically compares ping results against HTTPS results: if ping fails but HTTPS works, it
-reports "internet available, ICMP possibly filtered" rather than claiming the connection is
-down.
+specifically compares ping results against the Target check's results: if ping fails but the
+reachability check works, it reports "internet available, ICMP possibly filtered" rather than
+claiming the connection is down.
 
-Three more things show up as extra rows on the Diagnostics screen whenever they apply:
+## Adaptive cadence
 
-- **Ping targets** - Settings → Ping lets you name and add as many continuous ping targets as you
-  want (each gets its own 1-second-cadence latency graph, independent of the main cycle), instead
-  of a single fixed target.
-- **Wi-Fi signal** - when the active adapter is wireless, a row shows SSID, BSSID, signal quality,
-  link speed, and PHY type (802.11a/b/g/n/ac/ax), queried via the native Windows WLAN API as part
-  of the main cycle. This row is absent entirely on a wired connection.
-- **Speed Test** - download/upload throughput via a public [LibreSpeed](https://librespeed.org/)
-  server. Always available as a manual "Run" from the Diagnostics screen; optionally also runs
-  automatically on a 1/2/4/8/12/24-hour interval, configured on its own Settings tab. Either way,
-  the result becomes a normal chartable row and is written to the diagnostic log.
+The check cycle runs every 3 seconds while a window is open and every 15 seconds while only the
+tray icon is live (both configurable in Settings → Check interval) - history is always sampled at
+the slower, background rate regardless, so retention and chart density don't change depending on
+whether you happen to have the window open.
 
-## Two screens
+## Five screens
 
-- **Status** (left-click the tray icon): a simple green/red/amber overview for end users - is
-  the network, internet, DNS, and each configured endpoint working?
-- **Diagnostics** (right-click → Diagnostics): a technical screen for support staff - every
-  probe's raw measurements (latency, resolved IPs, HTTP status codes, TLS timings, exact error
-  text), the derived diagnosis, incident history, and diagnostic-log status. Includes a
-  "Check now" button and a "Copy diagnostics" button that generates a plain-text report suitable
-  for pasting into a support ticket. A "Traceroute" button opens a live-filling hop list for
-  whichever address you point it at.
+- **Status** (left-click the tray icon): a simple green/red/amber overview with a plain-language
+  explanation and a seven-step timeline - is the network, internet, DNS, and each configured
+  endpoint working, and which step is being re-checked right now?
+- **Diagnostics** (right-click → Diagnostics): every probe's raw measurements, the derived
+  diagnosis, a network-health summary (see below), and a table you can expand per step for exact
+  detail.
+- **History**: a zoomable, pannable chart per check (mouse wheel to zoom, drag to pan,
+  double-click to reset), switchable between any chartable series and a 15 min/1 hour/6 hour/24
+  hour/7 day/all-time range. Kept for 30 days.
+- **Incidents**: a run of consecutive failed diagnosis cycles (debounced, so a brief blip doesn't
+  create noise) grouped into a single incident with a unique ID (`INC-yyyyMMdd-####`), a
+  classification, a start/end time, and a snapshot of every probe's result at the start and at
+  resolution. Incident text (headline, explanation, step snapshots) is always recorded in English
+  regardless of the active display language, so an exported incident reads the same no matter who
+  opens it later.
+- **Tools**: a live-filling **Traceroute** (each hop optionally annotated with who owns it - your
+  own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings) and a
+  **Network scan** of the local subnet (which devices answer a ping, with hostname, MAC address,
+  and manufacturer - looked up via two free, alternating MAC-vendor APIs, toggleable in Settings -
+  for each).
 
-Double-click any row on the Diagnostics screen to open its history. Most rows open a scrollable,
-zoomable chart - mouse wheel to zoom, drag to pan, hover a point for its exact time and value (the
-Wi-Fi signal row's tooltip also shows that point's SSID, BSSID, and link speed; the Network row
-charts a connected/disconnected timeline rather than a numeric value). IP address is the one
-exception: an address isn't a number worth charting, so its history is a plain change log instead,
-listing only the moments it actually changed. History persists across restarts, with a
-configurable retention from 15 minutes up to 32 days.
+## Network health monitoring
 
-## Incidents
+Off by default (Settings → Network health). When enabled, flags packet-level conditions that sit
+below what the seven steps measure: TCP retransmissions, packet loss, TTL-exceeded responses, and
+an unexpected (rogue) DHCP server on the network - each with its own threshold and time window.
 
-A run of consecutive failed diagnosis cycles (debounced, so a brief blip doesn't create noise)
-is grouped into a single **incident** with a unique ID (`INC-yyyyMMdd-####`), a classification
-(Network / IpConfiguration / Gateway / Internet / Dns / Https / Application / TimeSync /
-FirewallSuspected), a start/end time, and a snapshot of every probe's result at the start and at
-resolution. Incidents are listed and browsable from the Diagnostics screen, independent of
-whatever diagnostic logging level is configured.
+## Exporting data
 
-## Uptime report
+Settings → Export covers four kinds of export, and a fifth is available per-incident from the
+Incidents screen:
 
-Settings → Uptime Report lets you choose exactly which infrastructure-level checks and which
-configured application endpoints count toward an uptime percentage, then view it (with downtime
-and incident count) for the last 7/30/90 days via the "Uptime report" button on the Diagnostics
-screen. Excluded items are opted out explicitly, so anything newly added - a classification or an
-endpoint - is included by default rather than silently missing until you remember to opt it in.
+- **Export all data** - a zip of settings (redacted), incidents, history, and the diagnostic log.
+- **Export for AI analysis** - a Markdown report with instructions aimed at an AI assistant.
+- **Export plain data** - the same report without the AI-facing instructions.
+- **Per-incident export** - a Markdown report for a single incident, from the Incidents screen.
+- **Network scan → Export CSV** - the LAN scan's device table (IP, hostname, MAC, vendor, response time).
+
+## Settings backup
+
+Settings → Configuration exports or imports this app's own configuration as JSON - separate from
+the data exports above, which never include enough to actually restore a setup.
+
+## Checking for updates
+
+Settings → Updates checks GitHub for a newer release once a day by default (configurable), plus a
+manual "Check for updates" in the tray menu. Either way, a pop-up reports what it found with a
+link to the release page. A separate "Update automatically" toggle (off by default) goes further:
+when a newer release is found, it's downloaded in the background, and after a short countdown
+pop-up the app replaces itself and restarts on its own.
 
 ## Diagnostic logging
 
-Optional, off by default. Configurable levels in Settings → Diagnostics:
+Optional, off by default. Configurable levels in Settings → Logging:
 
 | Level | What's recorded |
 |---|---|
@@ -99,80 +115,81 @@ technical data (addresses, timings, status codes, error text).
 
 ## Configuring application endpoints
 
-Settings → Endpoints lets you add, edit, enable/disable, and remove any number of application
+Settings → Targets lets you add, edit, enable/disable, and remove any number of application
 endpoints, of two kinds:
 
-- **HTTPS** - a full DNS → TCP → TLS → HTTP check against a URL, same as the built-in general
-  HTTPS check.
+- **HTTPS** - a full DNS → TCP → TLS → HTTP check against a URL, same as the built-in
+  reachability check, with optional custom headers (for an API that needs auth) and an optional
+  expected status code.
 - **Port (TCP/UDP)** - plain reachability of a host:port, for services that aren't HTTP (a
   database, an internal TCP service, ...). TCP treats both a successful connect and an actively
   refused connection as "reachable" (either proves something answered); UDP is inherently
   ambiguous, so a plain timeout is reported as "uncertain" rather than a false success/failure.
 
-Each enabled endpoint is checked every cycle exactly like the built-in checks and shown by name
-(not raw URL/host) on the simple status screen. See [`config.example.json`](config.example.json)
-for the on-disk shape, including an example of adding endpoints for a fictitious API.
+Each enabled endpoint is checked every cycle alongside the built-in checks and shown by name (not
+raw URL/host) on the Status screen.
 
 ## Uptime Kuma heartbeat
 
-Settings → Uptime Kuma lets you configure a push-monitor URL and interval (minimum 60 seconds).
-When a URL is set, the app sends a plain periodic `GET` to it - no dependency on any
-connectivity check, matching how Uptime Kuma push monitors are normally used. Off by default.
-See the [Uptime Kuma project](https://github.com/louislam/uptime-kuma) for what it is and how to
-set up a push monitor to get a URL from.
+Settings → Integrations lets you configure a push-monitor URL and interval (minimum 60 seconds).
+When a URL is set, the app sends a plain periodic `GET` to it - no dependency on any connectivity
+check, matching how Uptime Kuma push monitors are normally used. Off by default (no URL
+configured). See the [Uptime Kuma project](https://github.com/louislam/uptime-kuma) for what it is
+and how to set up a push monitor to get a URL from.
 
 ## Other settings
 
-- **Quiet hours** (General) - suppress the outage pop-up and "back online" balloon during a
-  configured daily time window. The tray icon, status window, and incident log keep reflecting
-  the real state regardless; only the interruptive notification is silenced.
-- **Check for updates** (General) - checks GitHub for a newer release once a day by default
-  (configurable), plus a manual "Check for updates" in the tray menu - both open the release page
-  directly. Off means zero outbound calls for this feature.
-- **Export/Import** (bottom of the Settings window) - back up the current configuration to a JSON
-  file, or load one back in. Applied live, no restart needed.
 - **Language** (General) - English, Dutch, German, or Polish. Switching takes effect immediately
   across the whole app, including an already-open Settings window.
+- **Theme** (General) - follows Windows, or forced light/dark.
+- **Incident pop-ups** (General) - a brief on-screen notice when a new incident opens.
+
+## What changed from v1
+
+v2 is a from-scratch rewrite rather than an incremental update, with a redesigned interface and
+an adaptive (3s/15s) check cadence instead of a fixed 15-second cycle. Settings, incident history,
+and per-check history all carry over automatically from an existing v1 installation - nothing
+needs to be reconfigured.
+
+A few v1 features were deliberately left out rather than ported as-is, because they measured
+something a general-purpose rewrite shouldn't assume every user wants running by default:
+continuous named ping targets with their own latency graphs, the Wi-Fi signal row, the Speed Test
+(LibreSpeed) check, quiet hours, and the SLA/uptime report. Configurable history retention was
+also dropped in favor of a fixed 30 days. The GitHub update check carries over and now also offers
+an optional fully automatic self-update (see above) that v1 never had.
 
 ## Project structure
 
 For a new contributor, the call chain from startup to a diagnosis on screen is:
 
 - **`Program.cs`** - entry point. Installs global exception handlers, enforces a single running
-  instance (`Startup/SingleInstanceManager.cs`), then hands off to...
-- **`UI/TrayApplicationContext.cs`** - the composition root. Owns the tray icon/menu, loads
-  `AppSettings`, and constructs everything below.
-- **`Network/ConnectivityMonitor.cs`** - a fast (1s) poller driving only the tray icon's
-  green/red/amber state. Independent of the diagnosis engine below; no UI dependency.
-- **`Network/DiagnosticsCoordinator.cs`** - the "real" diagnostics engine. Every 15 seconds it
-  runs every probe under `Network/Probes/` (see `Network/Probes/IProbe.cs` for the
-  probe/diagnosis separation of concerns) in parallel, assembles a `ProbeSnapshot`, and hands it
-  to...
-- **`Network/Diagnosis/DiagnosisEngine.cs`** - a pure function that walks the snapshot bottom-up
-  (adapter → IP → gateway → WAN → DNS → HTTPS → application → time-sync) and returns the single
-  most likely root cause, rather than reporting every failed probe as its own symptom.
-- From there, `Network/Diagnostics/IncidentTracker.cs` turns a run of failing cycles into a
-  tracked `Incident` (persisted via `IncidentStore`), `Network/Diagnostics/DiagnosticLogger.cs`
-  optionally writes a detailed JSONL log, and `UI/StatusPopupForm.cs` /
-  `UI/DiagnosticsForm.cs` render the result - both marshal background-thread events onto the UI
-  thread via `SynchronizationContext`, guarding every continuation with an `IsDisposed` check.
+  instance (`App/SingleInstanceManager.cs`), then hands off to...
+- **`App/AppHost.cs`** - the composition root. Owns the tray icon/menu, loads `AppSettings`, and
+  constructs and wires together everything below.
+- **`Core/Steps/StepPipeline.cs`** - runs the seven checks under `Core/Steps/Checks/` (see
+  `Core/Steps/IStepCheck.cs` for the check/result shape) concurrently every cycle and assembles a
+  `StepSnapshot`.
+- **`Core/Diagnosis/RootCauseAnalyzer.cs`** - a pure function that walks the snapshot bottom-up
+  and returns the single most likely root cause, rather than reporting every failed check as its
+  own symptom; `Core/Diagnosis/PlainLanguage.cs` turns that into the headline/explanation shown on
+  screen.
+- From there, `Core/Incidents/IncidentTracker.cs` turns a run of failing cycles into a tracked
+  `Incident` (persisted via `IncidentStore`), `Core/Diagnosis/DiagnosticLogger.cs` optionally
+  writes a detailed JSONL log, and the `Ui/Shell/Pages/` screens render the result - everything
+  crossing from a background thread onto the UI thread is marshalled via `SynchronizationContext`.
 
-Besides the main 15-second cycle, `DiagnosticsCoordinator` also owns three independent loops with
-their own cadence and their own live-reconfigure `Update*` methods, each following the same
-plain-`Task.Delay`-plus-cancellation-token shape: a 1-second ping loop
-(`Network/Probes/PingLatencyProbe.cs`, one per configured `PingTargetConfig`), an hourly NTP
-time-sync check, and an interval-based automatic Speed Test loop (`Network/SpeedTestClient.cs`).
-Wi-Fi signal info (`Network/WifiInfo.cs`, a native `wlanapi.dll` wrapper) is queried as part of
-the main cycle itself, conditionally, only when the active adapter is wireless; traceroute
-(`Network/Traceroute.cs`, TTL-increment ICMP) is the one genuinely on-demand tool, triggered only
-by its button. Speed test and Wi-Fi results are wrapped into normal `IProbeResult`s
-(`Network/Probes/ProbeDetailsFormatter.cs` / `Network/StatusLocalization.cs` format them for
-display) purely so they can reuse the same history/charting machinery as every core probe.
+Besides the main cycle, a handful of things run on their own schedule: `Core/Monitors/KumaPusher.cs`
+(the heartbeat push), `Core/Monitors/NetworkHealthMonitor.cs` (packet-level conditions),
+`Core/Updates/UpdateChecker.cs` (the daily GitHub check) - all three follow the same
+`Reconfigure(...)`-driven live-restart shape, so a Settings change takes effect immediately
+without restarting the app. Traceroute (`Core/Tools/Traceroute/`) and the LAN scanner
+(`Core/Tools/LanScan/`) are the two genuinely on-demand tools, triggered only from the Tools page.
 
 All user-facing text (including diagnosis headlines/explanations) goes through
 `Localization/LocalizationManager.cs`, loading `Localization/{en,nl,de,pl}.json` - four languages,
-switchable live from Settings; there is no hardcoded UI language anywhere in the probe/diagnosis
-layer.
+switchable live from Settings; there is no hardcoded UI language anywhere in the check/diagnosis
+layer. Every colour, spacing step, corner radius and font comes from `Ui/Theming/Theme.cs` - no
+control names a color of its own.
 
 ## Building and running
 
@@ -185,7 +202,7 @@ dotnet build InternetMonitor.sln
 Publish a single self-contained `.exe` (no .NET runtime needed on the target machine):
 
 ```powershell
-dotnet publish InternetMonitor/InternetMonitor.csproj -c Release -r win-x64 --self-contained true `
+dotnet publish src/InternetMonitor/InternetMonitorV2.csproj -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o ./publish
 ```
 
@@ -196,14 +213,16 @@ cold start is an easy trade for a tray app that starts once and runs for days.
 
 ## Settings and data locations
 
-- Settings: `%AppData%\InternetMonitor\settings.json`
+- Settings: `%AppData%\InternetMonitor\settings.json` (the same file v1 used - an existing
+  installation's settings are picked up automatically)
 - Diagnostic log: `%AppData%\InternetMonitor\logs\diagnostics.log` (+ rotated `.log.1`, `.log.2`, ...)
 - Incident history: `%AppData%\InternetMonitor\incidents.json`
-- Per-check history (the double-click charts): `%AppData%\InternetMonitor\history\`
-- Simple outage log: `%AppData%\InternetMonitor\logs\log.txt`
+- Per-check history (the History screen's charts): `%AppData%\InternetMonitor\history\`
+- Cached lookups (traceroute hop ownership, MAC vendors): `%AppData%\InternetMonitor\cache\`
+- Saved traceroute runs: `%AppData%\InternetMonitor\traceroutes\`
 
 None of these live inside the application directory, so the app itself can be replaced/updated
-without touching configuration or history.
+(by hand, or via the self-update feature above) without touching configuration or history.
 
 ## Known limitations
 
@@ -222,33 +241,34 @@ without touching configuration or history.
   server specifically" rather than a broader network/DNS issue.
 - Application endpoints are entirely user-configured with no target allowlist, by design (this
   is a local, single-user tool) - see [Security notes](#security-notes) below.
+- The self-update feature assumes the GitHub release it finds has exactly one asset named
+  `InternetMonitor.exe` (falling back to the first `.exe`-named asset otherwise) - the shape every
+  release has had so far.
 
 ## Security notes
 
-- **User-configured targets are trusted.** Application endpoints and the ping target are
-  entirely user-supplied and flow directly into raw TCP/UDP/HTTPS probes with no target
-  allowlist. This is intended - it's a local, single-user monitoring tool, and you're only ever
-  pointing it at hosts you choose. It does mean that importing a `settings.json` you don't trust
-  would let it probe whatever hosts that file names.
+- **User-configured targets are trusted.** Application endpoints are entirely user-supplied and
+  flow directly into raw TCP/UDP/HTTPS probes with no target allowlist. This is intended - it's a
+  local, single-user monitoring tool, and you're only ever pointing it at hosts you choose. It
+  does mean that importing a settings file you don't trust would let it probe whatever hosts that
+  file names.
 - **Endpoint URLs can end up in incident/log files.** If a monitored endpoint's URL embeds a
   secret (an API key or webhook token in the query string, for example), that full URL is
   captured verbatim into `incidents.json` and, if detailed diagnostic logging is enabled, into
   `diagnostics.log`. Avoid putting secrets directly in monitored URLs, or keep detailed logging
   off for such endpoints. The Uptime Kuma push URL is handled separately and is never logged.
-- **TLS validation is never bypassed.** The HTTPS probe (`Network/Probes/HttpsEndpointProbe.cs`)
-  uses .NET's default certificate validation with no custom callback, on every request.
-- **Speed Test moves real data to a third-party server.** Unlike every other check, a speed test
-  (manual or automatic) transfers real download/upload traffic to a public
-  [LibreSpeed](https://librespeed.org/) server, not just small probe packets. It never runs
-  unless a manual "Run" is clicked or automatic runs are explicitly turned on in Settings, and
-  automatic runs are capped to an interval of at least 1 hour.
-- **Reading the Wi-Fi SSID ties into Windows' Location privacy setting.** The Wi-Fi signal check
-  queries the native WLAN API for the connected network's SSID/BSSID; Windows treats SSID
-  visibility as location-adjacent for any process, regardless of intent, so this may show up
-  under Settings → Privacy → Location on Windows even though the app never calls any location
-  API itself. If Location is off, the SSID may come back blank rather than the check failing.
+- **TLS validation is never bypassed.** Every HTTPS check uses .NET's default certificate
+  validation with no custom callback.
+- **Three features send third parties something about your network, each with its own
+  off switch.** Traceroute's hop-ownership lookup sends hop IP addresses to Team Cymru and the
+  regional internet registries (toggleable in Settings → Tools); the LAN scanner's manufacturer
+  lookup sends each device's MAC prefix - never the full address - to macvendorlookup.com and
+  macvendors.com (same toggle group); and the update checker sends nothing but a plain request to
+  GitHub's public release API. All three are on by default except where noted, and every one is
+  switchable.
 - The app runs unelevated (`asInvoker`, see `app.manifest`) and only ever talks outbound over
-  the network - it opens no listening ports and requires no special permissions.
+  the network - it opens no listening ports and requires no special permissions, except that the
+  optional self-update feature replaces its own executable file on disk.
 
 ## License
 
