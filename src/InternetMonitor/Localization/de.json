@@ -387,5 +387,9 @@
   "lanScan.column.ip": "IP-Adresse",
   "lanScan.column.hostname": "Hostname",
   "lanScan.column.mac": "MAC-Adresse",
-  "lanScan.column.responseTime": "Antwortzeit"
+  "lanScan.column.responseTime": "Antwortzeit",
+  "settings.section.export": "Export",
+  "settings.section.export.subtitle": "Alle Daten exportieren, oder eine Datei speziell für die KI-Analyse.",
+  "settings.export.all": "Alle Daten exportieren",
+  "settings.export.ai": "Für KI-Analyse exportieren"
 }

@@ -1,8 +1,10 @@
 using InternetMonitor.App;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
+using InternetMonitor.Core.Export;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Monitors;
+using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -35,6 +37,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Card _networkHealthCard = null!;
     private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
+    private Card _exportCard = null!;
 
     private ComboBox _language = null!;
     private ComboBox _theme = null!;
@@ -58,6 +61,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private AppButton _kumaAbout = null!;
     private EndpointList _endpoints = null!;
     private AppButton _addEndpoint = null!;
+    private AppButton _exportAll = null!;
+    private AppButton _exportAi = null!;
 
     private readonly List<(Label Label, Control Field)> _rows = [];
 
@@ -86,7 +91,13 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _endpointsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Target };
         BuildEndpointsSection();
 
-        // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge.
+        _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
+        BuildExportSection();
+
+        // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge. Export is
+        // added first - and so ends up lowest - because it is an occasional action, not something
+        // that belongs among the frequently-changed settings above it.
+        Controls.Add(_exportCard);
         Controls.Add(_endpointsCard);
         Controls.Add(_integrationsCard);
         Controls.Add(_networkHealthCard);
@@ -524,6 +535,97 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         LayoutCards();
     }
 
+    // ---- Export ---------------------------------------------------------------------------------
+
+    private void BuildExportSection()
+    {
+        _exportAll = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
+        _exportAll.Click += (_, _) => ExportAllData();
+        _exportCard.Controls.Add(_exportAll);
+
+        _exportAi = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
+        _exportAi.Click += (_, _) => ExportForAi();
+        _exportCard.Controls.Add(_exportAi);
+    }
+
+    private void ExportAllData()
+    {
+        byte[]? logBytes = null;
+        try
+        {
+            if (File.Exists(Services.DiagnosticLog.LogPath))
+            {
+                logBytes = File.ReadAllBytes(Services.DiagnosticLog.LogPath);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Export still proceeds without the log - better than failing the whole export over a
+            // file that happened to be locked or unreadable at that moment.
+        }
+
+        byte[] zip = DataExportBuilder.Build(Services.Settings, Services.Incidents.All, BuildHistorySnapshot(), logBytes);
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "ZIP (*.zip)|*.zip",
+            FileName = $"internetmonitor-export-{DateTime.Now:yyyy-MM-dd}.zip",
+        };
+
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllBytes(dialog.FileName, zip);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not worth surfacing further for a manual export the user can just retry.
+        }
+    }
+
+    private void ExportForAi()
+    {
+        string markdown = AiExportBuilder.Build(Services.Incidents.All, BuildHistorySnapshot(), Services.Settings);
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "Markdown (*.md)|*.md",
+            FileName = $"internetmonitor-ai-export-{DateTime.Now:yyyy-MM-dd}.md",
+        };
+
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, markdown);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not worth surfacing further for a manual export the user can just retry.
+        }
+    }
+
+    private Dictionary<string, IReadOnlyList<MetricPoint>> BuildHistorySnapshot()
+    {
+        var history = new Dictionary<string, IReadOnlyList<MetricPoint>>();
+        foreach (StepId step in SeriesNames.Chartable)
+        {
+            if (SeriesNames.For(step) is { } seriesId)
+            {
+                history[seriesId] = Services.History.Get(seriesId);
+            }
+        }
+
+        return history;
+    }
+
     // ---- Shared row layout ----------------------------------------------------------------------
 
     /// <summary>
@@ -650,6 +752,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         int contentHeight = _addEndpoint.Height + Sp(2) + _endpoints.Height;
         _endpointsCard.Height = content.Top + contentHeight + _endpointsCard.Inset;
+
+        Rectangle exportContent = _exportCard.DisplayRectangle;
+        _exportAll.Location = new Point(exportContent.Left, exportContent.Top);
+        _exportAi.Location = new Point(_exportAll.Right + Sp(2), exportContent.Top);
+        _exportCard.Height = exportContent.Top + _exportAll.Height + _exportCard.Inset;
     }
 
     protected override void OnResize(EventArgs e)
@@ -819,6 +926,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _integrationsCard.Subtitle = Loc.Get("settings.section.integrations.subtitle");
         _endpointsCard.Title = Loc.Get("settings.section.endpoints");
         _endpointsCard.Subtitle = Loc.Get("settings.section.endpoints.subtitle");
+        _exportCard.Title = Loc.Get("settings.section.export");
+        _exportCard.Subtitle = Loc.Get("settings.section.export.subtitle");
 
         foreach ((Label label, _) in _rows)
         {
@@ -848,6 +957,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         _addEndpoint.Text = Loc.Get("settings.endpoint.add");
         _addEndpoint.SizeToContent();
+
+        _exportAll.Text = Loc.Get("settings.export.all");
+        _exportAll.SizeToContent();
+        _exportAi.Text = Loc.Get("settings.export.ai");
+        _exportAi.SizeToContent();
 
         _browseLogDirectory.Text = Loc.Get("settings.diagnostics.browse");
         _browseLogDirectory.SizeToContent();

@@ -387,5 +387,9 @@
   "lanScan.column.ip": "IP-adres",
   "lanScan.column.hostname": "Hostnaam",
   "lanScan.column.mac": "MAC-adres",
-  "lanScan.column.responseTime": "Reactietijd"
+  "lanScan.column.responseTime": "Reactietijd",
+  "settings.section.export": "Exporteren",
+  "settings.section.export.subtitle": "Alle gegevens exporteren, of een bestand speciaal voor AI-analyse.",
+  "settings.export.all": "Exporteer alle gegevens",
+  "settings.export.ai": "Exporteer voor AI-analyse"
 }
