@@ -91,27 +91,32 @@ public sealed class MainWindow : Form
         ApplyLocalization();
         ShowPage("status");
 
-        // Only when there is no saved preference yet (a true first run, or a reset settings file):
-        // the 1000x700 fallback above is smaller than the Status page's real content on most
-        // screens, which otherwise shows a scrollbar for no better reason than a guessed default
-        // being too small. Once the user has resized or closed the window even once, WindowWidth/
-        // WindowHeight are no longer zero (see RememberGeometry) and this never runs again - their
-        // own choice, once made, is never silently overridden.
-        if (_settings.WindowWidth == 0 && _settings.WindowHeight == 0)
+        if (_pages["status"] is StatusPage statusPage)
         {
-            FitHeightToStatusPageContent();
+            statusPage.ContentHeightChanged += EnsureStatusPageFits;
         }
+
+        // Covers both a true first run (the 1000x700 fallback above is smaller than the Status
+        // page's real content on most screens) and a saved window that has since become too short
+        // for it - a step row expanding, or a language switch making a wrapped detail line longer,
+        // both go through StatusPage.ContentHeightChanged and land here too. Never shrinks: a
+        // window the user made smaller on purpose stays that size, even if it now needs a
+        // scrollbar - exactly the "shows a scrollbar only when the screen is genuinely too small"
+        // behaviour that was asked for.
+        EnsureStatusPageFits();
     }
 
     /// <summary>
-    /// Grows the window's height to fit the Status page's actual content, clamped to the screen's
-    /// working area (never larger than fits) and to <see cref="MinimumSize"/> (never smaller than
-    /// the window already allows). Runs before the window is ever shown, so there is no visible
-    /// jump. Width is left alone - the scrollbar this fixes is vertical.
+    /// Grows the window's height to fit the Status page's actual content when it currently does
+    /// not, clamped to the screen's working area (never larger than fits - a content requirement
+    /// taller than the screen keeps its scrollbar, which is correct) and to <see cref="MinimumSize"/>.
+    /// Never shrinks the window - only ever called when content might have grown, and a smaller
+    /// requirement than the window's current size is left alone rather than snapped down to fit
+    /// exactly, which would undo a deliberate manual resize.
     /// </summary>
-    private void FitHeightToStatusPageContent()
+    private void EnsureStatusPageFits()
     {
-        if (_pages["status"] is not StatusPage status)
+        if (_pages["status"] is not StatusPage status || WindowState != FormWindowState.Normal)
         {
             return;
         }
@@ -122,12 +127,15 @@ public sealed class MainWindow : Form
         int chrome = Height - ClientSize.Height;
         int targetHeight = requiredContentHeight + chrome;
 
-        // Math.Max guards against a screen shorter than MinimumSize itself (an extreme, unlikely
-        // case) - Math.Clamp throws if its upper bound ends up below its lower one.
-        int screenHeight = Math.Max(MinimumSize.Height, Screen.FromControl(this).WorkingArea.Height);
-        int clamped = Math.Clamp(targetHeight, MinimumSize.Height, screenHeight);
+        if (targetHeight <= Height)
+        {
+            return;
+        }
 
-        Size = new Size(Width, clamped);
+        // Math.Max guards against a screen shorter than MinimumSize itself (an extreme, unlikely
+        // case) - Math.Min below would otherwise pick a height smaller than MinimumSize allows.
+        int screenHeight = Math.Max(MinimumSize.Height, Screen.FromControl(this).WorkingArea.Height);
+        Size = new Size(Width, Math.Min(targetHeight, screenHeight));
     }
 
     /// <summary>Switches to a page by nav-rail id, building it if this is its first time on screen.</summary>
@@ -271,6 +279,11 @@ public sealed class MainWindow : Form
         {
             Theme.Changed -= OnThemeChanged;
             LocalizationManager.Instance.LanguageChanged -= OnLanguageChanged;
+
+            if (_pages["status"] is StatusPage statusPage)
+            {
+                statusPage.ContentHeightChanged -= EnsureStatusPageFits;
+            }
         }
 
         base.Dispose(disposing);

@@ -28,6 +28,14 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
 
     public override string Id => "status";
 
+    /// <summary>
+    /// Raised whenever the steps card's height changes - a row expanding, or a language switch
+    /// making a wrapped detail line taller. <see cref="MainWindow"/> listens for this to grow the
+    /// window if it no longer fits the content, which a step row growing after the window was
+    /// already sized would otherwise leave as an avoidable scrollbar.
+    /// </summary>
+    public event Action? ContentHeightChanged;
+
     protected override void Build()
     {
         _steps = new StepList { Dock = DockStyle.Fill };
@@ -192,7 +200,13 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
 
         // The card sizes to its content rather than the content scrolling inside a fixed card:
         // seven rows is a known quantity, and an inner scrollbar on a short list looks broken.
+        int previousHeight = _stepsCard.Height;
         _stepsCard.Height = _steps.PreferredHeight + (_stepsCard.Height - _stepsCard.DisplayRectangle.Height);
+
+        if (_stepsCard.Height != previousHeight)
+        {
+            ContentHeightChanged?.Invoke();
+        }
     }
 
     protected override void Dispose(bool disposing)
