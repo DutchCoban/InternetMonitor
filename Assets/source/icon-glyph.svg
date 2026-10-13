@@ -1,30 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Original artwork (not derived from any third-party asset): a minimal screen with a single
-     rising monitoring line inside it - no stand, no extra badge shapes, chosen over an earlier,
-     more detailed version specifically for legibility at 16x16 (system tray scale). The screen is
-     a filled shape rather than an outline, which holds up far better than a thin stroke once
-     downsampled that small.
+<!-- Original artwork (not derived from any third-party asset): a clipboard holding a report with
+     a pulse/ECG line - a line-icon style (stroke only, no fills besides the white "knockouts"
+     where the clip overlaps the body) rather than the filled-shape style of earlier drafts of
+     this icon. Matches what this app actually produces: a diagnostic report with a connectivity
+     reading on it.
 
-     Bottom-right is deliberately left clear: TrayIconFactory composites a status-colour badge
-     circle there at runtime, over the tray icon variant of this artwork. The screen rectangle
-     (x:30-168, y:34-108 on this 200x200 grid) stays out of that corner by construction - its
-     bottom edge (y=108) sits above the badge's top edge (y=112 on this grid), so the two never
-     overlap regardless of the screen's horizontal extent. Palette matches the app's existing
-     slate-blue/white style. -->
+     Stroke widths here are deliberately much heavier than they would be in a poster-sized version
+     of this same drawing (13 units on this 200-unit grid, where ~7 would look "right" at a glance
+     here). That is not a style choice - a 7-unit stroke is sub-pixel once scaled to a 16x16 system
+     tray icon (7/200*16 = 0.56px), so downsampling renders it as a pale, half-opacity wash no
+     matter how good the resampler is; a renderer would need to deliberately clamp line width to
+     render it crisply, which the production pipeline (render large, then LANCZOS-downsample, the
+     same approach as every other icon in this file's history) does not do. The heavier strokes
+     here are what the 16px frame of Assets/app.ico actually needs to read as solid blue rather
+     than a blur - verified by rendering this file and checking actual pixel values at 16x16, not
+     just by eyeballing a browser preview (which renders SVG at higher effective resolution than a
+     true 16x16 bitmap and will look deceptively crisp regardless of stroke width).
+
+     Bottom-right is not fully clear of TrayIconFactory's runtime status badge - unlike earlier,
+     narrower icon shapes in this file's history, a roughly square clipboard filling most of the
+     canvas cannot avoid that corner without shrinking far enough to look cramped. The badge ends
+     up covering the folded-corner decoration and a sliver of the body's own corner, which was
+     judged an acceptable, minor trade-off rather than redesigning around it. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
     <style>
-      .bg { fill: #2E4057; }
-      .screen { fill: #FFFFFF; }
-      .graph { fill: none; stroke: #4682B4; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
+      .bg { fill: #FFFFFF; }
+      .ink { fill: none; stroke: #276BA4; stroke-linecap: round; stroke-linejoin: round; }
+      .knockout { fill: #FFFFFF; stroke: #276BA4; }
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="200" height="200" rx="34" ry="34"/>
+  <rect class="bg" x="0" y="0" width="200" height="200" rx="34"/>
 
-  <!-- Screen: filled, no stand - the one shape, kept clear of the bottom-right badge zone. -->
-  <rect class="screen" x="30" y="34" width="138" height="74" rx="14" ry="14"/>
+  <!-- Clipboard body -->
+  <rect class="ink" x="44" y="50" width="112" height="136" rx="13" stroke-width="13"/>
 
-  <!-- Rising monitoring graph, drawn inside the screen. -->
-  <polyline class="graph" points="44,86 66,68 88,78 110,48 132,56 152,36"/>
+  <!-- Clip, overlapping the body's top edge, plus its rivet -->
+  <rect class="knockout" x="77" y="34" width="46" height="30" rx="15" stroke-width="13"/>
+  <circle class="knockout" cx="100" cy="49" r="6.5" stroke-width="9"/>
+
+  <!-- Report text lines -->
+  <line class="ink" x1="64" y1="92" x2="102" y2="92" stroke-width="11"/>
+  <line class="ink" x1="64" y1="108" x2="142" y2="108" stroke-width="11"/>
+  <line class="ink" x1="64" y1="124" x2="142" y2="124" stroke-width="11"/>
+
+  <!-- Pulse / ECG line -->
+  <polyline class="ink" points="64,150 83,150 90,135 100,166 110,137 118,150 142,150" stroke-width="12"/>
+
+  <!-- Folded page corner -->
+  <polyline class="ink" points="126,176 126,158 144,176" stroke-width="9"/>
 </svg>
