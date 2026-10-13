@@ -15,6 +15,14 @@ namespace InternetMonitor.Configuration;
 /// that refuses to start because of a bad settings file is worse than one that starts with
 /// defaults and lets the user fix it.
 /// </summary>
+/// <summary>
+/// One network-health condition's threshold: fires when more than <see cref="MaxOccurrences"/>
+/// occurrences are seen within <see cref="WindowMinutes"/> minutes. <see cref="Enabled"/> is
+/// per-condition because a user may want TTL errors flagged without caring about
+/// retransmissions, say.
+/// </summary>
+public sealed record NetworkHealthThreshold(bool Enabled, int MaxOccurrences, int WindowMinutes);
+
 public sealed class AppSettings
 {
     private static readonly JsonSerializerOptions Json = new()
@@ -132,6 +140,24 @@ public sealed class AppSettings
     /// only the diagnostic log moves).
     /// </summary>
     public string DiagnosticLogDirectory { get; set; } = string.Empty;
+
+    // ---- Network health ------------------------------------------------------------------------
+
+    /// <summary>Off by default - packet-level monitoring is a deeper diagnostic than this app runs out of the box.</summary>
+    public bool NetworkHealthMonitoringEnabled { get; set; }
+
+    // The defaults below are deliberately uncalibrated - there is no measurement baseline in this
+    // codebase to set them from - and every condition starts disabled regardless, so they only
+    // matter once a user turns one on and have not yet typed their own numbers.
+    public NetworkHealthThreshold TcpRetransmissions { get; set; } = new(false, 500, 5);
+
+    /// <summary>MaxOccurrences here is a percentage (0-100), not a count.</summary>
+    public NetworkHealthThreshold PacketLoss { get; set; } = new(false, 20, 5);
+
+    public NetworkHealthThreshold TtlExceeded { get; set; } = new(false, 50, 5);
+
+    /// <summary>MaxOccurrences is unused for this condition - any server other than the known gateway is rogue. WindowMinutes is this condition's own poll interval instead.</summary>
+    public NetworkHealthThreshold RogueDhcp { get; set; } = new(false, 0, 5);
 
     // ---- Persistence --------------------------------------------------------------------------
 

@@ -30,6 +30,7 @@ public sealed class AppHost : ApplicationContext
     private readonly IncidentStore _incidents;
     private readonly KumaPusher _kuma;
     private readonly DiagnosticLogger _diagnosticLog;
+    private readonly NetworkHealthMonitor _networkHealth;
     private readonly ChangeDetector _changes;
     private readonly IncidentTracker _tracker;
     private readonly TrayController _tray;
@@ -97,7 +98,18 @@ public sealed class AppHost : ApplicationContext
         _changes = new ChangeDetector();
         _tracker = new IncidentTracker(_incidents, _changes);
 
-        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog);
+        _networkHealth = new NetworkHealthMonitor(
+            _incidents,
+            defaultTargets.PublicIpTargets,
+            () => _pipeline.LatestSnapshot?.FactsFor<IpAddressFacts>(StepId.IpAddress)?.Gateway);
+        _networkHealth.Reconfigure(
+            _settings.NetworkHealthMonitoringEnabled,
+            _settings.TcpRetransmissions,
+            _settings.PacketLoss,
+            _settings.TtlExceeded,
+            _settings.RogueDhcp);
+
+        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -118,6 +130,8 @@ public sealed class AppHost : ApplicationContext
         _incidents.Changed += OnIncidentsChanged;
         _tracker.IncidentOpened += OnIncidentOpened;
         _tracker.IncidentClosed += _diagnosticLog.LogIncidentResolved;
+        _networkHealth.IncidentOpened += OnIncidentOpened;
+        _networkHealth.IncidentClosed += _diagnosticLog.LogIncidentResolved;
         _cadence.Start();
 
         if (showWindowOnStart)
@@ -306,12 +320,15 @@ public sealed class AppHost : ApplicationContext
             _incidents.Changed -= OnIncidentsChanged;
             _tracker.IncidentOpened -= OnIncidentOpened;
             _tracker.IncidentClosed -= _diagnosticLog.LogIncidentResolved;
+            _networkHealth.IncidentOpened -= OnIncidentOpened;
+            _networkHealth.IncidentClosed -= _diagnosticLog.LogIncidentResolved;
             _pipeline.Dispose();
 
             // Blocking on shutdown is acceptable and necessary: this is the final flush, and
             // letting the process exit without it loses up to two minutes of recorded history.
             _history.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _kuma.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _networkHealth.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
             _tray.Dispose();
             _themeWatcher.Dispose();

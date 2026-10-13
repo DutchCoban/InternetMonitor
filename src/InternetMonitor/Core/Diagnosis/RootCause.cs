@@ -28,6 +28,13 @@ public enum RootCause
     /// </summary>
     FirewallSuspected,
 
+    /// <summary>
+    /// Raised by <see cref="Monitors.NetworkHealthMonitor"/>, not the step pipeline - a packet-level
+    /// condition (retransmissions, loss, TTL errors, a rogue DHCP server) crossed its configured
+    /// threshold. Which one is recorded on the incident itself, see <see cref="Incidents.Incident.ConditionKey"/>.
+    /// </summary>
+    NetworkHealth,
+
     Unknown,
 }
 
@@ -44,6 +51,7 @@ public static class RootCauseExtensions
         RootCause.Dns => "dns",
         RootCause.Target => "target",
         RootCause.FirewallSuspected => "firewall",
+        RootCause.NetworkHealth => "networkHealth",
         _ => "unknown",
     };
 

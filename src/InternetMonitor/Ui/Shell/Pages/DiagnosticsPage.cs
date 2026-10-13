@@ -1,7 +1,9 @@
 using System.Runtime.InteropServices;
 using InternetMonitor.App;
 using InternetMonitor.Core.Diagnosis;
+using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
+using InternetMonitor.Net;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
 using UiSeverity = InternetMonitor.Ui.Theming.Severity;
@@ -31,6 +33,10 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     private Label _bannerHeadline = null!;
     private Label _bannerMeta = null!;
 
+    private Card _networkHealthSummaryCard = null!;
+    private Label _networkHealthDisabledLabel = null!;
+    private readonly List<SummaryRow> _networkHealthRows = [];
+
     private Card _tableCard = null!;
     private StepTable _table = null!;
     private Card _detailCard = null!;
@@ -47,6 +53,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     protected override void Build()
     {
         BuildBanner();
+        BuildNetworkHealthSummary();
 
         _table = new StepTable { Dock = DockStyle.Fill };
         _table.SelectionChanged += OnTableSelectionChanged;
@@ -69,10 +76,133 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
         // Fill before Left, matching IncidentsPage: WinForms docks siblings in the order they are
         // added, so the filled panel has to come first to get what the left panel leaves behind.
+        // The summary card is added after both but before the banner, so among the Top-docked
+        // controls it lands just below the banner rather than above it.
         Controls.Add(_detailCard);
         Controls.Add(_tableCard);
+        Controls.Add(_networkHealthSummaryCard);
         Controls.Add(_bannerCard);
     }
+
+    private void BuildNetworkHealthSummary()
+    {
+        _networkHealthSummaryCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Warning };
+        _networkHealthSummaryCard.Height = Dp(28);
+        _networkHealthSummaryCard.Resize += (_, _) => LayoutNetworkHealthSummary();
+
+        _networkHealthDisabledLabel = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+            ForeColor = Theme.Current.TextMuted,
+        };
+        _networkHealthSummaryCard.Controls.Add(_networkHealthDisabledLabel);
+
+        _networkHealthRows.Add(MakeSummaryRow("tcpRetransmissions"));
+        _networkHealthRows.Add(MakeSummaryRow("packetLoss"));
+        _networkHealthRows.Add(MakeSummaryRow("ttlExceeded"));
+        _networkHealthRows.Add(MakeSummaryRow("rogueDhcp"));
+
+        ApplyNetworkHealthColors();
+    }
+
+    private SummaryRow MakeSummaryRow(string key)
+    {
+        var pill = new StatusPill { ShapeOnly = true };
+        var name = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body) };
+        var value = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleRight,
+            Font = Theme.Font(FontRole.Small),
+            ForeColor = Theme.Current.TextMuted,
+        };
+
+        _networkHealthSummaryCard.Controls.Add(pill);
+        _networkHealthSummaryCard.Controls.Add(name);
+        _networkHealthSummaryCard.Controls.Add(value);
+
+        return new SummaryRow(key, pill, name, value);
+    }
+
+    /// <summary>
+    /// Shows one dimmed row when the whole feature is off, four condition rows otherwise - same
+    /// "one quiet line instead of empty rows" choice the plan made for this card.
+    /// </summary>
+    private void LayoutNetworkHealthSummary()
+    {
+        Rectangle content = _networkHealthSummaryCard.DisplayRectangle;
+        int rowHeight = Dp(26);
+        bool enabled = Services.Settings.NetworkHealthMonitoringEnabled;
+
+        _networkHealthDisabledLabel.Visible = !enabled;
+        int y = content.Top;
+
+        if (!enabled)
+        {
+            _networkHealthDisabledLabel.Bounds = new Rectangle(content.Left, y, content.Width, rowHeight);
+            y += rowHeight;
+        }
+
+        foreach (SummaryRow row in _networkHealthRows)
+        {
+            row.Pill.Visible = enabled;
+            row.Name.Visible = enabled;
+            row.Value.Visible = enabled;
+
+            if (!enabled)
+            {
+                continue;
+            }
+
+            int pillSize = Dp(14);
+            row.Pill.Bounds = new Rectangle(content.Left, y + ((rowHeight - pillSize) / 2), pillSize, pillSize);
+
+            int nameLeft = content.Left + pillSize + Sp(2);
+            int valueWidth = Dp(130);
+            row.Name.Bounds = new Rectangle(nameLeft, y, Math.Max(0, content.Width - (nameLeft - content.Left) - valueWidth - Sp(2)), rowHeight);
+            row.Value.Bounds = new Rectangle(content.Right - valueWidth, y, valueWidth, rowHeight);
+
+            y += rowHeight;
+        }
+
+        _networkHealthSummaryCard.Height = y + _networkHealthSummaryCard.Inset;
+    }
+
+    private void RefreshNetworkHealthStatus(NetworkHealthStatus status)
+    {
+        SetSummaryRow(_networkHealthRows[0], status.TcpRetransmissions);
+        SetSummaryRow(_networkHealthRows[1], status.PacketLoss);
+        SetSummaryRow(_networkHealthRows[2], status.TtlExceeded);
+        SetSummaryRow(_networkHealthRows[3], status.RogueDhcp);
+
+        // The rogue-DHCP probe has its own failure mode distinct from "no incident" - the port
+        // bind not working on this system at all (see DhcpDiscoverProbe's own doc comment) - which
+        // deserves "not available" rather than a reading of zero that looks like a clean result.
+        SummaryRow rogueDhcpRow = _networkHealthRows[3];
+        if (rogueDhcpRow.Pill.Visible && status.RogueDhcp.Enabled && status.LastRogueDhcpProbeStatus == DhcpProbeStatus.Unavailable)
+        {
+            rogueDhcpRow.Value.Text = Loc.Get("diagnostics.networkHealth.unavailable");
+            rogueDhcpRow.Pill.Severity = UiSeverity.Idle;
+        }
+
+        LayoutNetworkHealthSummary();
+    }
+
+    private void SetSummaryRow(SummaryRow row, NetworkHealthConditionStatus status)
+    {
+        row.Name.Text = Loc.Get($"settings.networkHealth.{row.Key}");
+        row.Value.Text = Loc.Format("diagnostics.networkHealth.count", status.CountInWindow, status.Threshold);
+
+        row.Pill.Severity = !status.Enabled
+            ? UiSeverity.Idle
+            : status.IncidentOpen
+                ? UiSeverity.Error
+                : UiSeverity.Ok;
+    }
+
+    private void OnNetworkHealthStatusChanged(NetworkHealthStatus status) => Post(() => RefreshNetworkHealthStatus(status));
 
     private void BuildBanner()
     {
@@ -125,6 +255,11 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _tableCard.Subtitle = Loc.Get("diagnostics.table.subtitle");
         _detailCard.Title = Loc.Get("diagnostics.detail.title");
 
+        _networkHealthSummaryCard.Title = Loc.Get("diagnostics.networkHealth.title");
+        _networkHealthSummaryCard.Subtitle = Loc.Get("diagnostics.networkHealth.subtitle");
+        _networkHealthDisabledLabel.Text = Loc.Get("diagnostics.networkHealth.disabled");
+        RefreshNetworkHealthStatus(Services.NetworkHealth.CurrentStatus);
+
         _checkNow.Text = Loc.Get("menu.checkNow");
         _checkNow.SizeToContent();
         _copy.Text = Loc.Get("diagnostics.copy");
@@ -134,13 +269,32 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         RefreshFromSnapshot(Services.Pipeline.LatestSnapshot);
     }
 
-    protected override void OnThemeChanged() => ApplyBannerColors();
+    protected override void OnThemeChanged()
+    {
+        ApplyBannerColors();
+        ApplyNetworkHealthColors();
+    }
 
     private void ApplyBannerColors()
     {
         _bannerHeadline.BackColor = Theme.Current.Surface;
         _bannerMeta.BackColor = Theme.Current.Surface;
         _bannerMeta.ForeColor = Theme.Current.TextMuted;
+    }
+
+    private void ApplyNetworkHealthColors()
+    {
+        Palette p = Theme.Current;
+        _networkHealthDisabledLabel.BackColor = p.Surface;
+        _networkHealthDisabledLabel.ForeColor = p.TextMuted;
+
+        foreach (SummaryRow row in _networkHealthRows)
+        {
+            row.Name.BackColor = p.Surface;
+            row.Name.ForeColor = p.TextSecondary;
+            row.Value.BackColor = p.Surface;
+            row.Value.ForeColor = p.TextMuted;
+        }
     }
 
     protected override void OnActivated()
@@ -153,6 +307,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _subscribed = true;
         Services.Pipeline.StepChanged += OnStepChanged;
         Services.Pipeline.CycleCompleted += OnCycleCompleted;
+        Services.NetworkHealth.StatusChanged += OnNetworkHealthStatusChanged;
+        RefreshNetworkHealthStatus(Services.NetworkHealth.CurrentStatus);
 
         StepSnapshot? snapshot = Services.Pipeline.LatestSnapshot;
         if (snapshot is not null)
@@ -177,6 +333,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _subscribed = false;
         Services.Pipeline.StepChanged -= OnStepChanged;
         Services.Pipeline.CycleCompleted -= OnCycleCompleted;
+        Services.NetworkHealth.StatusChanged -= OnNetworkHealthStatusChanged;
     }
 
     private void OnTableSelectionChanged(StepId step) => _detail.Show(step, _table.ResultFor(step));
@@ -286,4 +443,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
         base.Dispose(disposing);
     }
+
+    /// <summary>One network-health condition's row in the summary card.</summary>
+    private sealed record SummaryRow(string Key, StatusPill Pill, Label Name, Label Value);
 }

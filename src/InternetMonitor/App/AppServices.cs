@@ -24,7 +24,8 @@ public sealed class AppServices(
     MetricStore history,
     IncidentStore incidents,
     KumaPusher kuma,
-    DiagnosticLogger diagnosticLog)
+    DiagnosticLogger diagnosticLog,
+    NetworkHealthMonitor networkHealth)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -42,4 +43,6 @@ public sealed class AppServices(
     public KumaPusher Kuma { get; } = kuma;
 
     public DiagnosticLogger DiagnosticLog { get; } = diagnosticLog;
+
+    public NetworkHealthMonitor NetworkHealth { get; } = networkHealth;
 }

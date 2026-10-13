@@ -68,5 +68,12 @@ public sealed record Incident
     /// <summary>A traceroute captured when the incident opened, when the cause made one worth having.</summary>
     public string? TraceroutePath { get; set; }
 
+    /// <summary>
+    /// Which network-health condition opened this, e.g. "tcpRetransmissions" - null for every
+    /// pipeline-driven incident. Lets the AI export group these by condition without parsing
+    /// <see cref="Headline"/> text.
+    /// </summary>
+    public string? ConditionKey { get; init; }
+
     public TimeSpan? Duration => EndUtc is { } end ? end - StartUtc : null;
 }

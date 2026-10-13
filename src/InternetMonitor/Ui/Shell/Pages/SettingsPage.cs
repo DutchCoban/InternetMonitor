@@ -32,6 +32,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Card _cadenceCard = null!;
     private Card _toolsCard = null!;
     private Card _diagnosticsCard = null!;
+    private Card _networkHealthCard = null!;
     private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
 
@@ -49,6 +50,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private AppButton _browseLogDirectory = null!;
     private AppButton _openLogFolder = null!;
     private AppButton _resetLogDirectory = null!;
+    private Toggle _networkHealthEnabled = null!;
+    private readonly List<ConditionRow> _conditionRows = [];
     private TextBox _kumaUrl = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
@@ -74,6 +77,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _diagnosticsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Diagnostics };
         BuildDiagnosticsRows();
 
+        _networkHealthCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Warning };
+        BuildNetworkHealthRows();
+
         _integrationsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Globe };
         BuildIntegrationsRows();
 
@@ -83,6 +89,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge.
         Controls.Add(_endpointsCard);
         Controls.Add(_integrationsCard);
+        Controls.Add(_networkHealthCard);
         Controls.Add(_diagnosticsCard);
         Controls.Add(_toolsCard);
         Controls.Add(_cadenceCard);
@@ -269,6 +276,119 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
     private void RefreshLogDirectoryText() => _logDirectory.Text = Services.DiagnosticLog.ResolvedDirectory();
 
+    // ---- Network health -------------------------------------------------------------------------
+
+    private void BuildNetworkHealthRows()
+    {
+        _networkHealthEnabled = new Toggle();
+        _networkHealthEnabled.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.NetworkHealthMonitoringEnabled = _networkHealthEnabled.Checked;
+            Services.Settings.Save();
+            ReconfigureNetworkHealth();
+        };
+        AddRow(_networkHealthCard, "settings.networkHealth.enabled", _networkHealthEnabled);
+
+        MakeConditionRow("tcpRetransmissions", "settings.networkHealth.tcpRetransmissions", 0, 1_000_000, hasThreshold: true);
+        MakeConditionRow("packetLoss", "settings.networkHealth.packetLoss", 0, 100, hasThreshold: true);
+        MakeConditionRow("ttlExceeded", "settings.networkHealth.ttlExceeded", 0, 1_000_000, hasThreshold: true);
+
+        // Rogue-DHCP has no occurrence threshold - any server that is not the known gateway is
+        // rogue - so this row skips the threshold field and "more than"/"in" wording entirely and
+        // reads as "[toggle] Rogue DHCP server, check every [window] minutes" instead.
+        MakeConditionRow("rogueDhcp", "settings.networkHealth.rogueDhcp", 0, 0, hasThreshold: false);
+    }
+
+    /// <summary>
+    /// One condition's own row: [toggle] [name] "more than" [threshold] "in" [window] "minutes",
+    /// or (for rogue-DHCP, see <see cref="BuildNetworkHealthRows"/>) [toggle] [name] "every"
+    /// [window] "minutes". Four conditions, each with its own enable flag and numbers that do not
+    /// all mean the same thing, do not fit the generic single-label/single-field
+    /// <see cref="AddRow"/> shape, so these are laid out by hand in <see cref="LayoutCards"/>
+    /// instead - same reasoning as the diagnostics directory buttons just above, which already sit
+    /// below their card's generic rows for the same kind of reason.
+    /// </summary>
+    private void MakeConditionRow(string key, string nameKey, int minThreshold, int maxThreshold, bool hasThreshold)
+    {
+        var toggle = new Toggle();
+        var name = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body), Tag = nameKey };
+        NumericUpDown? threshold = hasThreshold ? MakeIntervalField(minThreshold, Math.Max(minThreshold, maxThreshold)) : null;
+        var intervalLabel = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = Theme.Font(FontRole.Body),
+            Tag = hasThreshold ? "settings.networkHealth.in" : "settings.networkHealth.every",
+        };
+        NumericUpDown window = MakeIntervalField(1, 1440);
+        var minutesLabel = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body), Tag = "settings.networkHealth.minutes" };
+
+        var row = new ConditionRow(key, toggle, name, threshold, intervalLabel, window, minutesLabel);
+        _conditionRows.Add(row);
+
+        void Apply(object? sender, EventArgs e)
+        {
+            int thresholdValue = threshold is null ? 0 : (int)threshold.Value;
+            SetConditionThreshold(key, new NetworkHealthThreshold(toggle.Checked, thresholdValue, (int)window.Value));
+            Services.Settings.Save();
+            ReconfigureNetworkHealth();
+        }
+
+        toggle.CheckedChanged += Apply;
+        if (threshold is not null)
+        {
+            threshold.ValueChanged += Apply;
+        }
+
+        window.ValueChanged += Apply;
+
+        _networkHealthCard.Controls.Add(toggle);
+        _networkHealthCard.Controls.Add(name);
+        if (threshold is not null)
+        {
+            _networkHealthCard.Controls.Add(threshold);
+        }
+
+        _networkHealthCard.Controls.Add(intervalLabel);
+        _networkHealthCard.Controls.Add(window);
+        _networkHealthCard.Controls.Add(minutesLabel);
+    }
+
+    private void SetConditionThreshold(string key, NetworkHealthThreshold value)
+    {
+        switch (key)
+        {
+            case "tcpRetransmissions":
+                Services.Settings.TcpRetransmissions = value;
+                break;
+            case "packetLoss":
+                Services.Settings.PacketLoss = value;
+                break;
+            case "ttlExceeded":
+                Services.Settings.TtlExceeded = value;
+                break;
+            case "rogueDhcp":
+                Services.Settings.RogueDhcp = value;
+                break;
+        }
+    }
+
+    private NetworkHealthThreshold GetConditionThreshold(string key) => key switch
+    {
+        "tcpRetransmissions" => Services.Settings.TcpRetransmissions,
+        "packetLoss" => Services.Settings.PacketLoss,
+        "ttlExceeded" => Services.Settings.TtlExceeded,
+        "rogueDhcp" => Services.Settings.RogueDhcp,
+        _ => new NetworkHealthThreshold(false, 0, 5),
+    };
+
+    private void ReconfigureNetworkHealth() => Services.NetworkHealth.Reconfigure(
+        Services.Settings.NetworkHealthMonitoringEnabled,
+        Services.Settings.TcpRetransmissions,
+        Services.Settings.PacketLoss,
+        Services.Settings.TtlExceeded,
+        Services.Settings.RogueDhcp);
+
     // ---- Integrations ---------------------------------------------------------------------------
 
     private void BuildIntegrationsRows()
@@ -445,12 +565,62 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         card.Height = y + card.Inset;
     }
 
+    /// <summary>
+    /// Positions the four condition rows below the network-health card's one generic row (the
+    /// overall enable toggle, already placed by <see cref="LayoutCardRows"/>) - same "generic rows,
+    /// then hand-laid-out extras below" pattern the diagnostics and integrations cards use just
+    /// below here.
+    /// </summary>
+    private void LayoutConditionRows()
+    {
+        Rectangle content = _networkHealthCard.DisplayRectangle;
+        int y = _networkHealthCard.Height - _networkHealthCard.Inset;
+
+        int toggleWidth = Dp(44);
+        int nameWidth = Dp(170);
+        int numberWidth = Dp(70);
+        int intervalLabelWidth = Dp(40);
+        int minutesLabelWidth = Dp(80);
+        int gap = Sp(2);
+
+        foreach (ConditionRow row in _conditionRows)
+        {
+            int x = content.Left;
+
+            row.Toggle.Location = new Point(x, y + ((RowHeight - row.Toggle.Height) / 2));
+            x += toggleWidth + gap;
+
+            row.Name.Bounds = new Rectangle(x, y, nameWidth, RowHeight);
+            x += nameWidth + gap;
+
+            if (row.Threshold is { } threshold)
+            {
+                threshold.Location = new Point(x, y + ((RowHeight - threshold.Height) / 2));
+                x += numberWidth + gap;
+            }
+
+            row.IntervalLabel.Bounds = new Rectangle(x, y, intervalLabelWidth, RowHeight);
+            x += intervalLabelWidth + gap;
+
+            row.Window.Location = new Point(x, y + ((RowHeight - row.Window.Height) / 2));
+            x += numberWidth + gap;
+
+            row.MinutesLabel.Bounds = new Rectangle(x, y, minutesLabelWidth, RowHeight);
+
+            y += RowHeight;
+        }
+
+        _networkHealthCard.Height = y + _networkHealthCard.Inset;
+    }
+
     private void LayoutCards()
     {
         LayoutCardRows(_generalCard);
         LayoutCardRows(_cadenceCard);
         LayoutCardRows(_toolsCard);
         LayoutCardRows(_diagnosticsCard);
+        LayoutCardRows(_networkHealthCard);
+        LayoutConditionRows();
         LayoutCardRows(_integrationsCard);
 
         // LayoutCardRows sized the card to its three label/field rows; the directory buttons sit
@@ -522,6 +692,19 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _logSuccessfulChecks.SetWithoutNotify(settings.LogSuccessfulChecks);
         _logDetailedMeasurements.SetWithoutNotify(settings.LogDetailedMeasurements);
         RefreshLogDirectoryText();
+
+        _networkHealthEnabled.SetWithoutNotify(settings.NetworkHealthMonitoringEnabled);
+        foreach (ConditionRow row in _conditionRows)
+        {
+            NetworkHealthThreshold threshold = GetConditionThreshold(row.Key);
+            row.Toggle.SetWithoutNotify(threshold.Enabled);
+            if (row.Threshold is not null)
+            {
+                row.Threshold.Value = Math.Clamp(threshold.MaxOccurrences, row.Threshold.Minimum, row.Threshold.Maximum);
+            }
+
+            row.Window.Value = Math.Clamp(threshold.WindowMinutes, row.Window.Minimum, row.Window.Maximum);
+        }
 
         _kumaUrl.Leave -= OnKumaSettingsChanged;
         _kumaInterval.ValueChanged -= OnKumaSettingsChanged;
@@ -630,6 +813,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _toolsCard.Title = Loc.Get("settings.section.tools");
         _diagnosticsCard.Title = Loc.Get("settings.section.diagnostics");
         _diagnosticsCard.Subtitle = Loc.Get("settings.section.diagnostics.subtitle");
+        _networkHealthCard.Title = Loc.Get("settings.section.networkHealth");
+        _networkHealthCard.Subtitle = Loc.Get("settings.section.networkHealth.subtitle");
         _integrationsCard.Title = Loc.Get("settings.section.integrations");
         _integrationsCard.Subtitle = Loc.Get("settings.section.integrations.subtitle");
         _endpointsCard.Title = Loc.Get("settings.section.endpoints");
@@ -641,6 +826,13 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             {
                 label.Text = Loc.Get(key);
             }
+        }
+
+        foreach (ConditionRow row in _conditionRows)
+        {
+            row.Name.Text = Loc.Get((string)row.Name.Tag!);
+            row.IntervalLabel.Text = Loc.Get((string)row.IntervalLabel.Tag!);
+            row.MinutesLabel.Text = Loc.Get((string)row.MinutesLabel.Tag!);
         }
 
         string previousLanguage = (_language.SelectedItem as ComboItem)?.Key ?? Services.Settings.Language;
@@ -697,6 +889,25 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             field.ForeColor = p.TextPrimary;
         }
 
+        foreach (ConditionRow row in _conditionRows)
+        {
+            row.Name.ForeColor = p.TextSecondary;
+            row.Name.BackColor = p.Surface;
+            row.IntervalLabel.ForeColor = p.TextSecondary;
+            row.IntervalLabel.BackColor = p.Surface;
+            row.MinutesLabel.ForeColor = p.TextSecondary;
+            row.MinutesLabel.BackColor = p.Surface;
+
+            if (row.Threshold is not null)
+            {
+                row.Threshold.BackColor = p.SurfaceAlt;
+                row.Threshold.ForeColor = p.TextPrimary;
+            }
+
+            row.Window.BackColor = p.SurfaceAlt;
+            row.Window.ForeColor = p.TextPrimary;
+        }
+
         _logDirectory.BackColor = p.SurfaceAlt;
         _logDirectory.ForeColor = p.TextPrimary;
 
@@ -711,4 +922,17 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     {
         public override string ToString() => Display;
     }
+
+    /// <summary>
+    /// One network-health condition's row of controls. <see cref="Threshold"/> is null for
+    /// rogue-DHCP, which has no occurrence threshold - see <see cref="MakeConditionRow"/>.
+    /// </summary>
+    private sealed record ConditionRow(
+        string Key,
+        Toggle Toggle,
+        Label Name,
+        NumericUpDown? Threshold,
+        Label IntervalLabel,
+        NumericUpDown Window,
+        Label MinutesLabel);
 }
