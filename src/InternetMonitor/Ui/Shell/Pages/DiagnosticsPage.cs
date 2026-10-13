@@ -29,7 +29,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         ?? throw new InvalidOperationException("DiagnosticsPage must be constructed on the UI thread.");
 
     private Card _bannerCard = null!;
-    private StatusPill _bannerPill = null!;
+    private Panel _bannerAccent = null!;
+    private SeverityIconChip _bannerChip = null!;
     private Label _bannerHeadline = null!;
     private Label _bannerMeta = null!;
 
@@ -206,7 +207,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
     private void BuildBanner()
     {
-        _bannerPill = new StatusPill { ShapeOnly = true };
+        _bannerAccent = new Panel();
+        _bannerChip = new SeverityIconChip();
         _bannerHeadline = new Label
         {
             AutoSize = false,
@@ -221,9 +223,15 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
             ForeColor = Theme.Current.TextMuted,
         };
 
-        _bannerCard = new Card { Dock = DockStyle.Top, ShowShadow = false };
-        _bannerCard.Height = Dp(56);
-        _bannerCard.Controls.Add(_bannerPill);
+        // ShowShadow back on (true, the Card default) and a taller card than the original bare
+        // strip - that flat, shadowless 56dp treatment is what read as "not tidy" next to the
+        // Status page's hero card; this borrows its shadow, icon chip and accent-bar language
+        // without borrowing its stat row, which would be redundant here (the steps table below
+        // already is the detail view).
+        _bannerCard = new Card { Dock = DockStyle.Top };
+        _bannerCard.Height = Dp(72);
+        _bannerCard.Controls.Add(_bannerAccent);
+        _bannerCard.Controls.Add(_bannerChip);
         _bannerCard.Controls.Add(_bannerHeadline);
         _bannerCard.Controls.Add(_bannerMeta);
         _bannerCard.Resize += (_, _) => LayoutBanner();
@@ -234,12 +242,18 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     private void LayoutBanner()
     {
         Rectangle area = _bannerCard.DisplayRectangle;
-        int pillSize = Dp(22);
-        _bannerPill.Bounds = new Rectangle(area.Left, area.Top + ((area.Height - pillSize) / 2), pillSize, pillSize);
 
-        int textLeft = _bannerPill.Right + Sp(2);
-        _bannerHeadline.Bounds = new Rectangle(textLeft, area.Top, Math.Max(0, area.Width - (textLeft - area.Left)), area.Height / 2);
-        _bannerMeta.Bounds = new Rectangle(textLeft, area.Top + (area.Height / 2), Math.Max(0, area.Width - (textLeft - area.Left)), area.Height / 2);
+        int accentWidth = Dp(4);
+        _bannerAccent.Bounds = new Rectangle(area.Left, area.Top + Dp(4), accentWidth, Math.Max(0, area.Height - Dp(8)));
+
+        int chipSize = Dp(36);
+        int chipLeft = area.Left + accentWidth + Sp(3);
+        _bannerChip.Bounds = new Rectangle(chipLeft, area.Top + ((area.Height - chipSize) / 2), chipSize, chipSize);
+
+        int textLeft = _bannerChip.Right + Sp(3);
+        int textWidth = Math.Max(0, area.Width - (textLeft - area.Left));
+        _bannerHeadline.Bounds = new Rectangle(textLeft, area.Top + Dp(6), textWidth, area.Height / 2);
+        _bannerMeta.Bounds = new Rectangle(textLeft, area.Top + (area.Height / 2), textWidth, (area.Height / 2) - Dp(6));
     }
 
     public override void ApplyLocalization()
@@ -359,7 +373,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     {
         if (snapshot is null)
         {
-            _bannerPill.Severity = UiSeverity.Idle;
+            _bannerChip.Severity = UiSeverity.Idle;
+            _bannerAccent.BackColor = SeverityColors.Strong(UiSeverity.Idle);
             _bannerHeadline.ForeColor = Theme.Current.TextPrimary;
             _bannerHeadline.Text = Loc.Get("hero.checking.title");
             _bannerMeta.Text = string.Empty;
@@ -374,7 +389,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
             _ => UiSeverity.Ok,
         };
 
-        _bannerPill.Severity = severity;
+        _bannerChip.Severity = severity;
+        _bannerAccent.BackColor = SeverityColors.Strong(severity);
         _bannerHeadline.ForeColor = SeverityColors.Strong(severity);
         _bannerHeadline.Text = snapshot.FirstFailure?.Headline ?? Loc.Get($"cause.{diagnosis.Cause.Key()}");
         _bannerMeta.Text = Loc.Format("diagnostics.banner.lastCheck", snapshot.TakenUtc.ToLocalTime().ToString("HH:mm:ss"));
