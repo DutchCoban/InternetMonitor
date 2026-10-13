@@ -1,4 +1,5 @@
 using InternetMonitor.App;
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -18,6 +19,7 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
     private Card _detailCard = null!;
     private IncidentList _list = null!;
     private IncidentDetail _detail = null!;
+    private AppButton _export = null!;
     private AppButton _clear = null!;
 
     public override string Id => "incidents";
@@ -34,6 +36,10 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
         _detail = new IncidentDetail { Dock = DockStyle.Fill };
         _detailCard = new Card { Dock = DockStyle.Fill };
         _detailCard.Controls.Add(_detail);
+
+        _export = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
+        _export.Click += OnExportClicked;
+        Header.AddAction(_export);
 
         _clear = new AppButton { Variant = ButtonVariant.Danger, Glyph = Glyph.Cross };
         _clear.Click += OnClearClicked;
@@ -55,6 +61,8 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
 
         _listCard.Title = Loc.Get("incidents.list.title");
         _detailCard.Title = Loc.Get("incidents.detail.title");
+        _export.Text = Loc.Get("incidents.export");
+        _export.SizeToContent();
         _clear.Text = Loc.Get("incidents.clear");
         _clear.SizeToContent();
         Header.RefreshActions();
@@ -81,6 +89,36 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
         if (_detail is not null && _list.Selected is { } selected)
         {
             _detail.Show(selected);
+        }
+    }
+
+    private void OnExportClicked(object? sender, EventArgs e)
+    {
+        if (_list.Selected is not { } incident)
+        {
+            return;
+        }
+
+        string report = IncidentReportBuilder.Build(incident);
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "Text (*.txt)|*.txt",
+            FileName = $"incident-{incident.Id}.txt",
+        };
+
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, report);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not worth surfacing further for a manual export the user can just retry.
         }
     }
 

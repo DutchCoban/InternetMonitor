@@ -397,5 +397,6 @@
   "hero.stat.networkHealth.open": "{0} warning(s)",
   "diagnostics.networkHealth.rogueDhcp.found": "found: {0}",
   "diagnostics.networkHealth.lastUpdated": "Last updated at {0}",
-  "settings.export.plain": "Export data (without AI instructions)"
+  "settings.export.plain": "Export data (without AI instructions)",
+  "incidents.export": "Export incident"
 }

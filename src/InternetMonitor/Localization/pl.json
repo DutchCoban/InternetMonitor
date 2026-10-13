@@ -397,5 +397,6 @@
   "hero.stat.networkHealth.open": "{0} ostrzeżenie(a)",
   "diagnostics.networkHealth.rogueDhcp.found": "znaleziono: {0}",
   "diagnostics.networkHealth.lastUpdated": "Ostatnia aktualizacja o {0}",
-  "settings.export.plain": "Eksportuj dane (bez instrukcji dla AI)"
+  "settings.export.plain": "Eksportuj dane (bez instrukcji dla AI)",
+  "incidents.export": "Eksportuj incydent"
 }
