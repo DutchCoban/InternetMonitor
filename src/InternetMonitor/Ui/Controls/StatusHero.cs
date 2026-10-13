@@ -24,6 +24,9 @@ public sealed class StatusHero : ThemedControl
     private string _lastCheck = string.Empty;
     private bool _checking;
 
+    private bool _networkHealthEnabled;
+    private int _networkHealthOpenCount;
+
     protected override Color BehindColor => Theme.Current.Bg;
 
     public int PreferredHeight => Dp(146);
@@ -79,6 +82,25 @@ public sealed class StatusHero : ThemedControl
         _latency = latency is { } ms ? $"{ms:F0} ms" : "-";
         _lastCheck = snapshot.TakenUtc.ToLocalTime().ToString("HH:mm:ss");
 
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Sets the brief network-health stat, separately from <see cref="Apply"/> - it comes from
+    /// <see cref="Core.Monitors.NetworkHealthMonitor"/>, not the step snapshot, and updates on its
+    /// own schedule. <paramref name="enabled"/> hides the stat entirely rather than showing an
+    /// always-OK one when the feature is off, matching how the Diagnostics page's own summary card
+    /// collapses to one quiet line instead of empty rows.
+    /// </summary>
+    public void SetNetworkHealth(bool enabled, int openCount)
+    {
+        if (_networkHealthEnabled == enabled && _networkHealthOpenCount == openCount)
+        {
+            return;
+        }
+
+        _networkHealthEnabled = enabled;
+        _networkHealthOpenCount = openCount;
         Invalidate();
     }
 
@@ -146,13 +168,22 @@ public sealed class StatusHero : ThemedControl
         }
 
         int statsTop = (int)bounds.Bottom - Sp(5) - Dp(28);
-        DrawStat(g, p, loc.Get("hero.stat.latency"), _latency, textLeft, statsTop);
-        DrawStat(g, p, loc.Get("hero.stat.lastCheck"), _lastCheck, textLeft + Dp(120), statsTop);
+        DrawStat(g, p, loc.Get("hero.stat.latency"), _latency, p.TextPrimary, textLeft, statsTop);
+        DrawStat(g, p, loc.Get("hero.stat.lastCheck"), _lastCheck, p.TextPrimary, textLeft + Dp(120), statsTop);
+
+        if (_networkHealthEnabled)
+        {
+            string value = _networkHealthOpenCount == 0
+                ? loc.Get("hero.stat.networkHealth.ok")
+                : loc.Format("hero.stat.networkHealth.open", _networkHealthOpenCount);
+            Color color = SeverityColors.Strong(_networkHealthOpenCount == 0 ? Severity.Ok : Severity.Error);
+            DrawStat(g, p, loc.Get("hero.stat.networkHealth"), value, color, textLeft + Dp(240), statsTop);
+        }
     }
 
-    private void DrawStat(Graphics g, Palette p, string label, string value, int x, int y)
+    private void DrawStat(Graphics g, Palette p, string label, string value, Color valueColor, int x, int y)
     {
         g.DrawTextCrisp(label, Theme.Font(FontRole.Small), p.TextMuted, new Rectangle(x, y, Dp(116), Dp(14)));
-        g.DrawTextCrisp(value, Theme.Font(FontRole.BodyStrong), p.TextPrimary, new Rectangle(x, y + Dp(14), Dp(116), Dp(18)));
+        g.DrawTextCrisp(value, Theme.Font(FontRole.BodyStrong), valueColor, new Rectangle(x, y + Dp(14), Dp(116), Dp(18)));
     }
 }

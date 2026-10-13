@@ -1,5 +1,6 @@
 using InternetMonitor.App;
 using InternetMonitor.Core.History;
+using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -86,6 +87,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         // Step names live inside the list's own paint, so a language change just needs a repaint.
         _steps.Invalidate();
         _hero.Apply(Services.Pipeline.LatestSnapshot, checking: false);
+        RefreshNetworkHealth(Services.NetworkHealth.CurrentStatus);
     }
 
     protected override void OnActivated()
@@ -98,6 +100,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _subscribed = true;
         Services.Pipeline.StepChanged += OnStepChanged;
         Services.Pipeline.CycleCompleted += OnCycleCompleted;
+        Services.NetworkHealth.StatusChanged += OnNetworkHealthStatusChanged;
         Services.Cadence.Foreground = true;
 
         // Paint whatever the last cycle concluded straight away, so switching to this page never
@@ -112,6 +115,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
             _hero.Apply(snapshot, checking: false);
         }
 
+        RefreshNetworkHealth(Services.NetworkHealth.CurrentStatus);
         RefreshLatencyChart();
     }
 
@@ -125,6 +129,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _subscribed = false;
         Services.Pipeline.StepChanged -= OnStepChanged;
         Services.Pipeline.CycleCompleted -= OnCycleCompleted;
+        Services.NetworkHealth.StatusChanged -= OnNetworkHealthStatusChanged;
     }
 
     private void OnStepChanged(StepResult result) => Post(() =>
@@ -144,6 +149,21 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _hero.Apply(snapshot, checking: false);
         RefreshLatencyChart();
     });
+
+    private void OnNetworkHealthStatusChanged(NetworkHealthStatus status) => Post(() => RefreshNetworkHealth(status));
+
+    /// <summary>
+    /// The brief version of the Diagnostics page's network-health summary: just whether anything
+    /// is currently open, not which condition or by how much - that detail belongs on Diagnostics,
+    /// not on the page whose whole point is a glance-and-go verdict.
+    /// </summary>
+    private void RefreshNetworkHealth(NetworkHealthStatus status)
+    {
+        int openCount = new[] { status.TcpRetransmissions, status.PacketLoss, status.TtlExceeded, status.RogueDhcp }
+            .Count(c => c.Enabled && c.IncidentOpen);
+
+        _hero.SetNetworkHealth(status.MonitoringEnabled, openCount);
+    }
 
     /// <summary>
     /// The inline strip shows the last hour of public-internet latency - the number the hero

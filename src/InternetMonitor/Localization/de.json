@@ -391,5 +391,8 @@
   "settings.section.export": "Export",
   "settings.section.export.subtitle": "Alle Daten exportieren, oder eine Datei speziell für die KI-Analyse.",
   "settings.export.all": "Alle Daten exportieren",
-  "settings.export.ai": "Für KI-Analyse exportieren"
+  "settings.export.ai": "Für KI-Analyse exportieren",
+  "hero.stat.networkHealth": "Netzwerkgesundheit",
+  "hero.stat.networkHealth.ok": "OK",
+  "hero.stat.networkHealth.open": "{0} Warnung(en)"
 }

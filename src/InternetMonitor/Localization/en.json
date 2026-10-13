@@ -391,5 +391,8 @@
   "settings.section.export": "Export",
   "settings.section.export.subtitle": "Export all data, or a file made specifically for AI analysis.",
   "settings.export.all": "Export all data",
-  "settings.export.ai": "Export for AI analysis"
+  "settings.export.ai": "Export for AI analysis",
+  "hero.stat.networkHealth": "Network health",
+  "hero.stat.networkHealth.ok": "OK",
+  "hero.stat.networkHealth.open": "{0} warning(s)"
 }
