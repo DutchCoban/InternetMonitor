@@ -173,6 +173,16 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         },
         null);
 
+    /// <summary>
+    /// The total height this page's content actually needs. Used once, by the main window, to size
+    /// a fresh window to fit without a scrollbar when there is no saved window size yet.
+    /// Summing the already-resolved heights of the top-docked children rather than a hardcoded
+    /// number: this stays correct on its own if a card is ever added or a row grows, with nothing
+    /// here to go stale.
+    /// </summary>
+    internal int MeasureRequiredHeight() =>
+        Header.Height + _hero.Height + _stepsCard.Height + _latencyCard.Height + Padding.Top + Padding.Bottom;
+
     private void ResizeStepsCard()
     {
         if (_stepsCard is null)

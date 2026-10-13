@@ -90,6 +90,44 @@ public sealed class MainWindow : Form
 
         ApplyLocalization();
         ShowPage("status");
+
+        // Only when there is no saved preference yet (a true first run, or a reset settings file):
+        // the 1000x700 fallback above is smaller than the Status page's real content on most
+        // screens, which otherwise shows a scrollbar for no better reason than a guessed default
+        // being too small. Once the user has resized or closed the window even once, WindowWidth/
+        // WindowHeight are no longer zero (see RememberGeometry) and this never runs again - their
+        // own choice, once made, is never silently overridden.
+        if (_settings.WindowWidth == 0 && _settings.WindowHeight == 0)
+        {
+            FitHeightToStatusPageContent();
+        }
+    }
+
+    /// <summary>
+    /// Grows the window's height to fit the Status page's actual content, clamped to the screen's
+    /// working area (never larger than fits) and to <see cref="MinimumSize"/> (never smaller than
+    /// the window already allows). Runs before the window is ever shown, so there is no visible
+    /// jump. Width is left alone - the scrollbar this fixes is vertical.
+    /// </summary>
+    private void FitHeightToStatusPageContent()
+    {
+        if (_pages["status"] is not StatusPage status)
+        {
+            return;
+        }
+
+        status.PerformLayout();
+        int requiredContentHeight = status.MeasureRequiredHeight();
+
+        int chrome = Height - ClientSize.Height;
+        int targetHeight = requiredContentHeight + chrome;
+
+        // Math.Max guards against a screen shorter than MinimumSize itself (an extreme, unlikely
+        // case) - Math.Clamp throws if its upper bound ends up below its lower one.
+        int screenHeight = Math.Max(MinimumSize.Height, Screen.FromControl(this).WorkingArea.Height);
+        int clamped = Math.Clamp(targetHeight, MinimumSize.Height, screenHeight);
+
+        Size = new Size(Width, clamped);
     }
 
     /// <summary>Switches to a page by nav-rail id, building it if this is its first time on screen.</summary>
