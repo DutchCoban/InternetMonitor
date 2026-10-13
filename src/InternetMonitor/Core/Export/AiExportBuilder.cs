@@ -40,14 +40,45 @@ public static class AiExportBuilder
         sb.AppendLine();
         sb.AppendLine(Preamble);
         sb.AppendLine();
+
+        AppendSections(sb, incidents, historySeries, settings);
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Same sections as <see cref="Build"/>, without the specialist preamble - for a user who
+    /// wants the data itself, not an AI prompt built around it. Still English, like the rest of
+    /// this export set: it is the same content as the AI export, just missing the framing around
+    /// it, not a separately-localized document.
+    /// </summary>
+    public static string BuildPlain(
+        IReadOnlyList<Incident> incidents,
+        IReadOnlyDictionary<string, IReadOnlyList<MetricPoint>> historySeries,
+        AppSettings settings)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("# Internet Monitor - Data Export");
+        sb.AppendLine();
+
+        AppendSections(sb, incidents, historySeries, settings);
+
+        return sb.ToString();
+    }
+
+    private static void AppendSections(
+        StringBuilder sb,
+        IReadOnlyList<Incident> incidents,
+        IReadOnlyDictionary<string, IReadOnlyList<MetricPoint>> historySeries,
+        AppSettings settings)
+    {
         sb.AppendLine(CultureInfo.InvariantCulture, $"Generated: {DateTimeOffset.UtcNow:O}");
         sb.AppendLine();
 
         AppendIncidents(sb, incidents);
         AppendHistory(sb, historySeries);
         AppendNetworkHealth(sb, incidents, settings);
-
-        return sb.ToString();
     }
 
     private static void AppendIncidents(StringBuilder sb, IReadOnlyList<Incident> incidents)

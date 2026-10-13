@@ -63,6 +63,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private AppButton _addEndpoint = null!;
     private AppButton _exportAll = null!;
     private AppButton _exportAi = null!;
+    private AppButton _exportPlain = null!;
+    private readonly List<AppButton> _exportButtons = [];
 
     private readonly List<(Label Label, Control Field)> _rows = [];
 
@@ -539,13 +541,18 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
     private void BuildExportSection()
     {
-        _exportAll = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
-        _exportAll.Click += (_, _) => ExportAllData();
-        _exportCard.Controls.Add(_exportAll);
+        _exportAll = AddExportButton(ExportAllData);
+        _exportAi = AddExportButton(ExportForAi);
+        _exportPlain = AddExportButton(ExportPlainData);
+    }
 
-        _exportAi = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
-        _exportAi.Click += (_, _) => ExportForAi();
-        _exportCard.Controls.Add(_exportAi);
+    private AppButton AddExportButton(Action onClick)
+    {
+        var button = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
+        button.Click += (_, _) => onClick();
+        _exportCard.Controls.Add(button);
+        _exportButtons.Add(button);
+        return button;
     }
 
     private void ExportAllData()
@@ -595,6 +602,31 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         {
             Filter = "Markdown (*.md)|*.md",
             FileName = $"internetmonitor-ai-export-{DateTime.Now:yyyy-MM-dd}.md",
+        };
+
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, markdown);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not worth surfacing further for a manual export the user can just retry.
+        }
+    }
+
+    private void ExportPlainData()
+    {
+        string markdown = AiExportBuilder.BuildPlain(Services.Incidents.All, BuildHistorySnapshot(), Services.Settings);
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "Markdown (*.md)|*.md",
+            FileName = $"internetmonitor-data-export-{DateTime.Now:yyyy-MM-dd}.md",
         };
 
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
@@ -715,6 +747,34 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _networkHealthCard.Height = y + _networkHealthCard.Inset;
     }
 
+    /// <summary>
+    /// Wraps the export buttons left-to-right, same wrap-on-overflow approach as
+    /// <see cref="ChipGroup"/> - with up to five of them now (full export, AI export, plain export,
+    /// settings export, settings import) and labels long enough to vary a lot by language, a fixed
+    /// side-by-side row would overflow a narrower window.
+    /// </summary>
+    private void LayoutExportButtons()
+    {
+        Rectangle content = _exportCard.DisplayRectangle;
+        int rowHeight = Dp(32);
+        int x = content.Left;
+        int y = content.Top;
+
+        foreach (AppButton button in _exportButtons)
+        {
+            if (x > content.Left && x + button.Width > content.Right)
+            {
+                x = content.Left;
+                y += rowHeight + Sp(1);
+            }
+
+            button.Location = new Point(x, y);
+            x += button.Width + Sp(2);
+        }
+
+        _exportCard.Height = y + rowHeight + _exportCard.Inset;
+    }
+
     private void LayoutCards()
     {
         LayoutCardRows(_generalCard);
@@ -753,10 +813,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         int contentHeight = _addEndpoint.Height + Sp(2) + _endpoints.Height;
         _endpointsCard.Height = content.Top + contentHeight + _endpointsCard.Inset;
 
-        Rectangle exportContent = _exportCard.DisplayRectangle;
-        _exportAll.Location = new Point(exportContent.Left, exportContent.Top);
-        _exportAi.Location = new Point(_exportAll.Right + Sp(2), exportContent.Top);
-        _exportCard.Height = exportContent.Top + _exportAll.Height + _exportCard.Inset;
+        LayoutExportButtons();
     }
 
     protected override void OnResize(EventArgs e)
@@ -962,6 +1019,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _exportAll.SizeToContent();
         _exportAi.Text = Loc.Get("settings.export.ai");
         _exportAi.SizeToContent();
+        _exportPlain.Text = Loc.Get("settings.export.plain");
+        _exportPlain.SizeToContent();
 
         _browseLogDirectory.Text = Loc.Get("settings.diagnostics.browse");
         _browseLogDirectory.SizeToContent();
