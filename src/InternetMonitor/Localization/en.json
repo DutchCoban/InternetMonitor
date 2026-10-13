@@ -320,5 +320,7 @@
   "settings.kuma.pushUrl": "Uptime Kuma push URL",
   "settings.kuma.interval": "Interval (seconds)",
   "settings.kuma.about": "About Uptime Kuma",
-  "settings.kuma.url.error": "Enter a valid https:// URL, or leave the field empty to disable this."
+  "settings.kuma.url.error": "Enter a valid https:// URL, or leave the field empty to disable this.",
+  "settings.endpoint.headers": "Headers (optional)",
+  "settings.endpoint.headers.add": "Add header"
 }

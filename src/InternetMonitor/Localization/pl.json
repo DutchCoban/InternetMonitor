@@ -320,5 +320,7 @@
   "settings.kuma.pushUrl": "URL push Uptime Kuma",
   "settings.kuma.interval": "Interwał (sekundy)",
   "settings.kuma.about": "O Uptime Kuma",
-  "settings.kuma.url.error": "Podaj prawidłowy adres https://, albo pozostaw pole puste, aby wyłączyć tę funkcję."
+  "settings.kuma.url.error": "Podaj prawidłowy adres https://, albo pozostaw pole puste, aby wyłączyć tę funkcję.",
+  "settings.endpoint.headers": "Nagłówki (opcjonalnie)",
+  "settings.endpoint.headers.add": "Dodaj nagłówek"
 }

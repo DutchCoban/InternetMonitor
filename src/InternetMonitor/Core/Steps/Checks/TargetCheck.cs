@@ -171,7 +171,10 @@ public sealed class TargetCheck : IStepCheck
             return new TargetEndpointResult(target.Name, TargetKind.Url, target.Url, false, null, target.ExpectedStatusCode, HttpStage.None, "Invalid URL", null, null, null);
         }
 
-        HttpOutcome outcome = await TlsTimedRequest.RequestAsync(uri, timeout, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<RequestHeader> headers = target.Headers.Count == 0
+            ? []
+            : [.. target.Headers.Select(h => new RequestHeader(h.Name, h.Value))];
+        HttpOutcome outcome = await TlsTimedRequest.RequestAsync(uri, timeout, headers, cancellationToken).ConfigureAwait(false);
 
         return new TargetEndpointResult(
             target.Name,

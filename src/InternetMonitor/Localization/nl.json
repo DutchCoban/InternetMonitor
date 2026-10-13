@@ -320,5 +320,7 @@
   "settings.kuma.pushUrl": "Uptime Kuma push-URL",
   "settings.kuma.interval": "Interval (seconden)",
   "settings.kuma.about": "Over Uptime Kuma",
-  "settings.kuma.url.error": "Vul een geldige https://-URL in, of laat het veld leeg om uit te schakelen."
+  "settings.kuma.url.error": "Vul een geldige https://-URL in, of laat het veld leeg om uit te schakelen.",
+  "settings.endpoint.headers": "Headers (optioneel)",
+  "settings.endpoint.headers.add": "Header toevoegen"
 }

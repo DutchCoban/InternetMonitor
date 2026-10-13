@@ -7,6 +7,14 @@ using System.Text;
 
 namespace InternetMonitor.Net;
 
+/// <summary>
+/// One extra header line to send with a request - an API key or an Authorization token, most
+/// often. A plain pair rather than reusing Configuration's EndpointHeader: this namespace is a
+/// leaf (no other file here references Configuration), and keeping it that way means the request-
+/// building code below has no reason to know anything about where a header came from.
+/// </summary>
+public readonly record struct RequestHeader(string Name, string Value);
+
 /// <summary>Which stage of the request failed, when one did.</summary>
 public enum HttpStage
 {
@@ -58,7 +66,14 @@ public static class TlsTimedRequest
 {
     private static readonly TimeSpan DnsSubBudget = TimeSpan.FromSeconds(1.5);
 
-    public static async Task<HttpOutcome> RequestAsync(Uri uri, TimeSpan timeout, CancellationToken cancellationToken)
+    public static Task<HttpOutcome> RequestAsync(Uri uri, TimeSpan timeout, CancellationToken cancellationToken) =>
+        RequestAsync(uri, timeout, [], cancellationToken);
+
+    public static async Task<HttpOutcome> RequestAsync(
+        Uri uri,
+        TimeSpan timeout,
+        IReadOnlyList<RequestHeader> headers,
+        CancellationToken cancellationToken)
     {
         var total = Stopwatch.StartNew();
         int port = uri.Port;
@@ -129,7 +144,7 @@ public static class TlsTimedRequest
                 int statusCode;
                 try
                 {
-                    statusCode = await ReadStatusLineAsync(stream, uri, budget.Token).ConfigureAwait(false);
+                    statusCode = await ReadStatusLineAsync(stream, uri, headers, budget.Token).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is IOException or FormatException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
                 {
@@ -170,13 +185,18 @@ public static class TlsTimedRequest
         }
     }
 
-    private static async Task<int> ReadStatusLineAsync(Stream stream, Uri uri, CancellationToken cancellationToken)
+    private static async Task<int> ReadStatusLineAsync(
+        Stream stream,
+        Uri uri,
+        IReadOnlyList<RequestHeader> headers,
+        CancellationToken cancellationToken)
     {
         string request =
             $"GET {uri.PathAndQuery} HTTP/1.1\r\n"
             + $"Host: {uri.Host}\r\n"
             + "User-Agent: InternetMonitor/2.0\r\n"
             + "Accept: */*\r\n"
+            + string.Concat(headers.Select(h => $"{Sanitize(h.Name)}: {Sanitize(h.Value)}\r\n"))
             + "\r\n";
 
         await stream.WriteAsync(Encoding.ASCII.GetBytes(request), cancellationToken).ConfigureAwait(false);
@@ -197,6 +217,14 @@ public static class TlsTimedRequest
 
         return statusCode;
     }
+
+    /// <summary>
+    /// Strips any stray CR/LF from a user-supplied header name or value before it goes into the raw
+    /// request text above. These come from a settings dialog the user types into themselves, not an
+    /// untrusted network source - this is cheap insurance against a pasted newline producing a
+    /// malformed request, not a defence against a hostile actor.
+    /// </summary>
+    private static string Sanitize(string value) => value.Replace("\r", string.Empty).Replace("\n", string.Empty);
 
     private static string Describe(Exception ex) => ex switch
     {

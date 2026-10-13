@@ -21,7 +21,13 @@ public sealed record TargetEndpoint(
     TargetKind Kind = TargetKind.Url,
     string Host = "",
     int Port = 0,
-    int? ExpectedStatusCode = null);
+    int? ExpectedStatusCode = null,
+    IReadOnlyList<EndpointHeader>? Headers = null)
+{
+    // Same nullable-parameter-plus-shadowing-property trick as EndpointConfig.Headers: a default
+    // parameter value must be a compile-time constant, which an empty list is not.
+    public IReadOnlyList<EndpointHeader> Headers { get; init; } = Headers ?? [];
+}
 
 /// <summary>
 /// What the network steps aim at, and how long each is allowed to take.

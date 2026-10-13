@@ -29,6 +29,9 @@ public sealed class EndpointEditWindow : Form
     private readonly TextBox _url;
     private readonly Label _expectedStatusLabel;
     private readonly NumericUpDown _expectedStatus;
+    private readonly Label _headersLabel;
+    private readonly List<(TextBox Name, TextBox Value, AppButton Remove)> _headerRows = [];
+    private readonly AppButton _addHeader;
     private readonly Label _hostLabel;
     private readonly TextBox _host;
     private readonly Label _portLabel;
@@ -69,6 +72,11 @@ public sealed class EndpointEditWindow : Form
         _expectedStatusLabel = MakeLabel(_loc.Get("settings.endpoint.expectedStatus"));
         _expectedStatus = MakeNumeric(0, 599, existing?.ExpectedStatusCode ?? 0);
 
+        _headersLabel = MakeLabel(_loc.Get("settings.endpoint.headers"));
+        _addHeader = new AppButton { Variant = ButtonVariant.Secondary, Text = _loc.Get("settings.endpoint.headers.add") };
+        _addHeader.SizeToContent();
+        _addHeader.Click += (_, _) => { AddHeaderRow(string.Empty, string.Empty); LayoutFields(); };
+
         _hostLabel = MakeLabel(_loc.Get("settings.endpoint.host"));
         _host = MakeTextBox(existing is { Kind: EndpointKind.TcpPort } ? existing.Host : string.Empty);
 
@@ -100,6 +108,8 @@ public sealed class EndpointEditWindow : Form
         Controls.Add(_url);
         Controls.Add(_expectedStatusLabel);
         Controls.Add(_expectedStatus);
+        Controls.Add(_headersLabel);
+        Controls.Add(_addHeader);
         Controls.Add(_hostLabel);
         Controls.Add(_host);
         Controls.Add(_portLabel);
@@ -110,6 +120,14 @@ public sealed class EndpointEditWindow : Form
 
         AcceptButton = _save;
         CancelButton = _cancel;
+
+        if (existing is { Kind: EndpointKind.Url })
+        {
+            foreach (EndpointHeader header in existing.Headers)
+            {
+                AddHeaderRow(header.Name, header.Value);
+            }
+        }
 
         LayoutFields();
     }
@@ -139,6 +157,15 @@ public sealed class EndpointEditWindow : Form
         _url.Visible = isUrl;
         _expectedStatusLabel.Visible = isUrl;
         _expectedStatus.Visible = isUrl;
+        _headersLabel.Visible = isUrl;
+        _addHeader.Visible = isUrl;
+        foreach ((TextBox name, TextBox value, AppButton remove) in _headerRows)
+        {
+            name.Visible = isUrl;
+            value.Visible = isUrl;
+            remove.Visible = isUrl;
+        }
+
         _hostLabel.Visible = !isUrl;
         _host.Visible = !isUrl;
         _portLabel.Visible = !isUrl;
@@ -163,6 +190,25 @@ public sealed class EndpointEditWindow : Form
         {
             Row(_urlLabel, _url, Dp(24));
             Row(_expectedStatusLabel, _expectedStatus, Dp(24));
+
+            _headersLabel.Bounds = new Rectangle(left, y, fieldWidth, Dp(16));
+            y += Dp(18);
+
+            int removeWidth = Dp(24);
+            int gap = Sp(1);
+            int nameWidth = (int)((fieldWidth - removeWidth - (gap * 2)) * 0.35);
+            int valueWidth = fieldWidth - removeWidth - (gap * 2) - nameWidth;
+
+            foreach ((TextBox name, TextBox value, AppButton remove) in _headerRows)
+            {
+                name.Bounds = new Rectangle(left, y, nameWidth, Dp(24));
+                value.Bounds = new Rectangle(left + nameWidth + gap, y, valueWidth, Dp(24));
+                remove.Bounds = new Rectangle(left + nameWidth + gap + valueWidth + gap, y, removeWidth, Dp(24));
+                y += Dp(24) + Sp(1);
+            }
+
+            _addHeader.Location = new Point(left, y);
+            y += _addHeader.Height + Sp(2);
         }
         else
         {
@@ -177,6 +223,37 @@ public sealed class EndpointEditWindow : Form
         ClientSize = new Size(ClientSize.Width, buttonsY + Dp(44));
         _save.Location = new Point(ClientSize.Width - left - _save.Width, buttonsY);
         _cancel.Location = new Point(_save.Left - Sp(2) - _cancel.Width, buttonsY);
+    }
+
+    /// <summary>
+    /// Adds one empty or pre-filled header row (name, value, a small remove button) and relies on
+    /// the caller to re-run <see cref="LayoutFields"/> afterward - called both while building the
+    /// window (to restore an existing endpoint's headers) and from the "add header" button.
+    /// </summary>
+    private void AddHeaderRow(string name, string value)
+    {
+        TextBox nameBox = MakeTextBox(name);
+        TextBox valueBox = MakeTextBox(value);
+        var remove = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Cross };
+
+        Controls.Add(nameBox);
+        Controls.Add(valueBox);
+        Controls.Add(remove);
+
+        var row = (nameBox, valueBox, remove);
+        _headerRows.Add(row);
+
+        remove.Click += (_, _) =>
+        {
+            _headerRows.Remove(row);
+            Controls.Remove(nameBox);
+            Controls.Remove(valueBox);
+            Controls.Remove(remove);
+            nameBox.Dispose();
+            valueBox.Dispose();
+            remove.Dispose();
+            LayoutFields();
+        };
     }
 
     private void OnSaveClicked(object? sender, EventArgs e)
@@ -201,7 +278,14 @@ public sealed class EndpointEditWindow : Form
             }
 
             int? expected = _expectedStatus.Value == 0 ? null : (int)_expectedStatus.Value;
-            result = new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.Url, Url: url, ExpectedStatusCode: expected, Enabled: _existingEnabled);
+
+            // Rows with no name are dropped rather than rejected - a blank row the user added and
+            // left empty is not a mistake worth an error message, it is just not a header yet.
+            List<EndpointHeader> headers = [.. _headerRows
+                .Where(r => r.Name.Text.Trim().Length > 0)
+                .Select(r => new EndpointHeader(r.Name.Text.Trim(), r.Value.Text))];
+
+            result = new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.Url, Url: url, ExpectedStatusCode: expected, Enabled: _existingEnabled, Headers: headers);
         }
         else
         {

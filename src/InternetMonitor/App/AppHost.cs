@@ -70,7 +70,7 @@ public sealed class AppHost : ApplicationContext
                     .. endpoints.Where(e => e.Enabled).Select(e => e.Kind switch
                     {
                         EndpointKind.TcpPort => new TargetEndpoint(e.Name, Url: "", TargetKind.TcpPort, Host: e.Host, Port: e.Port),
-                        _ => new TargetEndpoint(e.Name, e.Url, TargetKind.Url, ExpectedStatusCode: e.ExpectedStatusCode),
+                        _ => new TargetEndpoint(e.Name, e.Url, TargetKind.Url, ExpectedStatusCode: e.ExpectedStatusCode, Headers: e.Headers),
                     }),
                 ],
             };
