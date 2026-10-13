@@ -199,4 +199,36 @@ public sealed class AppSettings
             return false;
         }
     }
+
+    /// <summary>
+    /// Writes the whole settings object to an arbitrary path, verbatim - unlike
+    /// <see cref="Core.Export.DataExportBuilder"/>'s redacted copy inside the "export all data"
+    /// zip, this is a literal backup/restore mechanism (mirroring v1's own settings export/import),
+    /// and a Kuma push URL or endpoint header with the secret blanked out would not actually
+    /// restore anything. Throws on failure, unlike <see cref="Save"/> - this is a user-initiated
+    /// action with its own dialog and its own error handling, not a background autosave.
+    /// </summary>
+    public void ExportTo(string path) => File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
+
+    /// <summary>Reads a settings file exported by <see cref="ExportTo"/> (or the regular on-disk settings.v2.json). Throws on a missing or malformed file - the caller decides how to tell the user.</summary>
+    public static AppSettings? ImportFrom(string path) =>
+        JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json);
+
+    /// <summary>
+    /// Copies every readable/writable property from <paramref name="source"/> onto this instance
+    /// in place, rather than replacing the object - other components already hold a reference to
+    /// this exact <see cref="AppSettings"/> instance, so swapping it out from under them would mean
+    /// finding and updating every one of those references too. Same reflection-based approach v1
+    /// used for the same reason.
+    /// </summary>
+    public void ApplyFrom(AppSettings source)
+    {
+        foreach (System.Reflection.PropertyInfo property in typeof(AppSettings).GetProperties())
+        {
+            if (property.CanRead && property.CanWrite)
+            {
+                property.SetValue(this, property.GetValue(source));
+            }
+        }
+    }
 }

@@ -398,5 +398,7 @@
   "diagnostics.networkHealth.rogueDhcp.found": "gefunden: {0}",
   "diagnostics.networkHealth.lastUpdated": "Zuletzt aktualisiert um {0}",
   "settings.export.plain": "Daten exportieren (ohne KI-Anweisungen)",
-  "incidents.export": "Vorfall exportieren"
+  "incidents.export": "Vorfall exportieren",
+  "settings.export.settings": "Einstellungen exportieren",
+  "settings.import.settings": "Einstellungen importieren"
 }

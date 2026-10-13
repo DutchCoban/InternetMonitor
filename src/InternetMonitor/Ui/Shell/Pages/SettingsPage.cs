@@ -64,6 +64,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private AppButton _exportAll = null!;
     private AppButton _exportAi = null!;
     private AppButton _exportPlain = null!;
+    private AppButton _exportSettings = null!;
+    private AppButton _importSettings = null!;
     private readonly List<AppButton> _exportButtons = [];
 
     private readonly List<(Label Label, Control Field)> _rows = [];
@@ -544,6 +546,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _exportAll = AddExportButton(ExportAllData);
         _exportAi = AddExportButton(ExportForAi);
         _exportPlain = AddExportButton(ExportPlainData);
+        _exportSettings = AddExportButton(ExportSettings);
+        _importSettings = AddExportButton(ImportSettings);
     }
 
     private AppButton AddExportButton(Action onClick)
@@ -642,6 +646,76 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         {
             // Not worth surfacing further for a manual export the user can just retry.
         }
+    }
+
+    /// <summary>
+    /// Unlike every other export on this card, this one is deliberately unredacted - confirmed
+    /// with the user to match v1's own settings export exactly. It is a literal backup/restore
+    /// mechanism, not something meant to be shared, and a Kuma push URL or endpoint header with
+    /// its secret blanked out would not actually restore anything on import.
+    /// </summary>
+    private void ExportSettings()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "JSON (*.json)|*.json",
+            FileName = $"internetmonitor-settings-{DateTime.Now:yyyy-MM-dd}.json",
+        };
+
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            Services.Settings.ExportTo(dialog.FileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not worth surfacing further for a manual export the user can just retry.
+        }
+    }
+
+    private void ImportSettings()
+    {
+        using var dialog = new OpenFileDialog { Filter = "JSON (*.json)|*.json" };
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        AppSettings? imported;
+        try
+        {
+            imported = AppSettings.ImportFrom(dialog.FileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            // Not worth surfacing further for a manual import the user can just retry with a
+            // known-good file.
+            return;
+        }
+
+        if (imported is null)
+        {
+            return;
+        }
+
+        // ApplyFrom only copies properties - every setting that also has a live side effect
+        // (autostart's registry key, the active language/theme, Kuma's running pusher, the
+        // network-health monitor) needs that side effect re-applied explicitly, the same way each
+        // one's own change handler already does when the user edits it directly.
+        Services.Settings.ApplyFrom(imported);
+        Services.Settings.Save();
+
+        App.AutoStart.SetEnabled(Services.Settings.AutoStartWithWindows);
+        LocalizationManager.Instance.SetLanguage(Services.Settings.Language);
+        Theme.Mode = Services.Settings.Theme;
+        Services.Kuma.Reconfigure(Services.Settings.KumaPushUrl, Services.Settings.KumaIntervalSeconds);
+        ReconfigureNetworkHealth();
+
+        LoadFromSettings();
     }
 
     private Dictionary<string, IReadOnlyList<MetricPoint>> BuildHistorySnapshot()
@@ -1021,6 +1095,10 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _exportAi.SizeToContent();
         _exportPlain.Text = Loc.Get("settings.export.plain");
         _exportPlain.SizeToContent();
+        _exportSettings.Text = Loc.Get("settings.export.settings");
+        _exportSettings.SizeToContent();
+        _importSettings.Text = Loc.Get("settings.import.settings");
+        _importSettings.SizeToContent();
 
         _browseLogDirectory.Text = Loc.Get("settings.diagnostics.browse");
         _browseLogDirectory.SizeToContent();
