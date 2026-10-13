@@ -406,5 +406,19 @@
   "settings.lanScanVendorLookup": "Fabrikant van elk apparaat opzoeken",
   "lanScan.column.vendor": "Merk",
   "settings.section.configBackup": "Configuratie",
-  "settings.section.configBackup.subtitle": "De instellingen van deze app zelf exporteren of terugzetten - niet de gemonitorde gegevens."
+  "settings.section.configBackup.subtitle": "De instellingen van deze app zelf exporteren of terugzetten - niet de gemonitorde gegevens.",
+  "menu.checkForUpdates": "Controleren op updates",
+  "settings.section.updates": "Updates",
+  "settings.section.updates.subtitle": "Controleer GitHub op een nieuwere versie, en werk eventueel automatisch bij.",
+  "settings.checkForUpdates": "Controleren op updates",
+  "settings.autoUpdateInstall": "Automatisch bijwerken",
+  "settings.currentVersion": "Huidige versie",
+  "update.toast.available.title": "Update beschikbaar",
+  "update.toast.available.text": "Versie {0} is beschikbaar. Klik om de releasepagina te openen.",
+  "update.toast.installing.title": "Bezig met bijwerken",
+  "update.toast.installing.text": "Versie {0} wordt geïnstalleerd. De app herstart over {1} seconden.",
+  "update.toast.upToDate.title": "Geen update beschikbaar",
+  "update.toast.upToDate.text": "U gebruikt de nieuwste versie.",
+  "update.toast.checkFailed.title": "Controleren mislukt",
+  "update.toast.checkFailed.text": "Kon niet controleren op updates. Controleer uw internetverbinding en probeer het opnieuw."
 }

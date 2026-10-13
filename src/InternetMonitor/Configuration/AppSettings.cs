@@ -103,6 +103,24 @@ public sealed class AppSettings
     /// </summary>
     public bool LanScanVendorLookup { get; set; } = true;
 
+    // ---- Updates -------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Whether the app checks GitHub for a newer release - once at startup, then once a day. Off
+    /// means zero outbound calls for this feature; a manual "Check for updates" from the tray menu
+    /// still works regardless.
+    /// </summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>
+    /// Whether a release found newer than this one is downloaded and installed automatically (with
+    /// a brief pop-up and an automatic restart), instead of only being reported with a link. Off by
+    /// default - like <see cref="TracerouteOwnerLookup"/> and <see cref="LanScanVendorLookup"/>,
+    /// this is more consequential than merely showing a notice, so it stays off until the user
+    /// deliberately turns it on.
+    /// </summary>
+    public bool AutoUpdateInstall { get; set; }
+
     // ---- Endpoints ---------------------------------------------------------------------------
 
     /// <summary>

@@ -4,6 +4,7 @@ using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
+using InternetMonitor.Core.Updates;
 
 namespace InternetMonitor.App;
 
@@ -25,7 +26,8 @@ public sealed class AppServices(
     IncidentStore incidents,
     KumaPusher kuma,
     DiagnosticLogger diagnosticLog,
-    NetworkHealthMonitor networkHealth)
+    NetworkHealthMonitor networkHealth,
+    UpdateChecker updateChecker)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -45,4 +47,6 @@ public sealed class AppServices(
     public DiagnosticLogger DiagnosticLog { get; } = diagnosticLog;
 
     public NetworkHealthMonitor NetworkHealth { get; } = networkHealth;
+
+    public UpdateChecker UpdateChecker { get; } = updateChecker;
 }

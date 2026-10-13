@@ -1,9 +1,11 @@
+using System.Reflection;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
+using InternetMonitor.Core.Updates;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
 using InternetMonitor.Ui.Theming;
@@ -36,6 +38,9 @@ public sealed class AppHost : ApplicationContext
     private readonly TrayController _tray;
     private readonly MainWindow _window;
     private readonly SynchronizationContext _ui;
+    private readonly UpdateChecker _updateChecker;
+    private readonly UpdateInstaller _updateInstaller;
+    private System.Windows.Forms.Timer? _updateRestartTimer;
 
     public AppHost(bool showWindowOnStart = false, string? initialPage = null, string? initialTrace = null)
     {
@@ -109,7 +114,12 @@ public sealed class AppHost : ApplicationContext
             _settings.TtlExceeded,
             _settings.RogueDhcp);
 
-        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth);
+        _updateChecker = new UpdateChecker(Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0));
+        _updateChecker.CheckCompleted += OnUpdateCheckCompleted;
+        _updateChecker.Reconfigure(_settings.CheckForUpdates);
+        _updateInstaller = new UpdateInstaller();
+
+        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -123,6 +133,7 @@ public sealed class AppHost : ApplicationContext
         _tray = new TrayController();
         _tray.OpenRequested += ShowWindow;
         _tray.SettingsRequested += ShowSettings;
+        _tray.CheckForUpdatesRequested += OnCheckForUpdatesRequested;
         _tray.ExitRequested += Shutdown;
 
         _pipeline.CycleCompleted += OnCycleCompleted;
@@ -218,6 +229,96 @@ public sealed class AppHost : ApplicationContext
                 }
             },
             null);
+    }
+
+    /// <summary>
+    /// The background check's result - fires from <see cref="UpdateChecker"/>'s own loop, not the
+    /// UI thread, so this always marshals through <see cref="_ui"/>, same as <see cref="OnIncidentOpened"/>.
+    /// Only ever acts when a newer version exists; a background check that finds nothing stays
+    /// silent, same as v1 - only the manual "Check for updates" (<see cref="OnCheckForUpdatesRequested"/>)
+    /// ever reports "up to date" or "check failed".
+    /// </summary>
+    private void OnUpdateCheckCompleted(object? sender, UpdateCheckResult result)
+    {
+        if (!result.IsUpdateAvailable)
+        {
+            return;
+        }
+
+        _ui.Post(_ => _ = HandleUpdateAvailableAsync(result), null);
+    }
+
+    /// <summary>
+    /// Either shows the "a newer version exists" toast (auto-update off, or nothing to download),
+    /// or downloads it and shows the "installing, restarting shortly" toast before shutting down -
+    /// never silently: a failed download still falls back to the plain notify toast, so the user
+    /// is never left with no feedback at all.
+    /// </summary>
+    private async Task HandleUpdateAvailableAsync(UpdateCheckResult result)
+    {
+        if (_settings.AutoUpdateInstall && result.AssetDownloadUrl is { } assetUrl)
+        {
+            string currentExePath = Environment.ProcessPath ?? Application.ExecutablePath;
+            bool applied = await _updateInstaller.DownloadAndApplyAsync(assetUrl, currentExePath, CancellationToken.None).ConfigureAwait(true);
+            if (applied)
+            {
+                ShowInstallingToastAndRestart(result);
+                return;
+            }
+        }
+
+        UpdateToast.Show(
+            UpdateToastKind.Available,
+            LocalizationManager.Instance.Get("update.toast.available.title"),
+            LocalizationManager.Instance.Format("update.toast.available.text", result.LatestVersion ?? "?"),
+            result.ReleaseUrl);
+    }
+
+    private const int UpdateRestartDelaySeconds = 15;
+
+    private void ShowInstallingToastAndRestart(UpdateCheckResult result)
+    {
+        UpdateToast.Show(
+            UpdateToastKind.Installing,
+            LocalizationManager.Instance.Get("update.toast.installing.title"),
+            LocalizationManager.Instance.Format("update.toast.installing.text", result.LatestVersion ?? "?", UpdateRestartDelaySeconds),
+            result.ReleaseUrl);
+
+        _updateRestartTimer?.Stop();
+        _updateRestartTimer?.Dispose();
+        _updateRestartTimer = new System.Windows.Forms.Timer { Interval = UpdateRestartDelaySeconds * 1000 };
+        _updateRestartTimer.Tick += (_, _) => Shutdown();
+        _updateRestartTimer.Start();
+    }
+
+    /// <summary>
+    /// The tray menu's "Check for updates" - unlike the background check, this always gives
+    /// feedback (found, not found, or couldn't check), since a user who just clicked "check"
+    /// deserves an answer even when there's nothing new to report. Never installs by itself, even
+    /// with auto-update on - that stays a purely background-triggered action.
+    /// </summary>
+    private async void OnCheckForUpdatesRequested()
+    {
+        UpdateCheckResult? result = await _updateChecker.CheckOnceAsync(CancellationToken.None).ConfigureAwait(true);
+        LocalizationManager loc = LocalizationManager.Instance;
+
+        if (result is null)
+        {
+            UpdateToast.Show(UpdateToastKind.CheckFailed, loc.Get("update.toast.checkFailed.title"), loc.Get("update.toast.checkFailed.text"));
+            return;
+        }
+
+        if (!result.IsUpdateAvailable)
+        {
+            UpdateToast.Show(UpdateToastKind.UpToDate, loc.Get("update.toast.upToDate.title"), loc.Get("update.toast.upToDate.text"));
+            return;
+        }
+
+        UpdateToast.Show(
+            UpdateToastKind.Available,
+            loc.Get("update.toast.available.title"),
+            loc.Format("update.toast.available.text", result.LatestVersion ?? "?"),
+            result.ReleaseUrl);
     }
 
     /// <summary>
@@ -329,6 +430,10 @@ public sealed class AppHost : ApplicationContext
             _history.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _kuma.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _networkHealth.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _updateChecker.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+            _updateRestartTimer?.Stop();
+            _updateRestartTimer?.Dispose();
 
             _tray.Dispose();
             _themeWatcher.Dispose();

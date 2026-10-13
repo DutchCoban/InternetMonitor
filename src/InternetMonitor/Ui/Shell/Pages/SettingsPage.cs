@@ -31,6 +31,7 @@ namespace InternetMonitor.Ui.Shell.Pages;
 public sealed class SettingsPage(AppServices services) : PageBase(services)
 {
     private Card _generalCard = null!;
+    private Card _updatesCard = null!;
     private Card _cadenceCard = null!;
     private Card _toolsCard = null!;
     private Card _diagnosticsCard = null!;
@@ -44,6 +45,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private ComboBox _theme = null!;
     private Toggle _autoStart = null!;
     private Toggle _showIncidentPopups = null!;
+    private Toggle _checkForUpdates = null!;
+    private Toggle _autoUpdateInstall = null!;
+    private Label _currentVersion = null!;
     private NumericUpDown _foregroundInterval = null!;
     private NumericUpDown _backgroundInterval = null!;
     private Toggle _tracerouteLookup = null!;
@@ -79,6 +83,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     {
         _generalCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Settings };
         BuildGeneralRows();
+
+        _updatesCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Refresh };
+        BuildUpdatesRows();
 
         _cadenceCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Refresh };
         BuildCadenceRows();
@@ -118,6 +125,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         Controls.Add(_diagnosticsCard);
         Controls.Add(_toolsCard);
         Controls.Add(_cadenceCard);
+        Controls.Add(_updatesCard);
         Controls.Add(_generalCard);
 
         LoadFromSettings();
@@ -152,6 +160,39 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             Services.Settings.Save();
         };
         AddRow(_generalCard, "settings.showIncidentPopups", _showIncidentPopups);
+    }
+
+    // ---- Updates ------------------------------------------------------------------------------
+
+    private void BuildUpdatesRows()
+    {
+        _checkForUpdates = new Toggle();
+        _checkForUpdates.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.CheckForUpdates = _checkForUpdates.Checked;
+            Services.Settings.Save();
+            Services.UpdateChecker.Reconfigure(_checkForUpdates.Checked);
+            _autoUpdateInstall.Enabled = _checkForUpdates.Checked;
+        };
+        AddRow(_updatesCard, "settings.checkForUpdates", _checkForUpdates);
+
+        _autoUpdateInstall = new Toggle();
+        _autoUpdateInstall.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.AutoUpdateInstall = _autoUpdateInstall.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_updatesCard, "settings.autoUpdateInstall", _autoUpdateInstall);
+
+        _currentVersion = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleRight,
+            Width = Dp(160),
+            Font = Theme.Font(FontRole.Body),
+            Text = (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3),
+        };
+        AddRow(_updatesCard, "settings.currentVersion", _currentVersion);
     }
 
     // ---- Cadence ------------------------------------------------------------------------------
@@ -878,6 +919,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private void LayoutCards()
     {
         LayoutCardRows(_generalCard);
+        LayoutCardRows(_updatesCard);
         LayoutCardRows(_cadenceCard);
         LayoutCardRows(_toolsCard);
         LayoutCardRows(_diagnosticsCard);
@@ -943,6 +985,10 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _autoStart.CheckedChanged += OnAutoStartChanged;
 
         _showIncidentPopups.SetWithoutNotify(settings.ShowIncidentPopups);
+
+        _checkForUpdates.SetWithoutNotify(settings.CheckForUpdates);
+        _autoUpdateInstall.SetWithoutNotify(settings.AutoUpdateInstall);
+        _autoUpdateInstall.Enabled = settings.CheckForUpdates;
 
         _foregroundInterval.Value = settings.ForegroundIntervalSeconds;
         _backgroundInterval.Value = settings.BackgroundIntervalSeconds;
@@ -1074,6 +1120,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         }
 
         _generalCard.Title = Loc.Get("settings.section.general");
+        _updatesCard.Title = Loc.Get("settings.section.updates");
+        _updatesCard.Subtitle = Loc.Get("settings.section.updates.subtitle");
         _cadenceCard.Title = Loc.Get("settings.section.cadence");
         _cadenceCard.Subtitle = Loc.Get("settings.section.cadence.subtitle");
         _toolsCard.Title = Loc.Get("settings.section.tools");

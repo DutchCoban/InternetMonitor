@@ -406,5 +406,19 @@
   "settings.lanScanVendorLookup": "Hersteller jedes Geräts nachschlagen",
   "lanScan.column.vendor": "Hersteller",
   "settings.section.configBackup": "Konfiguration",
-  "settings.section.configBackup.subtitle": "Die eigenen Einstellungen dieser App exportieren oder wiederherstellen - nicht die überwachten Daten."
+  "settings.section.configBackup.subtitle": "Die eigenen Einstellungen dieser App exportieren oder wiederherstellen - nicht die überwachten Daten.",
+  "menu.checkForUpdates": "Nach Updates suchen",
+  "settings.section.updates": "Updates",
+  "settings.section.updates.subtitle": "GitHub auf eine neuere Version prüfen und optional automatisch aktualisieren.",
+  "settings.checkForUpdates": "Nach Updates suchen",
+  "settings.autoUpdateInstall": "Automatisch aktualisieren",
+  "settings.currentVersion": "Aktuelle Version",
+  "update.toast.available.title": "Update verfügbar",
+  "update.toast.available.text": "Version {0} ist verfügbar. Klicken, um die Release-Seite zu öffnen.",
+  "update.toast.installing.title": "Wird aktualisiert",
+  "update.toast.installing.text": "Version {0} wird installiert. Die App startet in {1} Sekunden neu.",
+  "update.toast.upToDate.title": "Kein Update verfügbar",
+  "update.toast.upToDate.text": "Sie verwenden bereits die neueste Version.",
+  "update.toast.checkFailed.title": "Prüfung fehlgeschlagen",
+  "update.toast.checkFailed.text": "Es konnte nicht nach Updates gesucht werden. Überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut."
 }

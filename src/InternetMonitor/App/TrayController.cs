@@ -40,6 +40,8 @@ public sealed class TrayController : IDisposable
 
     public event Action? SettingsRequested;
 
+    public event Action? CheckForUpdatesRequested;
+
     public event Action? ExitRequested;
 
     /// <summary>
@@ -85,6 +87,7 @@ public sealed class TrayController : IDisposable
         var menu = new ContextMenuStrip();
         menu.Items.Add(loc.Get("menu.open"), null, (_, _) => OpenRequested?.Invoke());
         menu.Items.Add(loc.Get("menu.settings"), null, (_, _) => SettingsRequested?.Invoke());
+        menu.Items.Add(loc.Get("menu.checkForUpdates"), null, (_, _) => CheckForUpdatesRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(loc.Get("menu.exit"), null, (_, _) => ExitRequested?.Invoke());
         return menu;

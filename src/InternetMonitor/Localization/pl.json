@@ -406,5 +406,19 @@
   "settings.lanScanVendorLookup": "Sprawdzaj producenta każdego urządzenia",
   "lanScan.column.vendor": "Producent",
   "settings.section.configBackup": "Konfiguracja",
-  "settings.section.configBackup.subtitle": "Eksportuj lub przywróć ustawienia samej aplikacji - nie monitorowane dane."
+  "settings.section.configBackup.subtitle": "Eksportuj lub przywróć ustawienia samej aplikacji - nie monitorowane dane.",
+  "menu.checkForUpdates": "Sprawdź aktualizacje",
+  "settings.section.updates": "Aktualizacje",
+  "settings.section.updates.subtitle": "Sprawdzaj w serwisie GitHub nowszą wersję i opcjonalnie aktualizuj automatycznie.",
+  "settings.checkForUpdates": "Sprawdzaj aktualizacje",
+  "settings.autoUpdateInstall": "Aktualizuj automatycznie",
+  "settings.currentVersion": "Aktualna wersja",
+  "update.toast.available.title": "Dostępna aktualizacja",
+  "update.toast.available.text": "Dostępna jest wersja {0}. Kliknij, aby otworzyć stronę wydania.",
+  "update.toast.installing.title": "Trwa aktualizacja",
+  "update.toast.installing.text": "Instalowanie wersji {0}. Aplikacja uruchomi się ponownie za {1} sekund.",
+  "update.toast.upToDate.title": "Brak aktualizacji",
+  "update.toast.upToDate.text": "Używasz najnowszej wersji.",
+  "update.toast.checkFailed.title": "Sprawdzanie nie powiodło się",
+  "update.toast.checkFailed.text": "Nie udało się sprawdzić aktualizacji. Sprawdź połączenie internetowe i spróbuj ponownie."
 }
