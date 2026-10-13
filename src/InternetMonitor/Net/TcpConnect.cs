@@ -104,4 +104,21 @@ public static class TcpConnect
 
         return null;
     }
+
+    /// <summary>
+    /// Races <see cref="FirstAnsweringPortAsync"/> across many addresses at once - the TCP
+    /// equivalent of <see cref="IcmpPing.SendAllAsync"/>, used by the LAN scanner to find devices
+    /// that ignore ICMP but do have an open port.
+    /// </summary>
+    public static async Task<IReadOnlyList<(IPAddress Address, (int Port, TcpOutcome Outcome)? Result)>> SweepAsync(
+        IReadOnlyList<IPAddress> addresses,
+        IReadOnlyList<int> ports,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        (int Port, TcpOutcome Outcome)?[] results = await Task.WhenAll(
+            addresses.Select(a => FirstAnsweringPortAsync(a, ports, timeout, cancellationToken))).ConfigureAwait(false);
+
+        return [.. addresses.Zip(results, (address, result) => (address, result))];
+    }
 }

@@ -103,6 +103,32 @@ public sealed class AppSettings
     /// </summary>
     public bool LanScanVendorLookup { get; set; } = true;
 
+    /// <summary>
+    /// Whether the LAN scanner also tries a handful of common TCP ports for addresses that did not
+    /// answer a ping. On by default, unlike the two lookups above: this sends nothing to a third
+    /// party, it only talks to devices already on the user's own network, so the only trade-off is
+    /// scan time versus completeness - a device that ignores ICMP but has an open port would
+    /// otherwise never show up at all.
+    /// </summary>
+    public bool LanScanTcpFallback { get; set; } = true;
+
+    // ---- Speed test ---------------------------------------------------------------------------
+
+    /// <summary>Whether the Speed Test also runs on its own on a schedule, every <see cref="SpeedTestIntervalHours"/>. Off by default - a manual run from the Tools page is always available regardless.</summary>
+    public bool SpeedTestAutoRunEnabled { get; set; }
+
+    /// <summary>The only interval choices offered in Settings - deliberately a small fixed set (not a free-form numeric field) so this stays light on traffic by construction.</summary>
+    public static readonly int[] AllowedSpeedTestIntervalHours = [1, 2, 4, 8, 12, 24];
+
+    private int _speedTestIntervalHours = 4;
+
+    /// <summary>Clamped to <see cref="AllowedSpeedTestIntervalHours"/> here (not just in the UI) so a hand-edited settings.json is also protected - an out-of-set value is ignored, keeping whatever was previously valid.</summary>
+    public int SpeedTestIntervalHours
+    {
+        get => _speedTestIntervalHours;
+        set => _speedTestIntervalHours = Array.IndexOf(AllowedSpeedTestIntervalHours, value) >= 0 ? value : _speedTestIntervalHours;
+    }
+
     // ---- Updates -------------------------------------------------------------------------------
 
     /// <summary>

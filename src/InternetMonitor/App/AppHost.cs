@@ -5,6 +5,7 @@ using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
+using InternetMonitor.Core.Tools.SpeedTest;
 using InternetMonitor.Core.Updates;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
@@ -41,6 +42,7 @@ public sealed class AppHost : ApplicationContext
     private readonly UpdateChecker _updateChecker;
     private readonly UpdateInstaller _updateInstaller;
     private System.Windows.Forms.Timer? _updateRestartTimer;
+    private readonly SpeedTestScheduler _speedTestScheduler;
 
     public AppHost(bool showWindowOnStart = false, string? initialPage = null, string? initialTrace = null)
     {
@@ -119,7 +121,11 @@ public sealed class AppHost : ApplicationContext
         _updateChecker.Reconfigure(_settings.CheckForUpdates);
         _updateInstaller = new UpdateInstaller();
 
-        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker);
+        _speedTestScheduler = new SpeedTestScheduler();
+        _speedTestScheduler.RunCompleted += OnSpeedTestRunCompleted;
+        _speedTestScheduler.Reconfigure(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
+
+        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -346,6 +352,20 @@ public sealed class AppHost : ApplicationContext
         }
     }
 
+    /// <summary>
+    /// An automatic Speed Test run finished - record it the same two series a manual run (see
+    /// <c>ToolsPage</c>) records into, so History and the data exports don't need to know or care
+    /// which path a given sample came from. Runs on <see cref="SpeedTestScheduler"/>'s own
+    /// background loop, not the UI thread - fine, same as <see cref="RecordHistory"/> above,
+    /// since <see cref="MetricStore.Sample"/> is already safe to call off the UI thread.
+    /// </summary>
+    private void OnSpeedTestRunCompleted(object? sender, SpeedTestResult result)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        _history.Sample("speedtest-download", now, result.DownloadMbps);
+        _history.Sample("speedtest-upload", now, result.UploadMbps);
+    }
+
     private void UpdateTray(StepSnapshot snapshot, RootCauseResult diagnosis) => _ui.Post(
         _ =>
         {
@@ -431,6 +451,7 @@ public sealed class AppHost : ApplicationContext
             _kuma.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _networkHealth.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _updateChecker.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _speedTestScheduler.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
             _updateRestartTimer?.Stop();
             _updateRestartTimer?.Dispose();

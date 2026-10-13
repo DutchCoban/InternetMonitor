@@ -27,7 +27,8 @@ public sealed class AppServices(
     KumaPusher kuma,
     DiagnosticLogger diagnosticLog,
     NetworkHealthMonitor networkHealth,
-    UpdateChecker updateChecker)
+    UpdateChecker updateChecker,
+    SpeedTestScheduler speedTestScheduler)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -49,4 +50,6 @@ public sealed class AppServices(
     public NetworkHealthMonitor NetworkHealth { get; } = networkHealth;
 
     public UpdateChecker UpdateChecker { get; } = updateChecker;
+
+    public SpeedTestScheduler SpeedTestScheduler { get; } = speedTestScheduler;
 }

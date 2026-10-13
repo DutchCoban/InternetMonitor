@@ -1,6 +1,5 @@
 using InternetMonitor.App;
 using InternetMonitor.Core.History;
-using InternetMonitor.Core.Steps;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
 
@@ -32,7 +31,7 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
     private Panel _chipGroupSpacer = null!;
     private Label _rangesCaption = null!;
     private ChipGroup _ranges = null!;
-    private StepId _selectedStep = StepId.PublicIp;
+    private string _selectedSeriesId = "internet";
     private TimeSpan? _selectedRange = TimeSpan.FromHours(1);
 
     public override string Id => "history";
@@ -57,7 +56,7 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
         _steps = new ChipGroup { Dock = DockStyle.Top };
         _steps.SelectionChanged += id =>
         {
-            _selectedStep = Enum.GetValues<StepId>().First(s => s.Key() == id);
+            _selectedSeriesId = id;
             LoadSeries();
         };
         _stepsCaption = MakeCaption("history.caption.series");
@@ -118,8 +117,8 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
         _rangesCaption.Text = Loc.Get((string)_rangesCaption.Tag!);
 
         _steps.SetChips(
-            SeriesNames.Chartable.Select(s => new ChipGroup.Chip(s.Key(), Loc.Get($"step.{s.Key()}.name"))),
-            _selectedStep.Key());
+            SeriesNames.Chartable.Select(s => new ChipGroup.Chip(s.Id, Loc.Get(s.NameKey))),
+            _selectedSeriesId);
 
         _ranges.SetChips(
             Ranges.Select(r => new ChipGroup.Chip(r.Id, Loc.Get($"history.range.{r.Id}"))),
@@ -130,17 +129,17 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
 
     private void LoadSeries()
     {
-        string? series = SeriesNames.For(_selectedStep);
+        ChartableSeries? series = SeriesNames.Chartable.FirstOrDefault(s => s.Id == _selectedSeriesId);
         if (series is null)
         {
             _chart.SetSeries([], string.Empty);
             return;
         }
 
-        bool isState = SeriesNames.IsStateSeries(_selectedStep);
+        bool isState = series.IsState;
         _chart.SetSeries(
-            Services.History.Get(series),
-            SeriesNames.UnitFor(_selectedStep),
+            Services.History.Get(series.Id),
+            series.Unit,
             isState,
             isState ? null : Services.Targets.LatencyWarningMs,
             isState ? null : Services.Targets.LatencyErrorMs);

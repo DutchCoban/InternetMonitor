@@ -10,7 +10,8 @@ public sealed record TracerouteResult(
     IReadOnlyList<TracerouteHop> Hops,
     bool ReachedDestination,
     DateTimeOffset StartedUtc,
-    TimeSpan Duration);
+    TimeSpan Duration,
+    (int Port, double? ElapsedMs)? TcpReachability = null);
 
 /// <summary>
 /// Traceroute, run wide instead of deep.
@@ -24,6 +25,15 @@ public sealed record TracerouteResult(
 /// Waves rather than one giant fan-out, for two reasons. Hops arrive in order, so the list fills
 /// top to bottom the way a person reads it; and the run stops as soon as the destination answers,
 /// instead of always paying for thirty TTLs when the route is twelve long.
+///
+/// When the route doesn't reach the destination, a real per-hop TCP traceroute (tracking which
+/// router answers at each TTL) was considered and rejected: it needs a raw socket to catch the
+/// ICMP "Time Exceeded" replies a TCP SYN provokes, and raw sockets need administrator rights on
+/// Windows - this app runs <c>asInvoker</c> on purpose (see the README's security notes), and one
+/// tool asking to elevate would be a bigger change than this feature is worth. Instead, a silent
+/// ICMP route gets one extra, ordinary TCP connect straight to the destination
+/// (<see cref="TracerouteResult.TcpReachability"/>) - not hop information, just "is it ICMP that's
+/// blocked, or is the destination actually down".
 /// </summary>
 public sealed class TracerouteRunner
 {
@@ -32,6 +42,15 @@ public sealed class TracerouteRunner
     private const int WaveSize = 8;
 
     private static readonly TimeSpan PerProbeTimeout = TimeSpan.FromMilliseconds(1500);
+
+    /// <summary>
+    /// Ports tried for <see cref="TracerouteResult.TcpReachability"/> - not a real traceroute (see
+    /// the class doc comment on why that would need a raw socket and admin rights), just "is the
+    /// destination itself reachable at all", tried on the two ports almost everything answers on.
+    /// </summary>
+    private static readonly int[] TcpReachabilityPorts = [443, 80];
+
+    private static readonly TimeSpan TcpReachabilityTimeout = TimeSpan.FromSeconds(3);
 
     /// <summary>
     /// Runs a trace, reporting each hop as it is resolved. <paramref name="enrich"/> is given each
@@ -103,13 +122,27 @@ public sealed class TracerouteRunner
 
         HopAnnotator.Annotate(hops, reached, localNetwork);
 
+        (int Port, double? ElapsedMs)? tcpReachability = null;
+        if (!reached)
+        {
+            (int Port, TcpOutcome Outcome)? tcpResult = await TcpConnect
+                .FirstAnsweringPortAsync(destination, TcpReachabilityPorts, TcpReachabilityTimeout, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (tcpResult is { Outcome.Answered: true } answered)
+            {
+                tcpReachability = (answered.Port, answered.Outcome.ElapsedMs);
+            }
+        }
+
         return new TracerouteResult(
             target,
             destination,
             hops,
             reached,
             started,
-            TimeSpan.FromMilliseconds(Environment.TickCount64 - startTicks));
+            TimeSpan.FromMilliseconds(Environment.TickCount64 - startTicks),
+            tcpReachability);
     }
 
     private static async Task<TracerouteHop> ProbeHopAsync(IPAddress destination, int ttl, CancellationToken cancellationToken)

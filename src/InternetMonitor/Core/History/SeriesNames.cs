@@ -17,6 +17,16 @@ namespace InternetMonitor.Core.History;
 /// would put a line on the chart that means something different before and after the upgrade,
 /// which is worse than a short history.
 /// </summary>
+/// <summary>
+/// One entry in the History page's series picker: a series key (as stored in
+/// <see cref="MetricStore"/> and used by <see cref="SeriesNames.For"/>), the localization key for
+/// its chip label, its unit, and whether it's a state series (see <see cref="SeriesNames.IsStateSeries"/>).
+/// Exists because <see cref="SeriesNames.Chartable"/> covers more than the seven pipeline steps -
+/// the Speed Test's download/upload results are recorded the same way but have no <see cref="StepId"/>
+/// of their own, since they don't run as part of the step pipeline's cycle.
+/// </summary>
+public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState);
+
 public static class SeriesNames
 {
     public static string? For(StepId step) => step switch
@@ -48,6 +58,20 @@ public static class SeriesNames
     /// </summary>
     public static bool IsStateSeries(StepId step) => step is StepId.Adapter or StepId.Link;
 
-    public static IReadOnlyList<StepId> Chartable =>
-        [StepId.Gateway, StepId.PublicIp, StepId.Dns, StepId.Target, StepId.Adapter, StepId.Link];
+    /// <summary>
+    /// Every series the History page can show, in display order. The six pipeline steps are built
+    /// from the step-keyed members above (so they stay in sync automatically); the two Speed Test
+    /// series are listed directly, since they have no <see cref="StepId"/> to derive from.
+    /// </summary>
+    public static IReadOnlyList<ChartableSeries> Chartable { get; } =
+    [
+        new(For(StepId.Adapter)!, "step.adapter.name", UnitFor(StepId.Adapter), IsStateSeries(StepId.Adapter)),
+        new(For(StepId.Link)!, "step.link.name", UnitFor(StepId.Link), IsStateSeries(StepId.Link)),
+        new(For(StepId.Gateway)!, "step.gateway.name", UnitFor(StepId.Gateway), IsStateSeries(StepId.Gateway)),
+        new(For(StepId.PublicIp)!, "step.publicIp.name", UnitFor(StepId.PublicIp), IsStateSeries(StepId.PublicIp)),
+        new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns)),
+        new(For(StepId.Target)!, "step.target.name", UnitFor(StepId.Target), IsStateSeries(StepId.Target)),
+        new("speedtest-download", "speedtest.download.name", "Mbps", false),
+        new("speedtest-upload", "speedtest.upload.name", "Mbps", false),
+    ];
 }

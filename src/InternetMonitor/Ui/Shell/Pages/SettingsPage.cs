@@ -52,6 +52,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private NumericUpDown _backgroundInterval = null!;
     private Toggle _tracerouteLookup = null!;
     private Toggle _lanScanVendorLookup = null!;
+    private Toggle _lanScanTcpFallback = null!;
+    private Toggle _speedTestAutoRun = null!;
+    private ComboBox _speedTestInterval = null!;
     private ComboBox _logLevel = null!;
     private Toggle _logSuccessfulChecks = null!;
     private Toggle _logDetailedMeasurements = null!;
@@ -249,6 +252,40 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             Services.Settings.Save();
         };
         AddRow(_toolsCard, "settings.lanScanVendorLookup", _lanScanVendorLookup);
+
+        _lanScanTcpFallback = new Toggle();
+        _lanScanTcpFallback.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.LanScanTcpFallback = _lanScanTcpFallback.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_toolsCard, "settings.lanScanTcpFallback", _lanScanTcpFallback);
+
+        _speedTestAutoRun = new Toggle();
+        _speedTestAutoRun.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.SpeedTestAutoRunEnabled = _speedTestAutoRun.Checked;
+            Services.Settings.Save();
+            Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
+            _speedTestInterval.Enabled = _speedTestAutoRun.Checked;
+        };
+        AddRow(_toolsCard, "settings.speedTestAutoRun", _speedTestAutoRun);
+
+        _speedTestInterval = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
+        _speedTestInterval.SelectedIndexChanged += OnSpeedTestIntervalChanged;
+        AddRow(_toolsCard, "settings.speedTestInterval", _speedTestInterval);
+    }
+
+    private void OnSpeedTestIntervalChanged(object? sender, EventArgs e)
+    {
+        if (_speedTestInterval.SelectedItem is not ComboItem item || !int.TryParse(item.Key, out int hours))
+        {
+            return;
+        }
+
+        Services.Settings.SpeedTestIntervalHours = hours;
+        Services.Settings.Save();
+        Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
     }
 
     // ---- Diagnostics --------------------------------------------------------------------------
@@ -788,12 +825,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Dictionary<string, IReadOnlyList<MetricPoint>> BuildHistorySnapshot()
     {
         var history = new Dictionary<string, IReadOnlyList<MetricPoint>>();
-        foreach (StepId step in SeriesNames.Chartable)
+        foreach (ChartableSeries series in SeriesNames.Chartable)
         {
-            if (SeriesNames.For(step) is { } seriesId)
-            {
-                history[seriesId] = Services.History.Get(seriesId);
-            }
+            history[series.Id] = Services.History.Get(series.Id);
         }
 
         return history;
@@ -995,6 +1029,14 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         _tracerouteLookup.SetWithoutNotify(settings.TracerouteOwnerLookup);
         _lanScanVendorLookup.SetWithoutNotify(settings.LanScanVendorLookup);
+        _lanScanTcpFallback.SetWithoutNotify(settings.LanScanTcpFallback);
+
+        _speedTestAutoRun.SetWithoutNotify(settings.SpeedTestAutoRunEnabled);
+        _speedTestInterval.Enabled = settings.SpeedTestAutoRunEnabled;
+        _speedTestInterval.SelectedIndexChanged -= OnSpeedTestIntervalChanged;
+        PopulateSpeedTestIntervalItems();
+        SelectComboItem(_speedTestInterval, settings.SpeedTestIntervalHours.ToString());
+        _speedTestInterval.SelectedIndexChanged += OnSpeedTestIntervalChanged;
 
         _logLevel.SelectedIndexChanged -= OnLogLevelChanged;
         PopulateLogLevelItems();
@@ -1045,6 +1087,16 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _logLevel.Items.Add(new ComboItem(nameof(DiagnosticLogLevel.Basic), loc.Get("settings.diagnostics.level.basic")));
         _logLevel.Items.Add(new ComboItem(nameof(DiagnosticLogLevel.Extended), loc.Get("settings.diagnostics.level.extended")));
         _logLevel.Items.Add(new ComboItem(nameof(DiagnosticLogLevel.Full), loc.Get("settings.diagnostics.level.full")));
+    }
+
+    private void PopulateSpeedTestIntervalItems()
+    {
+        LocalizationManager loc = LocalizationManager.Instance;
+        _speedTestInterval.Items.Clear();
+        foreach (int hours in AppSettings.AllowedSpeedTestIntervalHours)
+        {
+            _speedTestInterval.Items.Add(new ComboItem(hours.ToString(), loc.Format("settings.speedTestInterval.option", hours)));
+        }
     }
 
     private static void SelectComboItem(ComboBox box, string key)
@@ -1156,6 +1208,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         string previousLanguage = (_language.SelectedItem as ComboItem)?.Key ?? Services.Settings.Language;
         string previousTheme = (_theme.SelectedItem as ComboItem)?.Key ?? Services.Settings.Theme.ToString();
         string previousLogLevel = (_logLevel.SelectedItem as ComboItem)?.Key ?? Services.Settings.DiagnosticLogLevel.ToString();
+        string previousSpeedTestInterval = (_speedTestInterval.SelectedItem as ComboItem)?.Key ?? Services.Settings.SpeedTestIntervalHours.ToString();
 
         PopulateThemeItems();
         SelectComboItem(_theme, previousTheme);
@@ -1163,6 +1216,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         PopulateLogLevelItems();
         SelectComboItem(_logLevel, previousLogLevel);
+
+        PopulateSpeedTestIntervalItems();
+        SelectComboItem(_speedTestInterval, previousSpeedTestInterval);
 
         _addEndpoint.Text = Loc.Get("settings.endpoint.add");
         _addEndpoint.SizeToContent();
@@ -1205,7 +1261,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             label.BackColor = p.Surface;
         }
 
-        foreach (ComboBox box in new[] { _language, _theme, _logLevel })
+        foreach (ComboBox box in new[] { _language, _theme, _logLevel, _speedTestInterval })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;

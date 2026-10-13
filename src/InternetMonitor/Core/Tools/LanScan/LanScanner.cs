@@ -45,12 +45,23 @@ public sealed class LanScanner
     private static readonly TimeSpan PingTimeout = TimeSpan.FromMilliseconds(800);
     private static readonly TimeSpan ReverseDnsTimeout = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// Candidate ports for the TCP fallback sweep (see <see cref="ScanAsync"/>'s <c>tcpFallback</c>
+    /// parameter) - common enough services (web, SSH, SMB, NetBIOS) that most devices answer on at
+    /// least one, without racing so many ports that a /24 of mostly-empty addresses takes
+    /// noticeably longer to scan.
+    /// </summary>
+    private static readonly int[] TcpFallbackPorts = [80, 443, 22, 445, 139];
+
+    private static readonly TimeSpan TcpFallbackTimeout = TimeSpan.FromMilliseconds(500);
+
     public async Task<LanScanResult> ScanAsync(
         IPAddress localAddress,
         IPAddress subnetMask,
         IProgress<LanDevice>? progress,
         CancellationToken cancellationToken,
-        MacVendorLookup? vendorLookup = null)
+        MacVendorLookup? vendorLookup = null,
+        bool tcpFallback = false)
     {
         DateTimeOffset started = DateTimeOffset.UtcNow;
         long startTicks = Environment.TickCount64;
@@ -69,11 +80,13 @@ public sealed class LanScanner
 
         var devices = new List<LanDevice>();
         var enrichTasks = new List<Task>();
+        var silentAddresses = new List<IPAddress>();
 
         foreach ((IPAddress address, PingOutcome outcome) in pingResults)
         {
             if (!outcome.Success)
             {
+                silentAddresses.Add(address);
                 continue;
             }
 
@@ -91,6 +104,11 @@ public sealed class LanScanner
             // device that could not be named still belongs in the result.
         }
 
+        if (tcpFallback && silentAddresses.Count > 0)
+        {
+            await TcpFallbackSweepAsync(silentAddresses, arp, devices, progress, vendorLookup, cancellationToken).ConfigureAwait(false);
+        }
+
         Task vendorResolutionComplete = ResolveVendorsAsync(devices, vendorLookup, progress, cancellationToken);
 
         return new LanScanResult(
@@ -100,6 +118,56 @@ public sealed class LanScanner
             started,
             TimeSpan.FromMilliseconds(Environment.TickCount64 - startTicks),
             vendorResolutionComplete);
+    }
+
+    /// <summary>
+    /// Second-chance discovery for addresses that did not answer a ping - a device that ignores
+    /// ICMP but has an open port still belongs on the network map. Takes a fresh ARP snapshot
+    /// rather than reusing the one from before the sweep: a silent address's entry only appears in
+    /// the OS ARP cache once something - here, the TCP connection attempt itself - actually talks
+    /// to it, so the earlier snapshot would find nothing for exactly the devices this is for.
+    /// </summary>
+    private static async Task TcpFallbackSweepAsync(
+        List<IPAddress> silentAddresses,
+        IReadOnlyDictionary<IPAddress, string> pingArp,
+        List<LanDevice> devices,
+        IProgress<LanDevice>? progress,
+        MacVendorLookup? vendorLookup,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<(IPAddress Address, (int Port, TcpOutcome Outcome)? Result)> results = await TcpConnect
+            .SweepAsync(silentAddresses, TcpFallbackPorts, TcpFallbackTimeout, cancellationToken)
+            .ConfigureAwait(false);
+
+        List<(IPAddress Address, double? RoundtripMs)> answered = [.. results
+            .Where(r => r.Result is { Outcome.Answered: true })
+            .Select(r => (r.Address, r.Result!.Value.Outcome.ElapsedMs))];
+
+        if (answered.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyDictionary<IPAddress, string> arp = ArpTable.Snapshot();
+        var enrichTasks = new List<Task>();
+        foreach ((IPAddress address, double? roundtripMs) in answered)
+        {
+            if (!arp.TryGetValue(address, out string? mac))
+            {
+                pingArp.TryGetValue(address, out mac);
+            }
+
+            enrichTasks.Add(EnrichAndReportAsync(address, roundtripMs, mac, devices, progress, vendorLookup, cancellationToken));
+        }
+
+        try
+        {
+            await Task.WhenAll(enrichTasks).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Same reasoning as the ping-sweep's own enrichment: decoration, not essential.
+        }
     }
 
     private static async Task EnrichAndReportAsync(

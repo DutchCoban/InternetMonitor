@@ -1,6 +1,7 @@
 using InternetMonitor.App;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Core.Tools.LanScan;
+using InternetMonitor.Core.Tools.SpeedTest;
 using InternetMonitor.Core.Tools.Traceroute;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -20,6 +21,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 {
     private const string TracerouteChipId = "traceroute";
     private const string LanScanChipId = "lanScan";
+    private const string SpeedTestChipId = "speedtest";
 
     private ChipGroup _toolSwitcher = null!;
 
@@ -39,6 +41,13 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
     private CancellationTokenSource? _scanning;
 
+    private Card _speedTestCard = null!;
+    private SpeedTestResultView _speedTestView = null!;
+    private AppButton _runSpeedTest = null!;
+    private Panel _speedTestBar = null!;
+
+    private CancellationTokenSource? _speedTestRunning;
+
     public override string Id => "tools";
 
     protected override void Build()
@@ -46,10 +55,12 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         BuildToolSwitcher();
         BuildTracerouteCard();
         BuildLanScanCard();
+        BuildSpeedTestCard();
 
         // Fill before Top, matching DiagnosticsPage: WinForms docks siblings in the order they are
-        // added, so the two filled cards have to come first to get what the switcher leaves below
-        // it. The two cards occupy the exact same area and ShowTool toggles which one is Visible.
+        // added, so the filled cards have to come first to get what the switcher leaves below it.
+        // All three cards occupy the exact same area and ShowTool toggles which one is Visible.
+        Controls.Add(_speedTestCard);
         Controls.Add(_lanScanCard);
         Controls.Add(_tracerouteCard);
         Controls.Add(_toolSwitcher);
@@ -57,6 +68,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         ApplyBarColors();
         LayoutBar();
         LayoutLanBar();
+        LayoutSpeedTestBar();
         ShowTool(TracerouteChipId);
     }
 
@@ -70,6 +82,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     {
         _tracerouteCard.Visible = id == TracerouteChipId;
         _lanScanCard.Visible = id == LanScanChipId;
+        _speedTestCard.Visible = id == SpeedTestChipId;
     }
 
     // ---- Traceroute -----------------------------------------------------------------------------
@@ -186,6 +199,11 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
                     result.Hops.Count,
                     $"{result.Duration.TotalSeconds:F1}");
 
+            if (result.TcpReachability is { } tcp)
+            {
+                _view.Status += " " + Loc.Format("traceroute.tcpReachable", tcp.Port, $"{tcp.ElapsedMs:F0}");
+            }
+
             _view.RefreshHops();
         }
         catch (OperationCanceledException)
@@ -293,7 +311,9 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
         try
         {
-            LanScanResult result = await scanner.ScanAsync(address, mask, progress, cts.Token, vendorLookup).ConfigureAwait(true);
+            LanScanResult result = await scanner
+                .ScanAsync(address, mask, progress, cts.Token, vendorLookup, Services.Settings.LanScanTcpFallback)
+                .ConfigureAwait(true);
 
             _lanDevices.Status = result.Devices.Count == 0
                 ? Loc.Get("lanScan.none")
@@ -353,6 +373,90 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         }
     }
 
+    // ---- Speed test -----------------------------------------------------------------------------
+
+    private void BuildSpeedTestCard()
+    {
+        _speedTestView = new SpeedTestResultView { Dock = DockStyle.Fill };
+
+        _runSpeedTest = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Pulse };
+        _runSpeedTest.Click += (_, _) => StartOrCancelSpeedTest();
+
+        _speedTestBar = new Panel { Dock = DockStyle.Top, Height = Dp(40) };
+        _speedTestBar.Controls.Add(_runSpeedTest);
+        _speedTestBar.Resize += (_, _) => LayoutSpeedTestBar();
+
+        _speedTestCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Pulse, Visible = false };
+        _speedTestCard.Controls.Add(_speedTestView);
+        _speedTestCard.Controls.Add(_speedTestBar);
+    }
+
+    private void LayoutSpeedTestBar()
+    {
+        if (_speedTestBar is null)
+        {
+            return;
+        }
+
+        _runSpeedTest.Top = (_speedTestBar.Height - _runSpeedTest.Height) / 2;
+        _runSpeedTest.Left = 0;
+    }
+
+    private void StartOrCancelSpeedTest()
+    {
+        if (_speedTestRunning is not null)
+        {
+            _speedTestRunning.Cancel();
+            return;
+        }
+
+        _ = RunSpeedTestAsync();
+    }
+
+    private async Task RunSpeedTestAsync()
+    {
+        var cts = new CancellationTokenSource();
+        _speedTestRunning = cts;
+
+        _speedTestView.Reset();
+        _speedTestView.Status = Loc.Get("speedtest.running");
+        _runSpeedTest.Text = Loc.Get("speedtest.stop");
+        _runSpeedTest.SizeToContent();
+        LayoutSpeedTestBar();
+
+        using var client = new SpeedTestClient();
+        var progress = new Progress<SpeedTestProgress>(p => _speedTestView.Apply(p));
+
+        try
+        {
+            SpeedTestResult result = await client.RunAsync(progress, cts.Token).ConfigureAwait(true);
+
+            // Recorded the same way an automatic run is (see AppHost.OnSpeedTestRunCompleted) - a
+            // manual run belongs in History and the data exports just as much as a scheduled one.
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            Services.History.Sample("speedtest-download", now, result.DownloadMbps);
+            Services.History.Sample("speedtest-upload", now, result.UploadMbps);
+
+            _speedTestView.Status = Loc.Get("speedtest.done");
+        }
+        catch (OperationCanceledException)
+        {
+            _speedTestView.Status = Loc.Get("speedtest.cancelled");
+        }
+        finally
+        {
+            _speedTestRunning = null;
+            cts.Dispose();
+
+            if (!IsDisposed)
+            {
+                _runSpeedTest.Text = Loc.Get("speedtest.run");
+                _runSpeedTest.SizeToContent();
+                LayoutSpeedTestBar();
+            }
+        }
+    }
+
     // ---- Shared -----------------------------------------------------------------------------------
 
     public override void ApplyLocalization()
@@ -368,6 +472,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
             [
                 new ChipGroup.Chip(TracerouteChipId, Loc.Get("tools.chip.traceroute")),
                 new ChipGroup.Chip(LanScanChipId, Loc.Get("tools.chip.lanScan")),
+                new ChipGroup.Chip(SpeedTestChipId, Loc.Get("tools.chip.speedtest")),
             ],
             _toolSwitcher.SelectedId ?? TracerouteChipId);
 
@@ -386,6 +491,13 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _exportCsv.SizeToContent();
         LayoutLanBar();
         _lanDevices.Status = Loc.Get("lanScan.idle");
+
+        _speedTestCard.Title = Loc.Get("speedtest.title");
+        _speedTestCard.Subtitle = Loc.Get("speedtest.subtitle");
+        _runSpeedTest.Text = Loc.Get(_speedTestRunning is null ? "speedtest.run" : "speedtest.stop");
+        _runSpeedTest.SizeToContent();
+        LayoutSpeedTestBar();
+        _speedTestView.Status = Loc.Get("speedtest.idle");
     }
 
     protected override void OnThemeChanged() => ApplyBarColors();
@@ -396,12 +508,14 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _target.BackColor = Theme.Current.SurfaceAlt;
         _target.ForeColor = Theme.Current.TextPrimary;
         _lanBar.BackColor = Theme.Current.Surface;
+        _speedTestBar.BackColor = Theme.Current.Surface;
     }
 
     protected override void OnDeactivated()
     {
         _running?.Cancel();
         _scanning?.Cancel();
+        _speedTestRunning?.Cancel();
     }
 
     protected override void Dispose(bool disposing)
@@ -410,6 +524,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         {
             _running?.Cancel();
             _scanning?.Cancel();
+            _speedTestRunning?.Cancel();
         }
 
         base.Dispose(disposing);
