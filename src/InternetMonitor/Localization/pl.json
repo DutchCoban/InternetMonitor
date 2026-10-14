@@ -59,7 +59,6 @@
   "step.publicIp.ok": "Osiągalny ({0} ms)",
   "step.publicIp.none": "Żaden publiczny adres nie jest osiągalny",
   "step.publicIp.none.detail": "Żaden z publicznych adresów testowych nie odpowiedział. Albo połączenie nie działa, albo ta sieć blokuje ruch ping.",
-  "step.publicIp.partial.detail": "Odpowiedziało {0} z {1} adresów testowych.",
   "step.dns.ok": "{0} rozwiązano ({1} ms)",
   "step.dns.slow": "Rozwiązywanie nazw trwa dłużej niż zwykle.",
   "step.dns.failed": "Nie udało się rozwiązać {0}",

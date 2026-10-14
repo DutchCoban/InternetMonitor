@@ -59,7 +59,6 @@
   "step.publicIp.ok": "Reachable ({0} ms)",
   "step.publicIp.none": "No public address reachable",
   "step.publicIp.none.detail": "None of the public test addresses answered. Either the connection is down, or this network blocks ping traffic.",
-  "step.publicIp.partial.detail": "{0} of {1} test addresses answered.",
   "step.dns.ok": "{0} resolved ({1} ms)",
   "step.dns.slow": "Name resolution is slower than usual.",
   "step.dns.failed": "{0} could not be resolved",

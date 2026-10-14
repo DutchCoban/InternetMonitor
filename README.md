@@ -28,7 +28,7 @@ is attributed to its most likely cause instead of being reported as a generic "i
 2. **Cable / link** - does the adapter report a physical link at all?
 3. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
 4. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
-5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). A single unreachable endpoint doesn't mean internet is down; the diagnosis only escalates once none of them respond.
+5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). They're pinged at once and the first answer settles it - a single unreachable endpoint doesn't mean internet is down, and the step doesn't wait out its timeout; the diagnosis only escalates once none of them respond.
 6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved by the DNS servers
    this adapter has, obtained via DHCP or set by hand? Those servers are asked directly. If they
    fail, the app works down a fixed chain and stops at the first server that resolves the name:
