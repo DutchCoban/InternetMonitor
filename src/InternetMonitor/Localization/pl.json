@@ -464,5 +464,14 @@
   "explain.dns.customOnly.todo": "Ustaw własny serwer DNS w ustawieniach sieci tej karty albo poproś administratora sieci o sprawdzenie serwera DNS.",
   "explain.dns.blocked.what": "Ruch DNS wydaje się blokowany po drodze, więc nazwy nie są rozwiązywane, choć serwery są osiągalne.",
   "explain.dns.blocked.cause": "Rozwiązanie {0} nie powiodło się przez serwer DNS tej karty ({1}) ani przez 9.9.9.9, 1.1.1.1 i 8.8.8.8, choć te publiczne serwery są osiągalne na porcie 443.",
-  "explain.dns.blocked.todo": "Sprawdź, czy zapora, antywirus lub sama sieć nie blokuje portu 53. W sieciach firmowych i dla gości często dozwolony jest tylko serwer DNS sieci."
+  "explain.dns.blocked.todo": "Sprawdź, czy zapora, antywirus lub sama sieć nie blokuje portu 53. W sieciach firmowych i dla gości często dozwolony jest tylko serwer DNS sieci.",
+  "step.target.captivePortal": "Ta sieć wymaga zalogowania",
+  "step.target.captivePortal.detail": "Ta sieć przechwytuje ruch WWW i najpierw wyświetla stronę logowania. Zaloguj się w przeglądarce, aby uzyskać dostęp do internetu.",
+  "measure.captivePortal": "Strona logowania",
+  "cause.captivePortal": "Strona logowania",
+  "explain.captivePortal.what": "Ta sieć wyświetla stronę logowania, zanim wpuści Cię do internetu, a logowanie nie zostało jeszcze wykonane.",
+  "explain.captivePortal.cause": "Zapytanie o znaną stronę testową wróciło jako przekierowanie lub inna strona: typowe dla Wi-Fi w hotelach, pociągach i sieciach dla gości. Samo połączenie działa.",
+  "explain.captivePortal.todo": "Otwórz stronę logowania w przeglądarce i zaloguj się lub zaakceptuj warunki. Potem problem rozwiąże się sam.",
+  "hero.portal.title": "Wymagane logowanie",
+  "hero.portal.open": "Otwórz stronę logowania"
 }

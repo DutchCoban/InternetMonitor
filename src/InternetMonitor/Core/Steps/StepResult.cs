@@ -119,4 +119,7 @@ public sealed class StepSnapshot
     public bool AnyFailure => _results.Values.Any(r => r.State.IsFailure());
 
     public bool AnyWarning => _results.Values.Any(r => r.State == StepState.Warning);
+
+    /// <summary>Step 7 found a login page between this network and the internet - see <see cref="TargetFacts.CaptivePortal"/>.</summary>
+    public bool CaptivePortal => FactsFor<TargetFacts>(StepId.Target)?.CaptivePortal == true;
 }

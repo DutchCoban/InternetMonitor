@@ -464,5 +464,14 @@
   "explain.dns.customOnly.todo": "Tragen Sie Ihren eigenen DNS-Server in den Netzwerkeinstellungen dieses Adapters ein, oder lassen Sie den DNS-Server vom Netzwerkadministrator prüfen.",
   "explain.dns.blocked.what": "DNS-Verkehr scheint unterwegs blockiert zu werden, daher werden Namen nicht aufgelöst, obwohl die Server erreichbar sind.",
   "explain.dns.blocked.cause": "Die Auflösung von {0} schlug über den DNS-Server dieses Adapters ({1}) sowie über 9.9.9.9, 1.1.1.1 und 8.8.8.8 fehl, obwohl diese öffentlichen Server auf Port 443 erreichbar sind.",
-  "explain.dns.blocked.todo": "Prüfen Sie, ob eine Firewall, ein Virenscanner oder das Netzwerk selbst Port 53 blockiert. In Firmen- und Gastnetzen ist oft nur der DNS-Server des Netzwerks erlaubt."
+  "explain.dns.blocked.todo": "Prüfen Sie, ob eine Firewall, ein Virenscanner oder das Netzwerk selbst Port 53 blockiert. In Firmen- und Gastnetzen ist oft nur der DNS-Server des Netzwerks erlaubt.",
+  "step.target.captivePortal": "Dieses Netzwerk verlangt eine Anmeldung",
+  "step.target.captivePortal.detail": "Dieses Netzwerk fängt Webverkehr ab und zeigt zuerst eine Anmeldeseite. Melden Sie sich im Browser an, um ins Internet zu gelangen.",
+  "measure.captivePortal": "Anmeldeseite",
+  "cause.captivePortal": "Anmeldeseite",
+  "explain.captivePortal.what": "Dieses Netzwerk zeigt eine Anmeldeseite, bevor es Sie ins Internet lässt, und Sie sind noch nicht angemeldet.",
+  "explain.captivePortal.cause": "Eine Anfrage nach einer bekannten Testseite kam als Weiterleitung oder als andere Seite zurück: typisch für WLAN in Hotels, Zügen und Gastnetzen. Ihre Verbindung selbst funktioniert.",
+  "explain.captivePortal.todo": "Öffnen Sie die Anmeldeseite im Browser und melden Sie sich an oder akzeptieren Sie die Bedingungen. Danach löst sich das Problem von selbst.",
+  "hero.portal.title": "Anmeldung erforderlich",
+  "hero.portal.open": "Anmeldeseite öffnen"
 }

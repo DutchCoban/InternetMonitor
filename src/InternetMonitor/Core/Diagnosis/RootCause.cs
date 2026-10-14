@@ -29,6 +29,12 @@ public enum RootCause
     FirewallSuspected,
 
     /// <summary>
+    /// The network puts a login page in front of the internet (hotel, train, guest Wi-Fi) and it
+    /// has not been passed yet. Nothing is broken - the user has to log in.
+    /// </summary>
+    CaptivePortal,
+
+    /// <summary>
     /// Raised by <see cref="Monitors.NetworkHealthMonitor"/>, not the step pipeline - a packet-level
     /// condition (retransmissions, loss, TTL errors, a rogue DHCP server) crossed its configured
     /// threshold. Which one is recorded on the incident itself, see <see cref="Incidents.Incident.ConditionKey"/>.
@@ -51,6 +57,7 @@ public static class RootCauseExtensions
         RootCause.Dns => "dns",
         RootCause.Target => "target",
         RootCause.FirewallSuspected => "firewall",
+        RootCause.CaptivePortal => "captivePortal",
         RootCause.NetworkHealth => "networkHealth",
         _ => "unknown",
     };
@@ -86,7 +93,7 @@ public static class RootCauseExtensions
         RootCause.Gateway => StepId.Gateway,
         RootCause.Internet or RootCause.FirewallSuspected => StepId.PublicIp,
         RootCause.Dns => StepId.Dns,
-        RootCause.Target => StepId.Target,
+        RootCause.Target or RootCause.CaptivePortal => StepId.Target,
         _ => null,
     };
 }

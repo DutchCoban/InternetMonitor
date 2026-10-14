@@ -1,4 +1,6 @@
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.Incidents;
+using InternetMonitor.Net;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Theming;
 
@@ -56,7 +58,18 @@ public sealed class IncidentToast : Form
         int margin = Dp(MarginDp);
         Location = new Point(workingArea.Right - Width - margin, workingArea.Bottom - Height - margin);
 
-        Click += (_, _) => Close();
+        // For a login page the toast is the quickest way to the fix, so a click opens it; for
+        // anything else a click just dismisses.
+        bool opensLoginPage = incident.Cause == RootCause.CaptivePortal;
+        Click += (_, _) =>
+        {
+            if (opensLoginPage)
+            {
+                ShellOpen.Open(CaptivePortalProbe.LoginPageUrl);
+            }
+
+            Close();
+        };
 
         _autoClose = new System.Windows.Forms.Timer { Interval = AutoCloseMs };
         _autoClose.Tick += (_, _) => Close();

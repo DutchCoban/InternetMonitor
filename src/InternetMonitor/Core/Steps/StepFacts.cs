@@ -106,7 +106,13 @@ public sealed record TargetEndpointResult(
     public bool StatusMismatch => Reachable && ExpectedStatusCode is { } expected && StatusCode != expected;
 }
 
-public sealed record TargetFacts(IReadOnlyList<TargetEndpointResult> Endpoints) : StepFacts
+public sealed record TargetFacts(
+    IReadOnlyList<TargetEndpointResult> Endpoints,
+
+    // Set when the reachability check failed and the follow-up probe found a login page in the
+    // way (see Net.CaptivePortalProbe). PortalHost is where it redirected to, for display only.
+    bool CaptivePortal = false,
+    string? PortalHost = null) : StepFacts
 {
     public bool AnyReachable => Endpoints.Any(e => e.Reachable);
 

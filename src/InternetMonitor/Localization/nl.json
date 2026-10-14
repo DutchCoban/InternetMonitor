@@ -464,5 +464,14 @@
   "explain.dns.customOnly.todo": "Stel je eigen DNS-server in bij de netwerkinstellingen van deze adapter, of laat de beheerder van het netwerk de DNS-server controleren.",
   "explain.dns.blocked.what": "DNS-verkeer lijkt onderweg geblokkeerd te worden, waardoor namen niet worden opgezocht terwijl de servers wel bereikbaar zijn.",
   "explain.dns.blocked.cause": "Het opzoeken van {0} mislukte via de DNS-server van deze adapter ({1}) en via 9.9.9.9, 1.1.1.1 en 8.8.8.8, terwijl die publieke servers wel bereikbaar zijn op poort 443.",
-  "explain.dns.blocked.todo": "Controleer of een firewall, antivirus of het netwerk zelf poort 53 blokkeert. Op bedrijfs- of gastnetwerken mag vaak alleen de DNS-server van het netwerk gebruikt worden."
+  "explain.dns.blocked.todo": "Controleer of een firewall, antivirus of het netwerk zelf poort 53 blokkeert. Op bedrijfs- of gastnetwerken mag vaak alleen de DNS-server van het netwerk gebruikt worden.",
+  "step.target.captivePortal": "Dit netwerk vraagt om in te loggen",
+  "step.target.captivePortal.detail": "Dit netwerk onderschept webverkeer en toont eerst een inlogpagina. Log in via je browser om toegang tot internet te krijgen.",
+  "measure.captivePortal": "Inlogpagina",
+  "cause.captivePortal": "Inlogpagina",
+  "explain.captivePortal.what": "Dit netwerk toont een inlogpagina voordat je het internet op mag, en je bent nog niet ingelogd.",
+  "explain.captivePortal.cause": "Een verzoek om een bekende testpagina kwam terug als doorverwijzing of als een andere pagina: typisch voor wifi in hotels, treinen en gastnetwerken. Je verbinding zelf werkt.",
+  "explain.captivePortal.todo": "Open de inlogpagina in je browser en log in of accepteer de voorwaarden. Daarna lost het probleem zichzelf op.",
+  "hero.portal.title": "Inloggen vereist",
+  "hero.portal.open": "Inlogpagina openen"
 }

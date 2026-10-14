@@ -464,5 +464,14 @@
   "explain.dns.customOnly.todo": "Set your own DNS server in this adapter's network settings, or ask the network's administrator to check its DNS server.",
   "explain.dns.blocked.what": "DNS traffic appears to be blocked along the way, so names are not resolved even though the servers are reachable.",
   "explain.dns.blocked.cause": "Looking up {0} failed through this adapter's DNS server ({1}) and through 9.9.9.9, 1.1.1.1 and 8.8.8.8, while those public servers are reachable on port 443.",
-  "explain.dns.blocked.todo": "Check whether a firewall, antivirus or the network itself blocks port 53. Corporate and guest networks often only allow the network's own DNS server."
+  "explain.dns.blocked.todo": "Check whether a firewall, antivirus or the network itself blocks port 53. Corporate and guest networks often only allow the network's own DNS server.",
+  "step.target.captivePortal": "This network asks you to log in",
+  "step.target.captivePortal.detail": "This network intercepts web traffic and shows a login page first. Log in through your browser to get access to the internet.",
+  "measure.captivePortal": "Login page",
+  "cause.captivePortal": "Login page",
+  "explain.captivePortal.what": "This network shows a login page before it lets you onto the internet, and you have not logged in yet.",
+  "explain.captivePortal.cause": "A request for a known test page came back as a redirect or a different page: typical for hotel, train and guest Wi-Fi. Your connection itself is working.",
+  "explain.captivePortal.todo": "Open the login page in your browser and log in or accept the terms. The problem resolves itself once you are through.",
+  "hero.portal.title": "Login required",
+  "hero.portal.open": "Open login page"
 }

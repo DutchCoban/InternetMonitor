@@ -1,6 +1,7 @@
 using System.Drawing.Drawing2D;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
+using InternetMonitor.Net;
 using InternetMonitor.Ui.Theming;
 
 namespace InternetMonitor.Ui.Controls;
@@ -27,6 +28,17 @@ public sealed class StatusHero : ThemedControl
     private bool _networkHealthEnabled;
     private int _networkHealthOpenCount;
 
+    // Shown only while a login page is in the way: the one state where the hero itself can offer
+    // the fix, not just name the problem.
+    private readonly AppButton _loginButton;
+
+    public StatusHero()
+    {
+        _loginButton = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Globe, Visible = false };
+        _loginButton.Click += (_, _) => ShellOpen.Open(CaptivePortalProbe.LoginPageUrl);
+        Controls.Add(_loginButton);
+    }
+
     protected override Color BehindColor => Theme.Current.Bg;
 
     public int PreferredHeight => Dp(146);
@@ -52,7 +64,17 @@ public sealed class StatusHero : ThemedControl
         }
 
         StepResult? failure = snapshot.FirstFailure;
-        if (failure is not null)
+        bool loginPage = snapshot.CaptivePortal && snapshot.StateOf(StepId.Gateway) != StepState.Failed;
+        if (loginPage)
+        {
+            // A login page fails DNS, pings and HTTPS together, but nothing is broken: the user
+            // has to log in. Warning colour rather than error, and the step 7 headline rather
+            // than whichever of those failures happened to come first.
+            _severity = Severity.Warning;
+            _headline = loc.Get("hero.portal.title");
+            _explanation = snapshot[StepId.Target]?.Headline ?? string.Empty;
+        }
+        else if (failure is not null)
         {
             _severity = Severity.Error;
             _headline = loc.Get("hero.problem.title");
@@ -82,7 +104,24 @@ public sealed class StatusHero : ThemedControl
         _latency = latency is { } ms ? $"{ms:F0} ms" : "-";
         _lastCheck = snapshot.TakenUtc.ToLocalTime().ToString("HH:mm:ss");
 
+        _loginButton.Text = loc.Get("hero.portal.open");
+        _loginButton.SizeToContent();
+        _loginButton.Visible = loginPage;
+        PositionLoginButton();
+
         Invalidate();
+    }
+
+    private void PositionLoginButton()
+    {
+        int gap = Dp(4);
+        _loginButton.Location = new Point(Width - gap - Sp(5) - _loginButton.Width, gap + Sp(4));
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        PositionLoginButton();
     }
 
     /// <summary>

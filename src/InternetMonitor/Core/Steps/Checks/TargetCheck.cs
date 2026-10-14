@@ -28,6 +28,11 @@ namespace InternetMonitor.Core.Steps.Checks;
 /// <see cref="TcpOutcome.Answered"/>'s reasoning elsewhere in this app: a refusal proves something
 /// is listening at that address, which is exactly what this check is trying to establish. Only a
 /// timeout or an unreachable error means nothing is there.
+///
+/// When the built-in reachability check fails - or answers with something other than its 204 -
+/// one extra plain-HTTP probe asks whether a login page is in the way (hotel, train, guest Wi-Fi).
+/// If so, that is the finding: "log in first" is what the user needs to hear, not which TLS stage
+/// a login page happened to break.
 /// </summary>
 public sealed class TargetCheck : IStepCheck
 {
@@ -63,9 +68,30 @@ public sealed class TargetCheck : IStepCheck
         TargetEndpointResult[] results = await Task.WhenAll(
             targets.Select(t => CheckOneAsync(t, context.Targets.TargetTimeout, context.LocalAddress, context.DnsServers, cancellationToken))).ConfigureAwait(false);
 
-        var facts = new TargetFacts(results);
+        CaptivePortalOutcome? portal = await ProbeForLoginPageAsync(targets, results, context, cancellationToken).ConfigureAwait(false);
+        var facts = new TargetFacts(results, portal?.IsPortal == true, portal?.RedirectHost);
 
         var measurements = results.Select(r => new Measurement(r.Name, DescribeResult(r, loc))).ToList();
+
+        if (facts.CaptivePortal)
+        {
+            measurements.Add(new Measurement(loc.Get("measure.captivePortal"), facts.PortalHost ?? $"HTTP {portal!.StatusCode}"));
+
+            return new StepResult(
+                Id,
+                StepState.Failed,
+                loc.Get("step.target.captivePortal"),
+                loc.Get("step.target.captivePortal.detail"),
+                null,
+                watch.Elapsed,
+                DateTimeOffset.UtcNow,
+                measurements,
+                facts)
+            {
+                HeadlineKey = "step.target.captivePortal",
+                DetailKey = "step.target.captivePortal.detail",
+            };
+        }
 
         // Per-stage timings are worth showing for a single endpoint; with several they would
         // swamp the panel, and the per-endpoint detail view is the right place for them. Only a
@@ -142,6 +168,33 @@ public sealed class TargetCheck : IStepCheck
             DetailKey = detailKey,
             DetailArgs = detailArgs2,
         };
+    }
+
+    /// <summary>
+    /// Runs the login-page probe, but only when the built-in reachability check did not get its
+    /// expected answer - a healthy connection never pays for it.
+    /// </summary>
+    private static async Task<CaptivePortalOutcome?> ProbeForLoginPageAsync(
+        IReadOnlyList<TargetEndpoint> targets,
+        TargetEndpointResult[] results,
+        StepContext context,
+        CancellationToken cancellationToken)
+    {
+        for (int i = 0; i < targets.Count; i++)
+        {
+            if (targets[i].IsReachabilityCheck && (!results[i].Reachable || results[i].StatusMismatch))
+            {
+                return await CaptivePortalProbe.ProbeAsync(
+                    context.Targets.CaptivePortalProbeUrl,
+                    context.Targets.CaptivePortalProbeBody,
+                    context.Targets.CaptivePortalProbeTimeout,
+                    cancellationToken,
+                    context.LocalAddress,
+                    context.DnsServers).ConfigureAwait(false);
+            }
+        }
+
+        return null;
     }
 
     private static double? ElapsedMsOf(TargetEndpointResult r) => r.Timings?.Total.TotalMilliseconds ?? r.ConnectMs;

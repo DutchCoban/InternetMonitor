@@ -54,6 +54,14 @@ public static class RootCauseAnalyzer
             return new RootCauseResult(RootCause.IpConfiguration, Severity.Error, [StepId.IpAddress]);
         }
 
+        // A login page breaks DNS, pings and HTTPS all at once, so it has to be recognised before
+        // any of those is blamed. It still needs the gateway: a login page is served by the local
+        // network, so with the router itself gone the probe's answer cannot have come from one.
+        if (snapshot.CaptivePortal && !Failed(snapshot, StepId.Gateway))
+        {
+            return new RootCauseResult(RootCause.CaptivePortal, Severity.Error, [StepId.Target]);
+        }
+
         // "Something beyond the local network answered" is the test for whether a failed probe is
         // a real outage or a filtered one. Checked once and reused for both the gateway and the
         // public-internet comparison below.

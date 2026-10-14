@@ -368,14 +368,20 @@ public sealed class AppHost : ApplicationContext
     private void UpdateTray(StepSnapshot snapshot, RootCauseResult diagnosis) => _ui.Post(
         _ =>
         {
-            Ui.Theming.Severity severity = diagnosis.Severity switch
-            {
-                Core.Diagnosis.Severity.Error => Ui.Theming.Severity.Error,
-                Core.Diagnosis.Severity.Degraded => Ui.Theming.Severity.Warning,
-                _ => Ui.Theming.Severity.Ok,
-            };
+            // A login page is recorded as an incident like any outage, but nothing is broken - the
+            // user just has to log in - so the tray shows it in the warning colour, like the hero.
+            Ui.Theming.Severity severity = diagnosis.Cause == RootCause.CaptivePortal
+                ? Ui.Theming.Severity.Warning
+                : diagnosis.Severity switch
+                {
+                    Core.Diagnosis.Severity.Error => Ui.Theming.Severity.Error,
+                    Core.Diagnosis.Severity.Degraded => Ui.Theming.Severity.Warning,
+                    _ => Ui.Theming.Severity.Ok,
+                };
 
-            string text = snapshot.FirstFailure?.Headline
+            string text = diagnosis.Cause == RootCause.CaptivePortal
+                ? LocalizationManager.Instance.Get("hero.portal.title")
+                : snapshot.FirstFailure?.Headline
                 ?? snapshot.All.FirstOrDefault(r => r.State == StepState.Warning)?.Headline
                 ?? LocalizationManager.Instance.Get("hero.ok.title");
 

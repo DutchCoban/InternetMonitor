@@ -27,6 +27,13 @@ public sealed record TargetEndpoint(
     // Same nullable-parameter-plus-shadowing-property trick as EndpointConfig.Headers: a default
     // parameter value must be a compile-time constant, which an empty list is not.
     public IReadOnlyList<EndpointHeader> Headers { get; init; } = Headers ?? [];
+
+    /// <summary>
+    /// Marks the built-in "is there internet at all" check, as opposed to a user's own endpoint. Only
+    /// this one is followed up with <see cref="CheckTargets.CaptivePortalProbeUrl"/> when it fails:
+    /// a user's own server being unreachable says nothing about a login page.
+    /// </summary>
+    public bool IsReachabilityCheck { get; init; }
 }
 
 /// <summary>
@@ -93,8 +100,20 @@ public sealed record CheckTargets
     /// </summary>
     public IReadOnlyList<TargetEndpoint> Targets { get; init; } =
     [
-        new TargetEndpoint("Internet", "https://connectivitycheck.volla.tech/generate_204"),
+        new TargetEndpoint("Internet", "https://connectivitycheck.volla.tech/generate_204", ExpectedStatusCode: 204) { IsReachabilityCheck = true },
     ];
+
+    /// <summary>
+    /// The plain-HTTP page asked for when the reachability check fails, to tell a login page apart
+    /// from a dead connection - Windows' own connectivity test page, so a network that lets Windows
+    /// through without a login lets this through too. See <see cref="Net.CaptivePortalProbe"/>.
+    /// </summary>
+    public Uri CaptivePortalProbeUrl { get; init; } = new("http://www.msftconnecttest.com/connecttest.txt");
+
+    /// <summary>The exact body <see cref="CaptivePortalProbeUrl"/> serves when nothing is in the way.</summary>
+    public string CaptivePortalProbeBody { get; init; } = "Microsoft Connect Test";
+
+    public TimeSpan CaptivePortalProbeTimeout { get; init; } = TimeSpan.FromSeconds(2.5);
 
     /// <summary>Ports raced alongside ICMP when checking the gateway: whichever answers first wins.</summary>
     public IReadOnlyList<int> GatewayProbePorts { get; init; } = [80, 443, 53];
