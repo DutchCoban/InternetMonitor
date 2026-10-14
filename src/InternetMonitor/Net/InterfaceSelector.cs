@@ -45,11 +45,40 @@ public static class InterfaceSelector
             && nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel),
     ];
 
+    private const int RouteLookupAttempts = 3;
+
+    private static readonly TimeSpan RouteLookupRetryDelay = TimeSpan.FromMilliseconds(30);
+
     /// <summary>
     /// The adapter Windows would route internet traffic over, or null when there is no route -
     /// which usually means no usable connection at all.
+    ///
+    /// Retried briefly before giving up: the route lookup itself is instant, but matching its
+    /// index back to an adapter can fail for a moment while that adapter is being reconfigured
+    /// (GetIPv4Properties throws mid-DHCP-renewal). Falling straight through to the heuristic
+    /// on that one bad moment let a secondary adapter - a USB NIC plugged into a switch for
+    /// configuration, with link but no internet - be described as the connection, which showed
+    /// up as a false DNS failure.
     /// </summary>
     public static NetworkInterface? GetRouted()
+    {
+        for (int attempt = 1; attempt <= RouteLookupAttempts; attempt++)
+        {
+            if (TryGetRoutedOnce() is { } routed)
+            {
+                return routed;
+            }
+
+            if (attempt < RouteLookupAttempts)
+            {
+                Thread.Sleep(RouteLookupRetryDelay);
+            }
+        }
+
+        return null;
+    }
+
+    private static NetworkInterface? TryGetRoutedOnce()
     {
         IReadOnlyList<NetworkInterface> all = GetCandidates();
 
@@ -80,7 +109,6 @@ public static class InterfaceSelector
             .OrderByDescending(nic => nic.OperationalStatus == OperationalStatus.Up)
             .ThenByDescending(HasIPv4Gateway)
             .ThenBy(IsLikelyVirtual)
-            .ThenByDescending(nic => nic.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet)
             .ThenByDescending(nic => nic.Speed)
             .FirstOrDefault();
 
