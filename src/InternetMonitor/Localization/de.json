@@ -137,6 +137,7 @@
   "measure.hostname": "Hostname",
   "measure.resolved": "Aufgelöst zu",
   "measure.dnsTime": "DNS-Abfrage",
+  "measure.dnsFromCache": "aus dem Cache",
   "measure.tcpTime": "TCP-Verbindung",
   "measure.tlsTime": "TLS-Handshake",
   "measure.httpTime": "HTTP-Antwort",

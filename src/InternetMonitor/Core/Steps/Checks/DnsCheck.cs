@@ -14,7 +14,9 @@ namespace InternetMonitor.Core.Steps.Checks;
 ///  1. The DNS servers that adapter actually has, obtained via DHCP or set by hand. Not the system
 ///     resolver: with several adapters up, Windows may answer through a different adapter's
 ///     server, and then this step would describe another path than the steps before it.
-///  2. Public resolvers, one at a time in a fixed order (9.9.9.9, then 1.1.1.1, then 8.8.8.8). The
+///  2. Public resolvers, one at a time in a fixed order (9.9.9.9, then 1.1.1.1, then 8.8.8.8),
+///     skipping any the adapter already uses - asking the same server again would only test the
+///     same thing twice, and its answer would be read as "a different server works". The
 ///     first one that answers proves the fault is the adapter's DNS server, not DNS as such. Each
 ///     one that stays silent is also tried on port 443 at the same moment: reachable there but
 ///     silent on DNS means something is blocking DNS traffic (port 53) rather than the server
@@ -88,13 +90,14 @@ public sealed class DnsCheck : IStepCheck
 
         // The adapter's own DNS failed: walk the public resolvers in order, stopping at the first
         // that resolves the name.
-        List<Attempt> publicAttempts = await WalkAsync(context.Targets.PublicResolvers, hostname, context, probeReachability: true, cancellationToken)
+        IReadOnlyList<IPAddress> publicResolvers = [.. context.Targets.PublicResolvers.Where(r => !servers.Contains(r))];
+        List<Attempt> publicAttempts = await WalkAsync(publicResolvers, hostname, context, probeReachability: true, cancellationToken)
             .ConfigureAwait(false);
         Attempt? publicWinner = publicAttempts.FirstOrDefault(a => a.Outcome == AttemptOutcome.Resolved);
         bool portBlocked = publicWinner is null && publicAttempts.Any(a => a.Outcome == AttemptOutcome.NoAnswerButReachable);
 
         // Only when every public resolver failed: the user's own last-resort servers, if any.
-        IReadOnlyList<IPAddress> custom = context.Targets.CustomDnsServers;
+        IReadOnlyList<IPAddress> custom = [.. context.Targets.CustomDnsServers.Where(c => !servers.Contains(c) && !publicResolvers.Contains(c))];
         List<Attempt> customAttempts = publicWinner is null && custom.Count > 0
             ? await WalkAsync(custom, hostname, context, probeReachability: false, cancellationToken).ConfigureAwait(false)
             : [];
@@ -108,7 +111,7 @@ public sealed class DnsCheck : IStepCheck
         var facts = new DnsFacts(hostname, [], result.ElapsedMs, servers, publicWinner is not null, portBlocked, customWorked);
 
         string serverList = servers.Count > 0 ? string.Join(", ", servers) : "-";
-        string publicList = string.Join(", ", context.Targets.PublicResolvers);
+        string publicList = publicResolvers.Count > 0 ? string.Join(", ", publicResolvers) : "-";
 
         (string headlineKey, object[] headlineArgs, string detailKey, object[] detailArgs) =
             publicWinner is not null && servers.Count == 0

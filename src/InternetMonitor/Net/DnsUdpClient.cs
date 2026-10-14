@@ -36,6 +36,10 @@ public sealed record DnsQueryResult(
 /// So this speaks the wire format directly - about as much protocol as v1's SNTP client, and in
 /// the same spirit. It handles exactly what those two callers need: one question, A or TXT
 /// answers, with name decompression, and no caching, no TCP fallback and no EDNS.
+///
+/// One thing it does copy from real resolvers: an unanswered query is sent once more halfway
+/// through the time budget. UDP has no delivery guarantee, and without that second packet a single
+/// datagram lost on a Wi-Fi hop reads as "this DNS server is not answering".
 /// </summary>
 public static class DnsUdpClient
 {
@@ -54,7 +58,8 @@ public static class DnsUdpClient
         DnsRecordType type,
         TimeSpan timeout,
         CancellationToken cancellationToken,
-        IPAddress? source = null)
+        IPAddress? source = null,
+        int port = 53)
     {
         long startedAt = Environment.TickCount64;
 
@@ -71,16 +76,33 @@ public static class DnsUdpClient
             using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             budget.CancelAfter(timeout);
 
-            await socket.SendToAsync(query, SocketFlags.None, new IPEndPoint(server, 53), budget.Token).ConfigureAwait(false);
+            var endpoint = new IPEndPoint(server, port);
+            await socket.SendToAsync(query, SocketFlags.None, endpoint, budget.Token).ConfigureAwait(false);
+
+            // The first wait ends halfway through the budget; if nothing has arrived by then the
+            // same query (same transaction id, so either reply is accepted) goes out once more.
+            using var firstWait = CancellationTokenSource.CreateLinkedTokenSource(budget.Token);
+            firstWait.CancelAfter(timeout / 2);
+            bool resent = false;
 
             var buffer = new byte[MaxResponseSize];
             EndPoint remote = new IPEndPoint(server.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, 0);
 
             while (true)
             {
-                SocketReceiveFromResult received = await socket
-                    .ReceiveFromAsync(buffer, SocketFlags.None, remote, budget.Token)
-                    .ConfigureAwait(false);
+                SocketReceiveFromResult received;
+                try
+                {
+                    received = await socket
+                        .ReceiveFromAsync(buffer, SocketFlags.None, remote, resent ? budget.Token : firstWait.Token)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!resent && !budget.IsCancellationRequested)
+                {
+                    resent = true;
+                    await socket.SendToAsync(query, SocketFlags.None, endpoint, budget.Token).ConfigureAwait(false);
+                    continue;
+                }
 
                 double elapsed = Environment.TickCount64 - startedAt;
                 if (received.ReceivedBytes < HeaderSize)

@@ -137,6 +137,7 @@
   "measure.hostname": "Hostnaam",
   "measure.resolved": "Opgelost naar",
   "measure.dnsTime": "DNS-lookup",
+  "measure.dnsFromCache": "uit cache",
   "measure.tcpTime": "TCP-verbinding",
   "measure.tlsTime": "TLS-handshake",
   "measure.httpTime": "HTTP-antwoord",

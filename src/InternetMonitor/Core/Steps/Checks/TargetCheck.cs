@@ -265,7 +265,15 @@ public sealed class TargetCheck : IStepCheck
             }
         }
 
-        Add("measure.dnsTime", timings.Dns);
+        if (timings.DnsFromCache)
+        {
+            measurements.Add(new Measurement(loc.Get("measure.dnsTime"), loc.Get("measure.dnsFromCache")));
+        }
+        else
+        {
+            Add("measure.dnsTime", timings.Dns);
+        }
+
         Add("measure.tcpTime", timings.Tcp);
         Add("measure.tlsTime", timings.Tls);
         Add("measure.httpTime", timings.Http);

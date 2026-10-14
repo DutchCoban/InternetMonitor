@@ -137,6 +137,7 @@
   "measure.hostname": "Nazwa hosta",
   "measure.resolved": "Rozwiązano na",
   "measure.dnsTime": "Zapytanie DNS",
+  "measure.dnsFromCache": "z pamięci podręcznej",
   "measure.tcpTime": "Połączenie TCP",
   "measure.tlsTime": "Uzgadnianie TLS",
   "measure.httpTime": "Odpowiedź HTTP",

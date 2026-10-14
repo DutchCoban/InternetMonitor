@@ -25,7 +25,11 @@ public enum HttpStage
     Http,
 }
 
-public sealed record HttpTimings(TimeSpan? Dns, TimeSpan? Tcp, TimeSpan? Tls, TimeSpan? Http, TimeSpan Total);
+public sealed record HttpTimings(TimeSpan? Dns, TimeSpan? Tcp, TimeSpan? Tls, TimeSpan? Http, TimeSpan Total)
+{
+    /// <summary>The address came from <see cref="DnsAnswerCache"/>, so <see cref="Dns"/> measured no lookup.</summary>
+    public bool DnsFromCache { get; init; }
+}
 
 public sealed record HttpOutcome(
     bool Succeeded,
@@ -80,6 +84,7 @@ public static class TlsTimedRequest
         var total = Stopwatch.StartNew();
         int port = uri.Port;
         TimeSpan? dnsTime = null;
+        bool dnsFromCache = false;
         TimeSpan? tcpTime = null;
         TimeSpan? tlsTime = null;
         IPAddress? remote = null;
@@ -92,6 +97,7 @@ public static class TlsTimedRequest
         {
             DnsOutcome dns = await DnsResolve.ResolveViaAsync(uri.Host, dnsServers, source, DnsSubBudget, budget.Token).ConfigureAwait(false);
             dnsTime = TimeSpan.FromMilliseconds(dns.ElapsedMs);
+            dnsFromCache = dns.FromCache;
             if (!dns.Success)
             {
                 return Fail(HttpStage.Dns, dns.TimedOut ? "DNS lookup timed out" : $"DNS lookup failed ({dns.Error})");
@@ -167,7 +173,7 @@ public static class TlsTimedRequest
                     remote,
                     port,
                     tlsProtocol,
-                    new HttpTimings(dnsTime, tcpTime, tlsTime, httpWatch.Elapsed, total.Elapsed));
+                    new HttpTimings(dnsTime, tcpTime, tlsTime, httpWatch.Elapsed, total.Elapsed) { DnsFromCache = dnsFromCache });
             }
             finally
             {
@@ -188,7 +194,7 @@ public static class TlsTimedRequest
             total.Stop();
             return new HttpOutcome(
                 false, null, stage, error, remote, port, tlsProtocol,
-                new HttpTimings(dnsTime, tcpTime, tlsTime, httpTime, total.Elapsed));
+                new HttpTimings(dnsTime, tcpTime, tlsTime, httpTime, total.Elapsed) { DnsFromCache = dnsFromCache });
         }
     }
 

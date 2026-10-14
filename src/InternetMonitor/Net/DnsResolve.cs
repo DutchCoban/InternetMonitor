@@ -8,7 +8,8 @@ public readonly record struct DnsOutcome(
     IReadOnlyList<IPAddress> Addresses,
     double ElapsedMs,
     SocketError? Error,
-    bool TimedOut)
+    bool TimedOut,
+    bool FromCache = false)
 {
     public bool Success => Addresses.Count > 0;
 }
@@ -59,6 +60,9 @@ public static class DnsResolve
     /// means "no adapter context" and uses the system resolver exactly like
     /// <see cref="ResolveAsync"/>; an empty list means the adapter has no DNS server at all, which
     /// is reported as a failed lookup rather than quietly borrowing another adapter's resolver.
+    ///
+    /// Successful answers through explicit servers are reused for a minute (see
+    /// <see cref="DnsAnswerCache"/>), the way the Windows resolver would have cached them.
     /// </summary>
     public static async Task<DnsOutcome> ResolveViaAsync(
         string hostname,
@@ -82,12 +86,18 @@ public static class DnsResolve
             return new DnsOutcome([], 0, SocketError.HostNotFound, false);
         }
 
+        if (DnsAnswerCache.Shared.TryGet(hostname, servers, source, out IReadOnlyList<IPAddress> cached))
+        {
+            return new DnsOutcome(cached, 0, null, false, FromCache: true);
+        }
+
         (IPAddress? _, DnsQueryResult result) = await DnsUdpClient
             .QueryFirstAnswerAsync(servers, hostname, DnsRecordType.A, timeout, cancellationToken, source)
             .ConfigureAwait(false);
 
         if (result.Success && result.Addresses.Count > 0)
         {
+            DnsAnswerCache.Shared.Store(hostname, servers, source, result.Addresses);
             return new DnsOutcome(result.Addresses, result.ElapsedMs, null, false);
         }
 
