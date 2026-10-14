@@ -1,3 +1,6 @@
+using System.Net;
+using InternetMonitor.Net;
+
 namespace InternetMonitor.Core.Tools.SpeedTest;
 
 public enum SpeedTestPhase
@@ -10,7 +13,41 @@ public enum SpeedTestPhase
 
 public sealed record SpeedTestProgress(SpeedTestPhase Phase, double Value);
 
-public sealed record SpeedTestResult(double PingMs, double JitterMs, double DownloadMbps, double UploadMbps);
+/// <param name="IdlePingMs">ICMP round trip with the line quiet - the baseline for the two loaded readings.</param>
+/// <param name="LoadedPingDownloadMs">Median ICMP round trip while the download phase filled the line.</param>
+/// <param name="LoadedPingUploadMs">Median ICMP round trip while the upload phase filled the line.</param>
+public sealed record SpeedTestResult(
+    double PingMs,
+    double JitterMs,
+    double DownloadMbps,
+    double UploadMbps,
+    double? IdlePingMs = null,
+    double? LoadedPingDownloadMs = null,
+    double? LoadedPingUploadMs = null)
+{
+    /// <summary>
+    /// How much the round trip grew while the line was full, in the worse direction - the number
+    /// bufferbloat is judged by. Null when ICMP was blocked and nothing could be compared.
+    /// </summary>
+    public double? LoadedIncreaseMs =>
+        IdlePingMs is { } idle && (LoadedPingDownloadMs ?? LoadedPingUploadMs) is not null
+            ? Math.Max(0, Math.Max(LoadedPingDownloadMs ?? 0, LoadedPingUploadMs ?? 0) - idle)
+            : null;
+
+    /// <summary>
+    /// A-F for <see cref="LoadedIncreaseMs"/>, on the scale the widely used bufferbloat tests use:
+    /// under 5 ms extra is excellent, over 200 ms means calls and games fall apart whenever
+    /// anyone downloads something.
+    /// </summary>
+    public static string Grade(double increaseMs) => increaseMs switch
+    {
+        < 5 => "A",
+        < 30 => "B",
+        < 60 => "C",
+        < 200 => "D",
+        _ => "F",
+    };
+}
 
 /// <summary>
 /// Speaks the LibreSpeed backend protocol (github.com/librespeed/speedtest) directly over a plain
@@ -41,14 +78,61 @@ public sealed class SpeedTestClient : IDisposable
     private const int PingSampleCount = 5;
     private const int UploadChunkBytes = 1_000_000;
 
+    // Latency under load is measured with ICMP to a well-known anycast address rather than with the
+    // speed-test server's own HTTP endpoint: the HTTP connections are the ones being saturated, so
+    // a request on them would measure their own queue, not the line's.
+    private static readonly TimeSpan LoadedPingInterval = TimeSpan.FromMilliseconds(200);
+    private static readonly TimeSpan LoadedPingTimeout = TimeSpan.FromSeconds(1);
+    private const int IdlePingSamples = 5;
+
     private readonly HttpClient _httpClient = new() { Timeout = Timeout.InfiniteTimeSpan };
+    private readonly IPAddress _pingTarget;
+
+    public SpeedTestClient(IPAddress? pingTarget = null) => _pingTarget = pingTarget ?? IPAddress.Parse("9.9.9.9");
 
     public async Task<SpeedTestResult> RunAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
     {
         (double pingMs, double jitterMs) = await MeasurePingJitterAsync(progress, cancellationToken).ConfigureAwait(false);
-        double downloadMbps = await MeasureDownloadAsync(progress, cancellationToken).ConfigureAwait(false);
-        double uploadMbps = await MeasureUploadAsync(progress, cancellationToken).ConfigureAwait(false);
-        return new SpeedTestResult(pingMs, jitterMs, downloadMbps, uploadMbps);
+        double? idlePing = Median(await PingRepeatedlyAsync(IdlePingSamples, cancellationToken).ConfigureAwait(false));
+        (double downloadMbps, double? loadedDown) = await MeasureDownloadAsync(progress, cancellationToken).ConfigureAwait(false);
+        (double uploadMbps, double? loadedUp) = await MeasureUploadAsync(progress, cancellationToken).ConfigureAwait(false);
+        return new SpeedTestResult(pingMs, jitterMs, downloadMbps, uploadMbps, idlePing, loadedDown, loadedUp);
+    }
+
+    /// <summary>ICMP pings at <see cref="LoadedPingInterval"/> until <paramref name="count"/> are sent or the token fires.</summary>
+    private async Task<List<double>> PingRepeatedlyAsync(int count, CancellationToken cancellationToken)
+    {
+        var samples = new List<double>();
+        try
+        {
+            for (int i = 0; i < count && !cancellationToken.IsCancellationRequested; i++)
+            {
+                PingOutcome outcome = await IcmpPing.SendAsync(_pingTarget, LoadedPingTimeout, cancellationToken).ConfigureAwait(false);
+                if (outcome.Success && outcome.RoundtripMs is { } roundtrip)
+                {
+                    samples.Add(roundtrip);
+                }
+
+                await Task.Delay(LoadedPingInterval, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The phase ended; whatever was collected stands.
+        }
+
+        return samples;
+    }
+
+    private static double? Median(List<double> samples)
+    {
+        if (samples.Count == 0)
+        {
+            return null;
+        }
+
+        samples.Sort();
+        return samples[samples.Count / 2];
     }
 
     private async Task<(double PingMs, double JitterMs)> MeasurePingJitterAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
@@ -84,7 +168,7 @@ public sealed class SpeedTestClient : IDisposable
         return (pingMs, jitterMs);
     }
 
-    private Task<double> MeasureDownloadAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken) =>
+    private Task<(double Mbps, double? LoadedPingMs)> MeasureDownloadAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken) =>
         RunThroughputPhaseAsync(SpeedTestPhase.Download, async (token, reportBytes) =>
         {
             string url = $"{BaseUrl}/{DownloadPath}?ckSize=100&r={Random.Shared.Next()}";
@@ -101,7 +185,7 @@ public sealed class SpeedTestClient : IDisposable
             }
         }, progress, cancellationToken);
 
-    private Task<double> MeasureUploadAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
+    private Task<(double Mbps, double? LoadedPingMs)> MeasureUploadAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
     {
         var payload = new byte[UploadChunkBytes];
         Random.Shared.NextBytes(payload);
@@ -124,9 +208,10 @@ public sealed class SpeedTestClient : IDisposable
     /// Shared scaffolding for both throughput phases: runs <paramref name="runOneRequestAsync"/>
     /// repeatedly across <see cref="ConcurrentStreams"/> concurrent loops until
     /// <see cref="PhaseDuration"/> elapses, reporting live Mbps as bytes come in via the callback
-    /// the request body is handed, then returns the phase's overall average Mbps.
+    /// the request body is handed, then returns the phase's overall average Mbps - plus the median
+    /// ICMP round trip measured alongside it while the line was full.
     /// </summary>
-    private async Task<double> RunThroughputPhaseAsync(
+    private async Task<(double Mbps, double? LoadedPingMs)> RunThroughputPhaseAsync(
         SpeedTestPhase phase,
         Func<CancellationToken, Action<int>, Task> runOneRequestAsync,
         IProgress<SpeedTestProgress>? progress,
@@ -164,12 +249,33 @@ public sealed class SpeedTestClient : IDisposable
             }
         }
 
+        // Pings start a second in, once the streams have ramped up: the first moments of a phase
+        // are TCP slow start, not a full line.
+        Task<List<double>> loadedPings = Task.Run(
+            async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cts.Token).ConfigureAwait(false);
+                return await PingRepeatedlyAsync(int.MaxValue, cts.Token).ConfigureAwait(false);
+            },
+            CancellationToken.None);
+
         await Task.WhenAll(Enumerable.Range(0, ConcurrentStreams).Select(_ => RunOneStreamAsync())).ConfigureAwait(false);
 
         sw.Stop();
         double finalMbps = sw.Elapsed.TotalSeconds > 0 ? totalBytes * 8.0 / sw.Elapsed.TotalSeconds / 1_000_000 : 0;
         progress?.Report(new SpeedTestProgress(phase, finalMbps));
-        return finalMbps;
+
+        List<double> pings;
+        try
+        {
+            pings = await loadedPings.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            pings = [];
+        }
+
+        return (finalMbps, Median(pings));
     }
 
     public void Dispose() => _httpClient.Dispose();

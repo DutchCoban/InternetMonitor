@@ -501,5 +501,11 @@
   "explain.dns.weakWifi.todo": "Podejdź bliżej punktu dostępowego lub routera, usuń przeszkody albo użyj kabla. Jeśli dzieje się to stale w jednym miejscu, pomoże tam dodatkowy punkt dostępowy lub węzeł mesh.",
   "explain.target.weakWifi.what": "Połączenie zawiodło przy słabym sygnale Wi-Fi.",
   "explain.target.weakWifi.cause": "Sygnał Wi-Fi wynosił tylko {0}%, gdy to się zaczęło. Przy takim poziomie pakiety giną, a połączenie z routerem się zrywa, więc awaria dalej najprawdopodobniej wynika ze słabego sygnału, a nie z routera czy dostawcy.",
-  "explain.target.weakWifi.todo": "Podejdź bliżej punktu dostępowego lub routera, usuń przeszkody albo użyj kabla. Jeśli dzieje się to stale w jednym miejscu, pomoże tam dodatkowy punkt dostępowy lub węzeł mesh."
+  "explain.target.weakWifi.todo": "Podejdź bliżej punktu dostępowego lub routera, usuń przeszkody albo użyj kabla. Jeśli dzieje się to stale w jednym miejscu, pomoże tam dodatkowy punkt dostępowy lub węzeł mesh.",
+  "step.latency.busy": "Czasy odpowiedzi są wyższe niż zwykle, a ten komputer pobierał {0} Mbit/s i wysyłał {1} Mbit/s - łącze było obciążone, więc najpewniej to własny ruch czeka w kolejce w routerze.",
+  "series.trafficDown": "Ruch (pobieranie)",
+  "series.trafficUp": "Ruch (wysyłanie)",
+  "series.speedTestPing": "Test prędkości (ping)",
+  "series.speedTestBufferbloat": "Test prędkości (dodatkowy ping pod obciążeniem)",
+  "speedtest.stat.loaded": "Ping pod obciążeniem"
 }

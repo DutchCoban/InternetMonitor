@@ -150,7 +150,7 @@ public sealed class TargetCheck : IStepCheck
                 ? MismatchDetail(results.First(r => r.StatusMismatch))
                 : anyServerError
                     ? ("step.target.serverError.detail", [])
-                    : state == StepState.Warning ? ("step.latency.high", []) : (null, []);
+                    : state == StepState.Warning ? LatencyClassifier.WarningDetail(context) : (null, []);
 
         return new StepResult(
             Id,

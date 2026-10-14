@@ -60,13 +60,13 @@ public sealed class PublicIpCheck : IStepCheck
 
         StepState state = LatencyClassifier.Classify(best, context.Targets);
         string bestText = best?.ToString("F0") ?? "?";
-        string? detailKey = state == StepState.Warning ? "step.latency.high" : null;
+        (string? detailKey, object[] detailArgs) = state == StepState.Warning ? LatencyClassifier.WarningDetail(context) : (null, []);
 
         return new StepResult(
             Id,
             state,
             loc.Format("step.publicIp.ok", bestText),
-            detailKey is null ? null : loc.Get(detailKey),
+            detailKey is null ? null : loc.Format(detailKey, detailArgs),
             best,
             watch.Elapsed,
             DateTimeOffset.UtcNow,
@@ -76,6 +76,7 @@ public sealed class PublicIpCheck : IStepCheck
             HeadlineKey = "step.publicIp.ok",
             HeadlineArgs = [bestText],
             DetailKey = detailKey,
+            DetailArgs = detailArgs,
         };
     }
 

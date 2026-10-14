@@ -501,5 +501,11 @@
   "explain.dns.weakWifi.todo": "Ga dichter bij het access point of de router zitten, haal obstakels weg of gebruik een kabel. Gebeurt dit steeds op dezelfde plek, dan helpt daar een extra access point of mesh-punt.",
   "explain.target.weakWifi.what": "De verbinding faalde terwijl het wifi-signaal zwak was.",
   "explain.target.weakWifi.cause": "Het wifi-signaal was maar {0}% toen dit begon. Bij zo'n signaal gaan pakketten verloren en valt de verbinding met de router weg, dus de storing verderop komt waarschijnlijk door het zwakke signaal en niet door de router of de provider.",
-  "explain.target.weakWifi.todo": "Ga dichter bij het access point of de router zitten, haal obstakels weg of gebruik een kabel. Gebeurt dit steeds op dezelfde plek, dan helpt daar een extra access point of mesh-punt."
+  "explain.target.weakWifi.todo": "Ga dichter bij het access point of de router zitten, haal obstakels weg of gebruik een kabel. Gebeurt dit steeds op dezelfde plek, dan helpt daar een extra access point of mesh-punt.",
+  "step.latency.busy": "De reactietijden zijn hoger dan normaal, terwijl deze computer {0} Mbit/s ontving en {1} Mbit/s verstuurde - de lijn was druk, dus dit komt waarschijnlijk door het eigen verkeer dat in de router in de rij staat.",
+  "series.trafficDown": "Verkeer (download)",
+  "series.trafficUp": "Verkeer (upload)",
+  "series.speedTestPing": "Snelheidstest (ping)",
+  "series.speedTestBufferbloat": "Snelheidstest (extra ping onder belasting)",
+  "speedtest.stat.loaded": "Ping onder belasting"
 }

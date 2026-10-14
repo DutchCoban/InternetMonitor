@@ -501,5 +501,11 @@
   "explain.dns.weakWifi.todo": "Move closer to the access point or router, remove obstacles in between, or use a cable. If this keeps happening in one place, an extra access point or mesh node there helps.",
   "explain.target.weakWifi.what": "The connection failed while the Wi-Fi signal was weak.",
   "explain.target.weakWifi.cause": "The Wi-Fi signal was only {0}% when this started. At that level packets are lost and the connection to the router drops out, so the failure further along is most likely caused by the weak signal rather than by the router or the provider.",
-  "explain.target.weakWifi.todo": "Move closer to the access point or router, remove obstacles in between, or use a cable. If this keeps happening in one place, an extra access point or mesh node there helps."
+  "explain.target.weakWifi.todo": "Move closer to the access point or router, remove obstacles in between, or use a cable. If this keeps happening in one place, an extra access point or mesh node there helps.",
+  "step.latency.busy": "Response times are higher than usual, while this computer was using {0} Mbit/s down and {1} Mbit/s up - the line was busy, so this is most likely its own traffic queueing in the router.",
+  "series.trafficDown": "Traffic (download)",
+  "series.trafficUp": "Traffic (upload)",
+  "series.speedTestPing": "Speed test (ping)",
+  "series.speedTestBufferbloat": "Speed test (extra ping under load)",
+  "speedtest.stat.loaded": "Ping under load"
 }

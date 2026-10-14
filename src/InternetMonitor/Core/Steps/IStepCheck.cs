@@ -24,6 +24,9 @@ public sealed class StepContext(CheckTargets targets)
     public IPAddress? Gateway { get; set; }
 
     public IReadOnlyList<IPAddress> DnsServers { get; set; } = [];
+
+    /// <summary>How busy this computer's connection was since the previous cycle; null when unknown.</summary>
+    public ThroughputSample? Throughput { get; set; }
 }
 
 /// <summary>

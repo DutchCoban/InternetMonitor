@@ -28,6 +28,16 @@ public static class LatencyClassifier
         return ms >= targets.LatencyWarningMs ? StepState.Warning : StepState.Ok;
     }
 
+    /// <summary>
+    /// The detail line for a latency warning. When this computer was filling the line at the time,
+    /// that is said outright - it turns "the internet is slow" into "your own downloads are
+    /// queueing in the router", which is a different fix and not the provider's.
+    /// </summary>
+    public static (string Key, object[] Args) WarningDetail(StepContext context) =>
+        context.Throughput is { Busy: true } busy
+            ? ("step.latency.busy", [busy.DownMbps.ToString("F0"), busy.UpMbps.ToString("F0")])
+            : ("step.latency.high", []);
+
     /// <summary>Combines two states, keeping the worse one. Ok &lt; Warning &lt; Failed.</summary>
     public static StepState Worse(StepState a, StepState b)
     {

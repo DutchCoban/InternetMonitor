@@ -70,6 +70,21 @@ public static class SeriesNames
     /// <summary>Wi-Fi signal quality in percent, with the access point's BSSID as each point's metadata.</summary>
     public const string WifiSignal = "wifi-signal";
 
+    /// <summary>This computer's own traffic per cycle, in Mbit/s - see <see cref="ThroughputMeter"/>.</summary>
+    public const string TrafficDown = "traffic-down";
+
+    public const string TrafficUp = "traffic-up";
+
+    public const string SpeedTestDownload = "speedtest-download";
+
+    public const string SpeedTestUpload = "speedtest-upload";
+
+    /// <summary>The speed test's idle round trip, as shown on its Ping tile.</summary>
+    public const string SpeedTestPing = "speedtest-ping";
+
+    /// <summary>How many milliseconds the round trip grew while the speed test filled the line.</summary>
+    public const string SpeedTestBufferbloat = "speedtest-bufferbloat";
+
     public static IReadOnlyList<ChartableSeries> Chartable { get; } =
     [
         new(For(StepId.Adapter)!, "step.adapter.name", UnitFor(StepId.Adapter), IsStateSeries(StepId.Adapter)),
@@ -79,7 +94,11 @@ public static class SeriesNames
         new(For(StepId.PublicIp)!, "step.publicIp.name", UnitFor(StepId.PublicIp), IsStateSeries(StepId.PublicIp)),
         new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns)),
         new(For(StepId.Target)!, "step.target.name", UnitFor(StepId.Target), IsStateSeries(StepId.Target)),
-        new("speedtest-download", "speedtest.download.name", "Mbps", false),
-        new("speedtest-upload", "speedtest.upload.name", "Mbps", false),
+        new(TrafficDown, "series.trafficDown", "Mbps", false),
+        new(TrafficUp, "series.trafficUp", "Mbps", false),
+        new(SpeedTestDownload, "speedtest.download.name", "Mbps", false),
+        new(SpeedTestUpload, "speedtest.upload.name", "Mbps", false),
+        new(SpeedTestPing, "series.speedTestPing", "ms", false),
+        new(SpeedTestBufferbloat, "series.speedTestBufferbloat", "ms", false),
     ];
 }

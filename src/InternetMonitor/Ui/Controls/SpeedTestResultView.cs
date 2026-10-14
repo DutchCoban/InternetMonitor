@@ -5,8 +5,8 @@ using InternetMonitor.Ui.Theming;
 namespace InternetMonitor.Ui.Controls;
 
 /// <summary>
-/// The Speed Test tool's result view: a status line plus four stat tiles (ping, jitter, download,
-/// upload), in the same label-over-value shape <see cref="StatusHero"/>'s own stats use. Unlike
+/// The Speed Test tool's result view: a status line plus five stat tiles (ping, jitter, download,
+/// upload, and how much the ping grew while the line was full), in the same label-over-value shape <see cref="StatusHero"/>'s own stats use. Unlike
 /// <see cref="TracerouteView"/>/<see cref="LanDeviceList"/> this never grows a list - a speed test
 /// has exactly one result at a time - so there is nothing to scroll, just four numbers that fill in
 /// live as each phase of the test reports progress.
@@ -18,6 +18,7 @@ public sealed class SpeedTestResultView : ThemedControl
     private double? _jitterMs;
     private double? _downloadMbps;
     private double? _uploadMbps;
+    private double? _loadedIncreaseMs;
     private SpeedTestPhase? _activePhase;
 
     protected override Color BehindColor => Theme.Current.Surface;
@@ -39,6 +40,7 @@ public sealed class SpeedTestResultView : ThemedControl
         _jitterMs = null;
         _downloadMbps = null;
         _uploadMbps = null;
+        _loadedIncreaseMs = null;
         _activePhase = null;
         Invalidate();
     }
@@ -66,13 +68,17 @@ public sealed class SpeedTestResultView : ThemedControl
         Invalidate();
     }
 
-    /// <summary>Applies a finished result outright - used when a result arrives without having been watched live (e.g. nothing to do here today, but keeps the view usable standalone).</summary>
+    /// <summary>
+    /// Applies a finished result outright. The loaded-latency tile only fills in here: it is a
+    /// comparison across the whole run, with no meaningful live value along the way.
+    /// </summary>
     public void Complete(SpeedTestResult result)
     {
         _pingMs = result.PingMs;
         _jitterMs = result.JitterMs;
         _downloadMbps = result.DownloadMbps;
         _uploadMbps = result.UploadMbps;
+        _loadedIncreaseMs = result.LoadedIncreaseMs;
         _activePhase = null;
         Invalidate();
     }
@@ -91,18 +97,22 @@ public sealed class SpeedTestResultView : ThemedControl
             new Rectangle(Sp(2), Sp(2), Math.Max(0, Width - Sp(4)), Dp(24)),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
 
-        int tileWidth = Dp(180);
+        int tileWidth = Math.Min(Dp(180), Math.Max(Dp(100), (Width - Sp(4)) / 5));
         int top = Sp(2) + Dp(36);
 
         DrawStat(g, p, loc.Get("speedtest.stat.ping"), _pingMs is { } ping ? $"{ping:F0} ms" : "-", SpeedTestPhase.Ping, Sp(2), top, tileWidth);
         DrawStat(g, p, loc.Get("speedtest.stat.jitter"), _jitterMs is { } jitter ? $"{jitter:F0} ms" : "-", SpeedTestPhase.Jitter, Sp(2) + tileWidth, top, tileWidth);
         DrawStat(g, p, loc.Get("speedtest.stat.download"), _downloadMbps is { } down ? $"{down:F1} Mbps" : "-", SpeedTestPhase.Download, Sp(2) + (tileWidth * 2), top, tileWidth);
         DrawStat(g, p, loc.Get("speedtest.stat.upload"), _uploadMbps is { } up ? $"{up:F1} Mbps" : "-", SpeedTestPhase.Upload, Sp(2) + (tileWidth * 3), top, tileWidth);
+
+        // "+38 ms (C)": the extra round trip with the line full, graded A-F.
+        string loaded = _loadedIncreaseMs is { } extra ? $"+{extra:F0} ms ({SpeedTestResult.Grade(extra)})" : "-";
+        DrawStat(g, p, loc.Get("speedtest.stat.loaded"), loaded, null, Sp(2) + (tileWidth * 4), top, tileWidth);
     }
 
-    private void DrawStat(Graphics g, Palette p, string label, string value, SpeedTestPhase phase, int x, int y, int width)
+    private void DrawStat(Graphics g, Palette p, string label, string value, SpeedTestPhase? phase, int x, int y, int width)
     {
-        bool active = _activePhase == phase;
+        bool active = phase is not null && _activePhase == phase;
         g.DrawTextCrisp(label, Theme.Font(FontRole.Small), p.TextMuted, new Rectangle(x, y, width, Dp(16)));
         g.DrawTextCrisp(
             value,

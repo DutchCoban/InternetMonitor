@@ -84,6 +84,9 @@ public sealed class StepPipeline : IDisposable
 
     public StepSnapshot? LatestSnapshot { get; private set; }
 
+    /// <summary>Reads the adapter's traffic once per cycle; see <see cref="ThroughputMeter"/>.</summary>
+    public ThroughputMeter Throughput { get; } = new();
+
     /// <summary>
     /// Runs one cycle. If a cycle is already running, this returns immediately rather than
     /// queueing: the caller is a timer or a user clicking "check now", and neither wants two
@@ -150,11 +153,14 @@ public sealed class StepPipeline : IDisposable
         }
         else
         {
+            // Read just before the network checks: the rate then covers the interval in which the
+            // user's own traffic was flowing, not the checks' own few packets.
+            context.Throughput = context.Adapter is { } adapter ? Throughput.Measure(adapter) : null;
             await RunNetworkChecksAsync(context, cancellationToken).ConfigureAwait(false);
         }
 
         DrainHeldFailures(force: true);
-        CompleteCycle();
+        CompleteCycle(context.Throughput);
     }
 
     private async Task<StepId?> RunLocalChecksAsync(StepContext context, CancellationToken cancellationToken)
@@ -349,12 +355,12 @@ public sealed class StepPipeline : IDisposable
         StepChanged?.Invoke(result);
     }
 
-    private void CompleteCycle()
+    private void CompleteCycle(ThroughputSample? throughput)
     {
         StepSnapshot snapshot;
         lock (_gate)
         {
-            snapshot = new StepSnapshot(_current.Values.ToList(), DateTimeOffset.UtcNow);
+            snapshot = new StepSnapshot(_current.Values.ToList(), DateTimeOffset.UtcNow) { Throughput = throughput };
         }
 
         LatestSnapshot = snapshot;

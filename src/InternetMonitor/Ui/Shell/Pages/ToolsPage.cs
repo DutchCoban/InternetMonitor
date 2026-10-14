@@ -433,9 +433,8 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
             // Recorded the same way an automatic run is (see AppHost.OnSpeedTestRunCompleted) - a
             // manual run belongs in History and the data exports just as much as a scheduled one.
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            Services.History.Sample("speedtest-download", now, result.DownloadMbps);
-            Services.History.Sample("speedtest-upload", now, result.UploadMbps);
+            SpeedTestRecorder.Record(Services.History, Services.Pipeline.Throughput, result, DateTimeOffset.UtcNow);
+            _speedTestView.Complete(result);
 
             _speedTestView.Status = Loc.Get("speedtest.done");
         }

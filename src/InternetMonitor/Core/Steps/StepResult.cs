@@ -100,6 +100,9 @@ public sealed class StepSnapshot
 
     public DateTimeOffset TakenUtc { get; }
 
+    /// <summary>This computer's traffic over the interval leading up to this cycle, when it could be measured.</summary>
+    public ThroughputSample? Throughput { get; init; }
+
     public IReadOnlyCollection<StepResult> All => _results.Values;
 
     public StepResult? this[StepId step] => _results.GetValueOrDefault(step);

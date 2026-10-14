@@ -95,6 +95,7 @@ public sealed class AppHost : ApplicationContext
             // a window happens to be open.
             MinimumSampleInterval = TimeSpan.FromSeconds(_settings.BackgroundIntervalSeconds),
         };
+        SpeedTestRecorder.RestoreCapacity(_history, _pipeline.Throughput);
 
         _incidents = new IncidentStore();
 
@@ -358,20 +359,24 @@ public sealed class AppHost : ApplicationContext
         {
             _history.Sample(SeriesNames.WifiSignal, link.TimestampUtc, signal, facts.Wifi.Bssid);
         }
+
+        if (snapshot.Throughput is { } traffic)
+        {
+            _history.Sample(SeriesNames.TrafficDown, snapshot.TakenUtc, Math.Round(traffic.DownMbps, 2));
+            _history.Sample(SeriesNames.TrafficUp, snapshot.TakenUtc, Math.Round(traffic.UpMbps, 2));
+        }
     }
 
     /// <summary>
-    /// An automatic Speed Test run finished - record it the same two series a manual run (see
-    /// <c>ToolsPage</c>) records into, so History and the data exports don't need to know or care
-    /// which path a given sample came from. Runs on <see cref="SpeedTestScheduler"/>'s own
+    /// An automatic Speed Test run finished - record it through <see cref="SpeedTestRecorder"/>,
+    /// exactly as a manual run (see <c>ToolsPage</c>) is, so History and the data exports don't need
+    /// to know or care which path a given sample came from. Runs on <see cref="SpeedTestScheduler"/>'s own
     /// background loop, not the UI thread - fine, same as <see cref="RecordHistory"/> above,
     /// since <see cref="MetricStore.Sample"/> is already safe to call off the UI thread.
     /// </summary>
     private void OnSpeedTestRunCompleted(object? sender, SpeedTestResult result)
     {
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        _history.Sample("speedtest-download", now, result.DownloadMbps);
-        _history.Sample("speedtest-upload", now, result.UploadMbps);
+        SpeedTestRecorder.Record(_history, _pipeline.Throughput, result, DateTimeOffset.UtcNow);
     }
 
     private void UpdateTray(StepSnapshot snapshot, RootCauseResult diagnosis) => _ui.Post(

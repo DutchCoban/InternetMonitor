@@ -501,5 +501,11 @@
   "explain.dns.weakWifi.todo": "Gehen Sie näher an den Access Point oder Router, entfernen Sie Hindernisse oder verwenden Sie ein Kabel. Passiert das immer am selben Ort, hilft dort ein zusätzlicher Access Point oder Mesh-Knoten.",
   "explain.target.weakWifi.what": "Die Verbindung ist ausgefallen, während das WLAN-Signal schwach war.",
   "explain.target.weakWifi.cause": "Das WLAN-Signal lag zu Beginn nur bei {0} %. Bei diesem Wert gehen Pakete verloren und die Verbindung zum Router bricht ab, daher liegt der Fehler weiter hinten höchstwahrscheinlich am schwachen Signal und nicht am Router oder Anbieter.",
-  "explain.target.weakWifi.todo": "Gehen Sie näher an den Access Point oder Router, entfernen Sie Hindernisse oder verwenden Sie ein Kabel. Passiert das immer am selben Ort, hilft dort ein zusätzlicher Access Point oder Mesh-Knoten."
+  "explain.target.weakWifi.todo": "Gehen Sie näher an den Access Point oder Router, entfernen Sie Hindernisse oder verwenden Sie ein Kabel. Passiert das immer am selben Ort, hilft dort ein zusätzlicher Access Point oder Mesh-Knoten.",
+  "step.latency.busy": "Die Antwortzeiten sind höher als üblich, während dieser Computer {0} Mbit/s empfing und {1} Mbit/s sendete - die Leitung war ausgelastet, daher staut sich höchstwahrscheinlich der eigene Verkehr im Router.",
+  "series.trafficDown": "Datenverkehr (Download)",
+  "series.trafficUp": "Datenverkehr (Upload)",
+  "series.speedTestPing": "Geschwindigkeitstest (Ping)",
+  "series.speedTestBufferbloat": "Geschwindigkeitstest (zusätzlicher Ping unter Last)",
+  "speedtest.stat.loaded": "Ping unter Last"
 }

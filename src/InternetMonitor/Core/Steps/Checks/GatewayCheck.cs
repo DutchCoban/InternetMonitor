@@ -115,11 +115,12 @@ public sealed class GatewayCheck : IStepCheck
 
         StepState state = LatencyClassifier.Classify(latency, context.Targets);
         string latencyText = latency?.ToString("F0") ?? "?";
+        (string? detailKey, object[] detailArgs) = state == StepState.Warning ? LatencyClassifier.WarningDetail(context) : (null, []);
         return new StepResult(
             Id,
             state,
             loc.Format("step.gateway.ok", gateway, latencyText),
-            state == StepState.Warning ? loc.Get("step.latency.high") : null,
+            detailKey is null ? null : loc.Format(detailKey, detailArgs),
             latency,
             watch.Elapsed,
             DateTimeOffset.UtcNow,
@@ -128,7 +129,8 @@ public sealed class GatewayCheck : IStepCheck
         {
             HeadlineKey = "step.gateway.ok",
             HeadlineArgs = [gateway, latencyText],
-            DetailKey = state == StepState.Warning ? "step.latency.high" : null,
+            DetailKey = detailKey,
+            DetailArgs = detailArgs,
         };
     }
 }
