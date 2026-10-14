@@ -164,9 +164,17 @@ It contains no network names, addresses or hardware identifiers - only times, du
 
 Reports → Export covers three kinds of export, and two more are available elsewhere:
 
-- **Export all data** - a zip of settings (redacted), incidents, history, and the diagnostic log.
-- **Export for AI analysis** - a Markdown report with instructions aimed at an AI assistant.
-- **Export plain data** - the same report without the AI-facing instructions.
+- **Export all data** - a zip of settings (redacted), incidents, every history series (including
+  ones no chart shows), the diagnostic log, and - as readable documents - the plain data summary
+  and the provider report.
+- **Export for AI analysis** - one Markdown document with instructions for an AI assistant (what
+  to look for, how to structure its answer) and everything the provider report has, plus: every
+  incident with its timeline, the changes recorded just before it and each step's measurements;
+  when outages start by hour and weekday; latency per day and by hour of day; Wi-Fi signal and
+  access-point switches; this computer's traffic; and statistics for every recorded series.
+  Wi-Fi network names, access points and MAC addresses are replaced by stable stand-ins
+  ("Wi-Fi network A", "AP-1", "MAC-1"), so it can be pasted into any AI tool.
+- **Export plain data** - the same document without the AI-facing instructions.
 - **Per-incident export** - a Markdown report for a single incident, from the Incidents screen.
 - **Network scan → Export CSV** - the LAN scan's device table (IP, hostname, MAC, vendor, response time).
 

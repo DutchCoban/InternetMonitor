@@ -30,11 +30,16 @@ public static class DataExportBuilder
         Converters = { new JsonStringEnumConverter() },
     };
 
+    /// <param name="documents">
+    /// Readable documents to include next to the raw data, by file name - the summary and the
+    /// provider report, so the zip holds everything the app can produce, not just its inputs.
+    /// </param>
     public static byte[] Build(
         AppSettings settings,
         IReadOnlyList<Incident> incidents,
         IReadOnlyDictionary<string, IReadOnlyList<MetricPoint>> historySeries,
-        byte[]? diagnosticsLogBytes)
+        byte[]? diagnosticsLogBytes,
+        IReadOnlyDictionary<string, string>? documents = null)
     {
         using var stream = new MemoryStream();
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
@@ -45,6 +50,11 @@ public static class DataExportBuilder
             foreach ((string seriesId, IReadOnlyList<MetricPoint> points) in historySeries)
             {
                 WriteTextEntry(zip, $"history/{seriesId}.csv", BuildHistoryCsv(points));
+            }
+
+            foreach ((string name, string content) in documents ?? new Dictionary<string, string>())
+            {
+                WriteTextEntry(zip, name, content);
             }
 
             if (diagnosticsLogBytes is { Length: > 0 })

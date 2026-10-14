@@ -104,6 +104,18 @@ public sealed class MetricStore : IAsyncDisposable
         }
     }
 
+    /// <summary>Every series that has data, including ones no chart shows (v1's per-address pings, for example).</summary>
+    public IReadOnlyList<string> SeriesIds
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return [.. _series.Where(s => s.Value.Count > 0).Select(s => s.Key).Order(StringComparer.Ordinal)];
+            }
+        }
+    }
+
     public IReadOnlyList<MetricPoint> Get(string seriesId)
     {
         lock (_lock)

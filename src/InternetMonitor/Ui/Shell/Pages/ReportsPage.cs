@@ -40,9 +40,9 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         BuildReportSection();
 
         _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
-        _exportAll = AddButton(_exportCard, _exportButtons, ExportAllData);
-        _exportAi = AddButton(_exportCard, _exportButtons, ExportForAi);
-        _exportPlain = AddButton(_exportCard, _exportButtons, ExportPlainData);
+        _exportAll = AddButton(_exportCard, _exportButtons, () => _ = ExportAllDataAsync());
+        _exportAi = AddButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: true));
+        _exportPlain = AddButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: false));
 
         // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge.
         Controls.Add(_exportCard);
@@ -114,14 +114,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
     {
         await Services.History.Loaded.ConfigureAwait(true);
 
-        DateTimeOffset to = DateTimeOffset.UtcNow;
-        DateTimeOffset from = to.AddDays(-Services.Settings.ReportPeriodDays);
-        ProviderReportData data = ProviderReportData.Compute(Services.Incidents.All, Services.History.Get, from, to, TimeZoneInfo.Local);
-        string version = (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3);
-        string html = ProviderReportHtml.Render(
-            data,
-            new ProviderReportOptions(Services.Settings.SubscribedDownloadMbps, Services.Settings.SubscribedUploadMbps, version, DateTimeOffset.Now, TimeZoneInfo.Local),
-            Loc);
+        string html = BuildProviderReport();
         string fileName = $"internetmonitor-report-{DateTime.Now:yyyy-MM-dd}.html";
 
         if (!open)
@@ -142,6 +135,19 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         {
             // The temp folder being unwritable is not worth a dialog; "Save as" still works.
         }
+    }
+
+    private static string AppVersion => (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3);
+
+    private string BuildProviderReport()
+    {
+        DateTimeOffset to = DateTimeOffset.UtcNow;
+        DateTimeOffset from = to.AddDays(-Services.Settings.ReportPeriodDays);
+        ProviderReportData data = ProviderReportData.Compute(Services.Incidents.All, Services.History.Get, from, to, TimeZoneInfo.Local);
+        return ProviderReportHtml.Render(
+            data,
+            new ProviderReportOptions(Services.Settings.SubscribedDownloadMbps, Services.Settings.SubscribedUploadMbps, AppVersion, DateTimeOffset.Now, TimeZoneInfo.Local),
+            Loc);
     }
 
     private void PopulatePeriodItems()
@@ -171,8 +177,15 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
     // ---- Data exports ---------------------------------------------------------------------------
 
-    private void ExportAllData()
+    /// <summary>
+    /// Every export waits for history to finish loading first, for the same reason as the report:
+    /// an export made in the first seconds after start-up would otherwise silently miss most of it.
+    /// The zip also carries the readable summary and the provider report, so it really is all of it.
+    /// </summary>
+    private async Task ExportAllDataAsync()
     {
+        await Services.History.Loaded.ConfigureAwait(true);
+
         byte[]? logBytes = null;
         try
         {
@@ -187,20 +200,29 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
             // file that happened to be locked or unreadable at that moment.
         }
 
-        byte[] zip = DataExportBuilder.Build(Services.Settings, Services.Incidents.All, BuildHistorySnapshot(), logBytes);
+        Dictionary<string, IReadOnlyList<MetricPoint>> history = BuildHistorySnapshot();
+        var documents = new Dictionary<string, string>
+        {
+            ["summary.md"] = AiExportBuilder.BuildPlain(Services.Incidents.All, history, Services.Settings, AppVersion),
+            ["provider-report.html"] = BuildProviderReport(),
+        };
+
+        byte[] zip = DataExportBuilder.Build(Services.Settings, Services.Incidents.All, history, logBytes, documents);
         SaveAs("ZIP (*.zip)|*.zip", $"internetmonitor-export-{DateTime.Now:yyyy-MM-dd}.zip", path => File.WriteAllBytes(path, zip));
     }
 
-    private void ExportForAi()
+    private async Task ExportMarkdownAsync(bool forAi)
     {
-        string markdown = AiExportBuilder.Build(Services.Incidents.All, BuildHistorySnapshot(), Services.Settings);
-        SaveAs("Markdown (*.md)|*.md", $"internetmonitor-ai-export-{DateTime.Now:yyyy-MM-dd}.md", path => File.WriteAllText(path, markdown));
-    }
+        await Services.History.Loaded.ConfigureAwait(true);
 
-    private void ExportPlainData()
-    {
-        string markdown = AiExportBuilder.BuildPlain(Services.Incidents.All, BuildHistorySnapshot(), Services.Settings);
-        SaveAs("Markdown (*.md)|*.md", $"internetmonitor-data-export-{DateTime.Now:yyyy-MM-dd}.md", path => File.WriteAllText(path, markdown));
+        Dictionary<string, IReadOnlyList<MetricPoint>> history = BuildHistorySnapshot();
+        string markdown = forAi
+            ? AiExportBuilder.Build(Services.Incidents.All, history, Services.Settings, AppVersion)
+            : AiExportBuilder.BuildPlain(Services.Incidents.All, history, Services.Settings, AppVersion);
+        string fileName = forAi
+            ? $"internetmonitor-ai-export-{DateTime.Now:yyyy-MM-dd}.md"
+            : $"internetmonitor-data-export-{DateTime.Now:yyyy-MM-dd}.md";
+        SaveAs("Markdown (*.md)|*.md", fileName, path => File.WriteAllText(path, markdown));
     }
 
     private void SaveAs(string filter, string fileName, Action<string> write)
@@ -223,10 +245,12 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
     private Dictionary<string, IReadOnlyList<MetricPoint>> BuildHistorySnapshot()
     {
+        // Every series on disk, not just the ones the History page offers: v1's per-address pings
+        // and endpoint series are still evidence, and an export is the place for all of it.
         var history = new Dictionary<string, IReadOnlyList<MetricPoint>>();
-        foreach (ChartableSeries series in SeriesNames.Chartable)
+        foreach (string id in Services.History.SeriesIds.Union(SeriesNames.Chartable.Select(s => s.Id)))
         {
-            history[series.Id] = Services.History.Get(series.Id);
+            history[id] = Services.History.Get(id);
         }
 
         return history;

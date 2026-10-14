@@ -118,6 +118,64 @@ public sealed class LocalizationManager
         }
     }
 
+    private static readonly Lazy<IReadOnlyList<Dictionary<string, string>>> AllLanguages = new(() =>
+        [.. SupportedLanguages.Select(l => LoadLanguageFile(l.Code))]);
+
+    /// <summary>
+    /// A key's text in every supported language. For reading back something recorded under a
+    /// translated label - incident measurements keep whatever language the screen showed at the
+    /// time - without caring which language that was.
+    /// </summary>
+    public static IReadOnlyList<string> TranslationsOf(string key) =>
+        [.. AllLanguages.Value.Select(d => d.GetValueOrDefault(key)).OfType<string>().Distinct()];
+
+    private static readonly Lazy<Dictionary<string, string>> BackToEnglish = new(() =>
+    {
+        // Text -> its English equivalent, for every key whose translation is a fixed string. The
+        // same word can mean different things under different keys ("Uit" is "Disabled" for DHCP
+        // but "Off" for a log level), so measurement and link-state keys - what recorded data
+        // actually contains - win over the rest; a text still ambiguous after that is left out.
+        static bool Measurement(string key) => key.StartsWith("measure.", StringComparison.Ordinal) || key.StartsWith("linkState.", StringComparison.Ordinal);
+
+        var candidates = new Dictionary<string, List<(string English, bool Measurement)>>(StringComparer.Ordinal);
+        foreach (Dictionary<string, string> language in AllLanguages.Value)
+        {
+            foreach ((string key, string text) in language)
+            {
+                if (text.Contains('{') || !FallbackStrings.Value.TryGetValue(key, out string? english) || text == english)
+                {
+                    continue;
+                }
+
+                if (!candidates.TryGetValue(text, out List<(string, bool)>? list))
+                {
+                    candidates[text] = list = [];
+                }
+
+                list.Add((english, Measurement(key)));
+            }
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach ((string text, List<(string English, bool Measurement)> list) in candidates)
+        {
+            List<string> preferred = [.. (list.Any(c => c.Measurement) ? list.Where(c => c.Measurement) : list).Select(c => c.English).Distinct()];
+            if (preferred.Count == 1)
+            {
+                map[text] = preferred[0];
+            }
+        }
+
+        return map;
+    });
+
+    /// <summary>
+    /// Turns text that was recorded in some display language back into English, when it is exactly
+    /// one of the app's own fixed strings (a measurement label, "Off", a link state). Anything else -
+    /// composed text, a value from the network - comes back unchanged.
+    /// </summary>
+    public static string ToEnglish(string text) => BackToEnglish.Value.GetValueOrDefault(text, text);
+
     private static Dictionary<string, string> LoadLanguageFile(string languageCode)
     {
         string resourceName = $"InternetMonitor.Localization.{languageCode}.json";
