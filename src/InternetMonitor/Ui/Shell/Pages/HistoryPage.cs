@@ -145,7 +145,7 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
             series.IsState,
             latency ? Services.Targets.LatencyWarningMs : null,
             latency ? Services.Targets.LatencyErrorMs : null,
-            series.MarksMetadataChanges);
+            series.MetadataChangeKey);
 
         _chart.SetRange(_selectedRange);
     }

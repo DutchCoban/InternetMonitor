@@ -25,11 +25,11 @@ namespace InternetMonitor.Core.History;
 /// the Speed Test's download/upload results are recorded the same way but have no <see cref="StepId"/>
 /// of their own, since they don't run as part of the step pipeline's cycle.
 /// </summary>
-/// <param name="MarksMetadataChanges">
-/// Draw a marker wherever a point's <see cref="MetricPoint.Metadata"/> differs from the one before
-/// it - for the Wi-Fi signal series that is the access point, so a roam shows on the chart.
+/// <param name="MetadataChangeKey">
+/// When set, the chart marks every point whose key (derived from its <see cref="MetricPoint.Metadata"/>)
+/// differs from the one before - for the Wi-Fi signal series the access point, so a roam shows.
 /// </param>
-public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState, bool MarksMetadataChanges = false);
+public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState, Func<string?, string?>? MetadataChangeKey = null);
 
 public static class SeriesNames
 {
@@ -89,7 +89,7 @@ public static class SeriesNames
     [
         new(For(StepId.Adapter)!, "step.adapter.name", UnitFor(StepId.Adapter), IsStateSeries(StepId.Adapter)),
         new(For(StepId.Link)!, "step.link.name", UnitFor(StepId.Link), IsStateSeries(StepId.Link)),
-        new(WifiSignal, "series.wifiSignal", "%", false, MarksMetadataChanges: true),
+        new(WifiSignal, "series.wifiSignal", "%", false, WifiHistory.AccessPointOf),
         new(For(StepId.Gateway)!, "step.gateway.name", UnitFor(StepId.Gateway), IsStateSeries(StepId.Gateway)),
         new(For(StepId.PublicIp)!, "step.publicIp.name", UnitFor(StepId.PublicIp), IsStateSeries(StepId.PublicIp)),
         new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns)),

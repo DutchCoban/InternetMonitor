@@ -33,7 +33,7 @@ public sealed class MetricChart : ThemedControl
     private double? _warnThreshold;
     private double? _errorThreshold;
     private bool _stateSeries;
-    private bool _markMetadataChanges;
+    private Func<string?, string?>? _metadataChangeKey;
     private int _stateBucketCount = 1;
     private bool _compact;
 
@@ -91,12 +91,12 @@ public sealed class MetricChart : ThemedControl
         bool stateSeries = false,
         double? warnThreshold = null,
         double? errorThreshold = null,
-        bool markMetadataChanges = false)
+        Func<string?, string?>? metadataChangeKey = null)
     {
         _points = points;
         _unit = unit;
         _stateSeries = stateSeries;
-        _markMetadataChanges = markMetadataChanges;
+        _metadataChangeKey = metadataChangeKey;
         _warnThreshold = warnThreshold;
         _errorThreshold = errorThreshold;
 
@@ -445,9 +445,9 @@ public sealed class MetricChart : ThemedControl
             DrawSeries(g, p, plot, max);
         }
 
-        if (_markMetadataChanges && !Compact)
+        if (_metadataChangeKey is { } key && !Compact)
         {
-            DrawMetadataChanges(g, p, plot);
+            DrawMetadataChanges(g, p, plot, key);
         }
 
         if (!Compact)
@@ -585,12 +585,12 @@ public sealed class MetricChart : ThemedControl
     }
 
     /// <summary>
-    /// A thin dotted line with a small diamond on top wherever a point's metadata differs from the
-    /// previous point's - for the Wi-Fi signal series, a switch to another access point. Read from
+    /// A thin dotted line with a small diamond on top wherever a point's metadata key differs from
+    /// the previous point's - for the Wi-Fi signal series, a switch to another access point. Read from
     /// the full point list, not the downsampled visible one: a downsample keeps the shape of the
     /// line, not every point where the metadata happened to change.
     /// </summary>
-    private void DrawMetadataChanges(Graphics g, Palette p, Rectangle plot)
+    private void DrawMetadataChanges(Graphics g, Palette p, Rectangle plot, Func<string?, string?> keyOf)
     {
         using var pen = new Pen(p.TextMuted.WithAlpha(150), 1f) { DashStyle = DashStyle.Dot };
         using var brush = new SolidBrush(p.TextSecondary);
@@ -599,7 +599,7 @@ public sealed class MetricChart : ThemedControl
         string? previous = null;
         foreach (MetricPoint point in _points)
         {
-            if (point.Metadata is not { Length: > 0 } metadata)
+            if (keyOf(point.Metadata) is not { } metadata)
             {
                 continue;
             }
