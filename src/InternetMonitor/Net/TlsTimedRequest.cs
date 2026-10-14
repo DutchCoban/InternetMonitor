@@ -73,7 +73,9 @@ public static class TlsTimedRequest
         Uri uri,
         TimeSpan timeout,
         IReadOnlyList<RequestHeader> headers,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IPAddress? source = null,
+        IReadOnlyList<IPAddress>? dnsServers = null)
     {
         var total = Stopwatch.StartNew();
         int port = uri.Port;
@@ -88,7 +90,7 @@ public static class TlsTimedRequest
 
         try
         {
-            DnsOutcome dns = await DnsResolve.ResolveAsync(uri.Host, DnsSubBudget, budget.Token).ConfigureAwait(false);
+            DnsOutcome dns = await DnsResolve.ResolveViaAsync(uri.Host, dnsServers, source, DnsSubBudget, budget.Token).ConfigureAwait(false);
             dnsTime = TimeSpan.FromMilliseconds(dns.ElapsedMs);
             if (!dns.Success)
             {
@@ -102,6 +104,11 @@ public static class TlsTimedRequest
                 ?? dns.Addresses[0];
 
             using var tcp = new TcpClient(remote.AddressFamily) { NoDelay = true };
+            if (!TcpConnect.TryBind(tcp.Client, source))
+            {
+                return Fail(HttpStage.Tcp, "Local address not available");
+            }
+
             var tcpWatch = Stopwatch.StartNew();
             try
             {

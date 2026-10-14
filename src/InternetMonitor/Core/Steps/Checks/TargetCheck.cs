@@ -61,7 +61,7 @@ public sealed class TargetCheck : IStepCheck
         }
 
         TargetEndpointResult[] results = await Task.WhenAll(
-            targets.Select(t => CheckOneAsync(t, context.Targets.TargetTimeout, cancellationToken))).ConfigureAwait(false);
+            targets.Select(t => CheckOneAsync(t, context.Targets.TargetTimeout, context.LocalAddress, context.DnsServers, cancellationToken))).ConfigureAwait(false);
 
         var facts = new TargetFacts(results);
 
@@ -173,18 +173,28 @@ public sealed class TargetCheck : IStepCheck
         };
     }
 
+    /// <summary>
+    /// <paramref name="source"/> and <paramref name="dnsServers"/> are the adapter steps 1-4
+    /// described: names are resolved through that adapter's own DNS servers and connections leave
+    /// from its address, so this step tests the same path as the ones before it rather than
+    /// whichever adapter Windows' routing happens to prefer.
+    /// </summary>
     private static Task<TargetEndpointResult> CheckOneAsync(
         TargetEndpoint target,
         TimeSpan timeout,
+        IPAddress? source,
+        IReadOnlyList<IPAddress> dnsServers,
         CancellationToken cancellationToken) => target.Kind switch
         {
-            TargetKind.TcpPort => CheckTcpPortAsync(target, timeout, cancellationToken),
-            _ => CheckUrlAsync(target, timeout, cancellationToken),
+            TargetKind.TcpPort => CheckTcpPortAsync(target, timeout, source, dnsServers, cancellationToken),
+            _ => CheckUrlAsync(target, timeout, source, dnsServers, cancellationToken),
         };
 
     private static async Task<TargetEndpointResult> CheckUrlAsync(
         TargetEndpoint target,
         TimeSpan timeout,
+        IPAddress? source,
+        IReadOnlyList<IPAddress> dnsServers,
         CancellationToken cancellationToken)
     {
         if (!Uri.TryCreate(target.Url, UriKind.Absolute, out Uri? uri))
@@ -197,7 +207,7 @@ public sealed class TargetCheck : IStepCheck
         IReadOnlyList<RequestHeader> headers = target.Headers.Count == 0
             ? []
             : [.. target.Headers.Select(h => new RequestHeader(h.Name, h.Value))];
-        HttpOutcome outcome = await TlsTimedRequest.RequestAsync(uri, timeout, headers, cancellationToken).ConfigureAwait(false);
+        HttpOutcome outcome = await TlsTimedRequest.RequestAsync(uri, timeout, headers, cancellationToken, source, dnsServers).ConfigureAwait(false);
 
         return new TargetEndpointResult(
             target.Name,
@@ -220,13 +230,15 @@ public sealed class TargetCheck : IStepCheck
     private static async Task<TargetEndpointResult> CheckTcpPortAsync(
         TargetEndpoint target,
         TimeSpan timeout,
+        IPAddress? source,
+        IReadOnlyList<IPAddress> dnsServers,
         CancellationToken cancellationToken)
     {
         string label = PortLabel(target);
 
         if (!IPAddress.TryParse(target.Host, out IPAddress? address))
         {
-            DnsOutcome dns = await DnsResolve.ResolveAsync(target.Host, DnsSubBudget, cancellationToken).ConfigureAwait(false);
+            DnsOutcome dns = await DnsResolve.ResolveViaAsync(target.Host, dnsServers, source, DnsSubBudget, cancellationToken).ConfigureAwait(false);
             if (!dns.Success)
             {
                 string error = dns.TimedOut ? "DNS lookup timed out" : $"DNS lookup failed ({dns.Error})";
@@ -236,7 +248,7 @@ public sealed class TargetCheck : IStepCheck
             address = dns.Addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork) ?? dns.Addresses[0];
         }
 
-        TcpOutcome outcome = await TcpConnect.TryConnectAsync(address, target.Port, timeout, cancellationToken).ConfigureAwait(false);
+        TcpOutcome outcome = await TcpConnect.TryConnectAsync(address, target.Port, timeout, cancellationToken, source).ConfigureAwait(false);
 
         return outcome.Answered
             ? new TargetEndpointResult(target.Name, TargetKind.TcpPort, label, true, null, null, HttpStage.None, null, null, address, outcome.ElapsedMs)

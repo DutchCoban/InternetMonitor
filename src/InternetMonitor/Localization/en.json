@@ -440,5 +440,13 @@
   "settings.speedTestAutoRun": "Run speed test automatically",
   "settings.speedTestInterval": "Interval",
   "settings.speedTestInterval.option": "Every {0}h",
-  "traceroute.tcpReachable": "ICMP route unknown, but the destination is reachable via TCP (port {0}, {1} ms) - ICMP appears to be blocked along the way."
+  "traceroute.tcpReachable": "ICMP route unknown, but the destination is reachable via TCP (port {0}, {1} ms) - ICMP appears to be blocked along the way.",
+  "measure.dnsAnsweredBy": "Answered by",
+  "step.dns.noServers": "No DNS server on this adapter",
+  "step.dns.noServers.detail": "This adapter has no DNS server, obtained or configured, so names cannot be resolved over this connection.",
+  "settings.section.publicIp": "Public internet",
+  "settings.section.publicIp.subtitle": "The addresses step 5 pings to decide whether the internet is reachable.",
+  "settings.publicIp.targets": "Test addresses (IPv4, comma-separated)",
+  "settings.publicIp.error.empty": "Enter at least one address.",
+  "settings.publicIp.error.invalid": "Not a valid IPv4 address: {0}"
 }

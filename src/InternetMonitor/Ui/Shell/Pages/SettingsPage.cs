@@ -38,6 +38,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Card _networkHealthCard = null!;
     private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
+    private Card _publicIpCard = null!;
     private Card _exportCard = null!;
     private Card _settingsBackupCard = null!;
 
@@ -65,6 +66,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Toggle _networkHealthEnabled = null!;
     private readonly List<ConditionRow> _conditionRows = [];
     private TextBox _kumaUrl = null!;
+    private TextBox _publicIpTargets = null!;
+    private Label _publicIpError = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
     private AppButton _kumaAbout = null!;
@@ -105,6 +108,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _integrationsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Globe };
         BuildIntegrationsRows();
 
+        _publicIpCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Globe };
+        BuildPublicIpRows();
+
         _endpointsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Target };
         BuildEndpointsSection();
 
@@ -123,6 +129,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         Controls.Add(_settingsBackupCard);
         Controls.Add(_exportCard);
         Controls.Add(_endpointsCard);
+        Controls.Add(_publicIpCard);
         Controls.Add(_integrationsCard);
         Controls.Add(_networkHealthCard);
         Controls.Add(_diagnosticsCard);
@@ -499,6 +506,49 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         Services.Settings.PacketLoss,
         Services.Settings.TtlExceeded,
         Services.Settings.RogueDhcp);
+
+    // ---- Public internet (step 5) ---------------------------------------------------------------
+
+    private void BuildPublicIpRows()
+    {
+        _publicIpTargets = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(260), Font = Theme.Font(FontRole.Body) };
+        _publicIpTargets.Leave += OnPublicIpTargetsChanged;
+        AddRow(_publicIpCard, "settings.publicIp.targets", _publicIpTargets);
+
+        _publicIpError = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+            Text = string.Empty,
+        };
+        _publicIpCard.Controls.Add(_publicIpError);
+    }
+
+    /// <summary>
+    /// Accepts a comma-, semicolon- or space-separated list of IPv4 addresses. Any entry that is
+    /// not one is rejected as a whole rather than silently dropped, so what is saved is always
+    /// exactly what the field shows.
+    /// </summary>
+    private void OnPublicIpTargetsChanged(object? sender, EventArgs e)
+    {
+        string[] entries = _publicIpTargets.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        List<System.Net.IPAddress> parsed = AppSettings.ParseIPv4List(entries);
+        string? invalid = entries.FirstOrDefault(entry => AppSettings.ParseIPv4List([entry]).Count == 0);
+
+        if (entries.Length == 0 || invalid is not null)
+        {
+            _publicIpError.Text = invalid is null
+                ? Loc.Get("settings.publicIp.error.empty")
+                : Loc.Format("settings.publicIp.error.invalid", invalid);
+            return;
+        }
+
+        _publicIpError.Text = string.Empty;
+        Services.Settings.PublicIpTargets = [.. parsed.Select(a => a.ToString())];
+        Services.Settings.Save();
+        _publicIpTargets.Text = string.Join(", ", Services.Settings.PublicIpTargets);
+    }
 
     // ---- Integrations ---------------------------------------------------------------------------
 
@@ -982,6 +1032,13 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         integrationsY += _kumaAbout.Height;
         _integrationsCard.Height = integrationsY + _integrationsCard.Inset;
 
+        // Same "rows, then an error line below them" shape as the integrations card above.
+        LayoutCardRows(_publicIpCard);
+        Rectangle publicIpContent = _publicIpCard.DisplayRectangle;
+        int publicIpY = _publicIpCard.Height - _publicIpCard.Inset;
+        _publicIpError.Bounds = new Rectangle(publicIpContent.Left, publicIpY, publicIpContent.Width, Dp(16));
+        _publicIpCard.Height = publicIpY + Dp(18) + _publicIpCard.Inset;
+
         Rectangle content = _endpointsCard.DisplayRectangle;
         _addEndpoint.Width = content.Width;
         _endpoints.Width = content.Width;
@@ -1059,6 +1116,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
             row.Window.Value = Math.Clamp(threshold.WindowMinutes, row.Window.Minimum, row.Window.Maximum);
         }
+
+        _publicIpTargets.Leave -= OnPublicIpTargetsChanged;
+        _publicIpTargets.Text = string.Join(", ", settings.ParsedPublicIpTargets());
+        _publicIpError.Text = string.Empty;
+        _publicIpTargets.Leave += OnPublicIpTargetsChanged;
 
         _kumaUrl.Leave -= OnKumaSettingsChanged;
         _kumaInterval.ValueChanged -= OnKumaSettingsChanged;
@@ -1183,6 +1245,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _networkHealthCard.Subtitle = Loc.Get("settings.section.networkHealth.subtitle");
         _integrationsCard.Title = Loc.Get("settings.section.integrations");
         _integrationsCard.Subtitle = Loc.Get("settings.section.integrations.subtitle");
+        _publicIpCard.Title = Loc.Get("settings.section.publicIp");
+        _publicIpCard.Subtitle = Loc.Get("settings.section.publicIp.subtitle");
         _endpointsCard.Title = Loc.Get("settings.section.endpoints");
         _endpointsCard.Subtitle = Loc.Get("settings.section.endpoints.subtitle");
         _exportCard.Title = Loc.Get("settings.section.export");
@@ -1300,6 +1364,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _kumaUrl.ForeColor = p.TextPrimary;
         _kumaError.BackColor = p.Surface;
         _kumaError.ForeColor = p.Error;
+
+        _publicIpTargets.BackColor = p.SurfaceAlt;
+        _publicIpTargets.ForeColor = p.TextPrimary;
+        _publicIpError.BackColor = p.Surface;
+        _publicIpError.ForeColor = p.Error;
     }
 
     /// <summary>A combo-box entry carrying both the stored key and the text shown to the user.</summary>

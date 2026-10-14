@@ -53,9 +53,9 @@ public sealed class GatewayCheck : IStepCheck
         TimeSpan timeout = context.Targets.GatewayTimeout;
         using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        Task<PingOutcome> icmp = IcmpPing.SendAsync(gateway, timeout, race.Token);
+        Task<PingOutcome> icmp = IcmpPing.SendAsync(gateway, timeout, race.Token, context.LocalAddress);
         Task<(int Port, TcpOutcome Outcome)?> tcp = TcpConnect.FirstAnsweringPortAsync(
-            gateway, context.Targets.GatewayProbePorts, timeout, race.Token);
+            gateway, context.Targets.GatewayProbePorts, timeout, race.Token, context.LocalAddress);
 
         PingOutcome ping;
         (int Port, TcpOutcome Outcome)? tcpAnswer;

@@ -31,7 +31,7 @@ public sealed class PublicIpCheck : IStepCheck
         IReadOnlyList<IPAddress> targets = context.Targets.PublicIpTargets;
 
         IReadOnlyList<(IPAddress Address, PingOutcome Outcome)> results =
-            await IcmpPing.SendAllAsync(targets, context.Targets.PublicIpTimeout, cancellationToken).ConfigureAwait(false);
+            await IcmpPing.SendAllAsync(targets, context.Targets.PublicIpTimeout, cancellationToken, context.LocalAddress).ConfigureAwait(false);
 
         var endpoints = results
             .Select(r => new PublicIpEndpointResult(r.Address, r.Outcome.Success, r.Outcome.RoundtripMs, r.Outcome.Status))

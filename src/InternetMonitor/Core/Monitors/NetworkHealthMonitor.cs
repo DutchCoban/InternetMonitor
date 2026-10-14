@@ -46,7 +46,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     private static readonly NetworkHealthConditionStatus DisabledCondition = new(false, 0, 0, 5, false);
 
     private readonly IncidentStore _incidents;
-    private readonly IReadOnlyList<IPAddress> _pingTargets;
+    private readonly Func<IReadOnlyList<IPAddress>> _pingTargets;
 
     /// <summary>
     /// Reads the pipeline's current gateway address. A delegate rather than a direct
@@ -74,7 +74,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     private CancellationTokenSource? _dhcpLoopCts;
     private Task? _dhcpLoopTask;
 
-    public NetworkHealthMonitor(IncidentStore incidents, IReadOnlyList<IPAddress> pingTargets, Func<IPAddress?> gatewayProvider)
+    public NetworkHealthMonitor(IncidentStore incidents, Func<IReadOnlyList<IPAddress>> pingTargets, Func<IPAddress?> gatewayProvider)
     {
         _incidents = incidents;
         _pingTargets = pingTargets;
@@ -230,10 +230,11 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
             _lastTtlExceeded = ttlExceeded;
         }
 
-        if (_packetLoss.Threshold.Enabled && _pingTargets.Count > 0)
+        IReadOnlyList<IPAddress> pingTargets = _pingTargets();
+        if (_packetLoss.Threshold.Enabled && pingTargets.Count > 0)
         {
             IReadOnlyList<(IPAddress Address, PingOutcome Outcome)> results = await IcmpPing
-                .SendAllAsync(_pingTargets, PingTimeout, cancellationToken)
+                .SendAllAsync(pingTargets, PingTimeout, cancellationToken)
                 .ConfigureAwait(false);
 
             int lostPercent = (int)Math.Round(100.0 * results.Count(r => !r.Outcome.Success) / results.Count);

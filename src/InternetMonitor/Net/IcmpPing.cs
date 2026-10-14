@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 
 namespace InternetMonitor.Net;
 
@@ -19,6 +20,15 @@ public readonly record struct PingOutcome(IPStatus Status, double? RoundtripMs, 
 public static class IcmpPing
 {
     private static readonly byte[] Payload = "internet-monitor"u8.ToArray();
+
+    /// <summary>
+    /// <paramref name="source"/> pins the echo to one local address - see <see cref="SendFromAsync"/>.
+    /// Null leaves the choice to Windows' routing table, as before.
+    /// </summary>
+    public static Task<PingOutcome> SendAsync(IPAddress address, TimeSpan timeout, CancellationToken cancellationToken, IPAddress? source) =>
+        source is { AddressFamily: AddressFamily.InterNetwork } && address.AddressFamily == AddressFamily.InterNetwork
+            ? SendFromAsync(source, address, timeout, cancellationToken)
+            : SendAsync(address, timeout, cancellationToken);
 
     public static async Task<PingOutcome> SendAsync(IPAddress address, TimeSpan timeout, CancellationToken cancellationToken)
     {
@@ -104,11 +114,127 @@ public static class IcmpPing
     public static async Task<IReadOnlyList<(IPAddress Address, PingOutcome Outcome)>> SendAllAsync(
         IReadOnlyList<IPAddress> addresses,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IPAddress? source = null)
     {
         PingOutcome[] outcomes = await Task.WhenAll(
-            addresses.Select(a => SendAsync(a, timeout, cancellationToken))).ConfigureAwait(false);
+            addresses.Select(a => SendAsync(a, timeout, cancellationToken, source))).ConfigureAwait(false);
 
         return [.. addresses.Zip(outcomes, (address, outcome) => (address, outcome))];
     }
+
+    /// <summary>
+    /// An IPv4 echo sent from a specific local address. <see cref="Ping"/> has no way to choose
+    /// the source, so this goes to IcmpSendEcho2Ex directly. Pinning the source is what makes the
+    /// step pipeline describe one path: with several adapters up, an unpinned echo leaves by
+    /// whichever adapter Windows' routing prefers, which need not be the adapter steps 1-4 just
+    /// described. Windows' default strong-host send model only uses routes on the interface that
+    /// owns the source address, so an adapter with no way out answers "unreachable" here - which
+    /// is the truth about that adapter.
+    ///
+    /// The native call blocks for up to the timeout, so it runs on the thread pool.
+    /// </summary>
+    private static async Task<PingOutcome> SendFromAsync(IPAddress source, IPAddress destination, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            return await Task.Run(() => SendFromBlocking(source, destination, timeout), cancellationToken)
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is EntryPointNotFoundException or DllNotFoundException)
+        {
+            return new PingOutcome(IPStatus.Unknown, null, null);
+        }
+    }
+
+    private static PingOutcome SendFromBlocking(IPAddress source, IPAddress destination, TimeSpan timeout)
+    {
+        IntPtr handle = IcmpCreateFile();
+        if (handle == IntPtr.Zero || handle == new IntPtr(-1))
+        {
+            return new PingOutcome(IPStatus.Unknown, null, null);
+        }
+
+        const int ReplyBufferSize = 1024;
+        IntPtr reply = Marshal.AllocHGlobal(ReplyBufferSize);
+        try
+        {
+            uint count = IcmpSendEcho2Ex(
+                handle,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                ToNative(source),
+                ToNative(destination),
+                Payload,
+                (ushort)Payload.Length,
+                IntPtr.Zero,
+                reply,
+                ReplyBufferSize,
+                (uint)Math.Max(1, timeout.TotalMilliseconds));
+
+            if (count == 0)
+            {
+                // No reply at all: the error code is the IP_STATUS (timed out, unreachable...),
+                // whose values IPStatus mirrors one for one.
+                // A source address with no route out fails before anything is sent, with a plain
+                // Win32 "unreachable" code rather than an IP_STATUS - mapped so the Diagnostics
+                // screen says "unreachable" rather than "unknown".
+                int error = Marshal.GetLastWin32Error();
+                IPStatus failure = error switch
+                {
+                    ErrorNetworkUnreachable => IPStatus.DestinationNetworkUnreachable,
+                    ErrorHostUnreachable => IPStatus.DestinationHostUnreachable,
+                    _ when Enum.IsDefined(typeof(IPStatus), error) => (IPStatus)error,
+                    _ => IPStatus.Unknown,
+                };
+                return new PingOutcome(failure, null, null);
+            }
+
+            // ICMP_ECHO_REPLY starts with the responder address, the status and the round trip.
+            var responder = new IPAddress(BitConverter.GetBytes(Marshal.ReadInt32(reply, 0)));
+            var status = (IPStatus)Marshal.ReadInt32(reply, 4);
+            uint roundtrip = (uint)Marshal.ReadInt32(reply, 8);
+
+            return new PingOutcome(status, status == IPStatus.Success ? roundtrip : null, responder);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(reply);
+            IcmpCloseHandle(handle);
+        }
+    }
+
+    private const int ErrorNetworkUnreachable = 1231;
+    private const int ErrorHostUnreachable = 1232;
+
+    private static uint ToNative(IPAddress address) => BitConverter.ToUInt32(address.GetAddressBytes(), 0);
+
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern IntPtr IcmpCreateFile();
+
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern bool IcmpCloseHandle(IntPtr handle);
+
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern uint IcmpSendEcho2Ex(
+        IntPtr icmpHandle,
+        IntPtr eventHandle,
+        IntPtr apcRoutine,
+        IntPtr apcContext,
+        uint sourceAddress,
+        uint destinationAddress,
+        byte[] requestData,
+        ushort requestSize,
+        IntPtr requestOptions,
+        IntPtr replyBuffer,
+        uint replySize,
+        uint timeout);
 }

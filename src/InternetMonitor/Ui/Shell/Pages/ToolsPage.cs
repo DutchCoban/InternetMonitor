@@ -126,7 +126,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     private string DefaultTarget()
     {
         GatewayFacts? gateway = Services.Pipeline.LatestSnapshot?.FactsFor<GatewayFacts>(StepId.Gateway);
-        return Services.Targets.PublicIpTargets.FirstOrDefault()?.ToString()
+        return Services.Settings.ParsedPublicIpTargets().FirstOrDefault()?.ToString()
             ?? gateway?.Address?.ToString()
             ?? "9.9.9.9";
     }

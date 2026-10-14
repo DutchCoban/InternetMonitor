@@ -54,6 +54,48 @@ public static class DnsResolve
     }
 
     /// <summary>
+    /// Resolves through specific DNS servers - the adapter's own - from a specific local address,
+    /// so a lookup made on behalf of one adapter really goes over that adapter. A null server list
+    /// means "no adapter context" and uses the system resolver exactly like
+    /// <see cref="ResolveAsync"/>; an empty list means the adapter has no DNS server at all, which
+    /// is reported as a failed lookup rather than quietly borrowing another adapter's resolver.
+    /// </summary>
+    public static async Task<DnsOutcome> ResolveViaAsync(
+        string hostname,
+        IReadOnlyList<IPAddress>? servers,
+        IPAddress? source,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        if (IPAddress.TryParse(hostname, out IPAddress? literal))
+        {
+            return new DnsOutcome([literal], 0, null, false);
+        }
+
+        if (servers is null)
+        {
+            return await ResolveAsync(hostname, timeout, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (servers.Count == 0)
+        {
+            return new DnsOutcome([], 0, SocketError.HostNotFound, false);
+        }
+
+        (IPAddress? _, DnsQueryResult result) = await DnsUdpClient
+            .QueryFirstAnswerAsync(servers, hostname, DnsRecordType.A, timeout, cancellationToken, source)
+            .ConfigureAwait(false);
+
+        if (result.Success && result.Addresses.Count > 0)
+        {
+            return new DnsOutcome(result.Addresses, result.ElapsedMs, null, false);
+        }
+
+        bool timedOut = !result.Answered && result.Error == "Timed out";
+        return new DnsOutcome([], result.ElapsedMs, timedOut ? null : SocketError.HostNotFound, timedOut);
+    }
+
+    /// <summary>
     /// Best-effort reverse lookup, used for traceroute hop names. Returns null rather than
     /// throwing or waiting: a hop with no PTR record is completely normal and must not hold up
     /// the rest of the trace.

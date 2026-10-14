@@ -60,20 +60,18 @@ public sealed class AppHost : ApplicationContext
 
         // Built fresh from current settings on every call rather than captured once: the
         // pipeline already calls its targets provider at the start of every single cycle (see
-        // StepPipeline.RunCycleCoreAsync), so reading live settings here is all a step-7 endpoint
-        // added through Settings needs to take effect on the very next cycle - no extra event
-        // wiring required.
+        // StepPipeline.RunCycleCoreAsync), so reading live settings here is all a step-5 address
+        // or step-7 endpoint changed in Settings needs to take effect on the very next cycle - no
+        // extra event wiring required.
         var defaultTargets = new CheckTargets();
         CheckTargets BuildTargets()
         {
             List<EndpointConfig> endpoints = _settings.ApplicationEndpoints;
-            if (endpoints.Count == 0)
-            {
-                return defaultTargets;
-            }
+            IReadOnlyList<System.Net.IPAddress> publicIpTargets = _settings.ParsedPublicIpTargets();
 
             return defaultTargets with
             {
+                PublicIpTargets = publicIpTargets,
                 Targets =
                 [
                     .. defaultTargets.Targets,
@@ -107,7 +105,7 @@ public sealed class AppHost : ApplicationContext
 
         _networkHealth = new NetworkHealthMonitor(
             _incidents,
-            defaultTargets.PublicIpTargets,
+            _settings.ParsedPublicIpTargets,
             () => _pipeline.LatestSnapshot?.FactsFor<IpAddressFacts>(StepId.IpAddress)?.Gateway);
         _networkHealth.Reconfigure(
             _settings.NetworkHealthMonitoringEnabled,

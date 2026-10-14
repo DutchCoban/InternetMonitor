@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using InternetMonitor.Core.Diagnosis;
@@ -155,6 +156,35 @@ public sealed class AppSettings
     /// baked in, exactly as v1 described itself.
     /// </summary>
     public List<EndpointConfig> ApplicationEndpoints { get; set; } = [];
+
+    /// <summary>The default for <see cref="PublicIpTargets"/>: three well-known public resolvers.</summary>
+    public static readonly IReadOnlyList<string> DefaultPublicIpTargets = ["9.9.9.9", "8.8.8.8", "1.1.1.1"];
+
+    /// <summary>
+    /// The addresses step 5 pings to decide whether the public internet is reachable at all (and
+    /// network-health monitoring pings for packet loss). Kept as text so a hand-edited file with a
+    /// typo degrades to "that entry is ignored" rather than a settings file that fails to load.
+    /// </summary>
+    public List<string> PublicIpTargets { get; set; } = [.. DefaultPublicIpTargets];
+
+    /// <summary>
+    /// <see cref="PublicIpTargets"/> as addresses: the valid IPv4 entries, or the defaults when
+    /// none are - step 5 with nothing to ping would read as "the internet is down".
+    /// </summary>
+    public IReadOnlyList<IPAddress> ParsedPublicIpTargets()
+    {
+        List<IPAddress> parsed = ParseIPv4List(PublicIpTargets);
+        return parsed.Count > 0 ? parsed : ParseIPv4List(DefaultPublicIpTargets);
+    }
+
+    /// <summary>The valid IPv4 addresses among <paramref name="entries"/>, in order, without duplicates.</summary>
+    public static List<IPAddress> ParseIPv4List(IEnumerable<string> entries) =>
+    [
+        .. entries
+            .Select(e => IPAddress.TryParse(e.Trim(), out IPAddress? a) && a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? a : null)
+            .OfType<IPAddress>()
+            .Distinct(),
+    ];
 
     // ---- Integrations -------------------------------------------------------------------------
 

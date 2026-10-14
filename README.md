@@ -28,11 +28,20 @@ is attributed to its most likely cause instead of being reported as a generic "i
 2. **Cable / link** - does the adapter report a physical link at all?
 3. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
 4. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
-5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1`. A single unreachable endpoint doesn't mean internet is down; the diagnosis only escalates once none of the three respond.
-6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved? On failure, also
-   cross-checked against the same three public resolvers to see if it's your configured DNS
-   server specifically (see Known limitations below).
+5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). A single unreachable endpoint doesn't mean internet is down; the diagnosis only escalates once none of them respond.
+6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved by the DNS servers
+   this adapter has, obtained via DHCP or set by hand? Those servers are asked directly. On
+   failure, the same question goes to three public resolvers (`9.9.9.9`, `1.1.1.1`, `8.8.8.8`): if
+   they answer, it's your network's DNS server; if they don't either, it's DNS as a whole.
 7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request.
+
+All seven steps describe **one path**: the adapter Windows routes internet traffic over is
+chosen once per cycle, and steps 4-7 send everything from that adapter's own address and resolve
+names through that adapter's own DNS servers. On a machine with several adapters up at once -
+say WiFi for internet plus a USB-Ethernet adapter used to configure a switch - the diagnosis
+therefore never mixes facts about one adapter with traffic over another. If the chosen adapter
+has no way out, step 5 fails ("no internet") instead of a later step failing for a misleading
+reason.
 
 Because a network firewall can block ICMP without blocking real traffic, the diagnosis engine
 specifically compares ping results against the Target check's results: if ping fails but the
@@ -268,12 +277,11 @@ None of these live inside the application directory, so the app itself can be re
   is rare in practice. This check has no retry: a network settings change (even just the DNS
   server) can make the gateway genuinely unreachable at the OS level for a few seconds, and
   that's real, momentary state worth showing, not a measurement error to hide.
-- DNS "resolver used" reporting shows the interface's *configured* DNS servers, not necessarily
-  which one actually answered a given query - Windows doesn't expose that for a normal lookup.
-  When a lookup fails, though, the app cross-checks the same hostname directly against three
-  well-known public resolvers (9.9.9.9, 8.8.8.8, 1.1.1.1); if they succeed where the system
-  lookup didn't, the diagnosis says so - narrowing the problem down to "your configured DNS
-  server specifically" rather than a broader network/DNS issue.
+- The DNS step queries the adapter's DNS servers directly over plain UDP port 53, not through
+  Windows' own resolver. That's what lets it test exactly that adapter's servers and report which
+  one answered, but it also means a setup that only resolves through Windows' encrypted DNS
+  (DNS over HTTPS) with plain DNS blocked would show a DNS failure here even though browsing works.
+  An adapter that has no DNS server at all is reported as exactly that.
 - Application endpoints are entirely user-configured with no target allowlist, by design (this
   is a local, single-user tool) - see [Security notes](#security-notes) below.
 - The self-update feature assumes the GitHub release it finds has exactly one asset named

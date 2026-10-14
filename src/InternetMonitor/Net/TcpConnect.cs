@@ -19,13 +19,24 @@ public readonly record struct TcpOutcome(bool Connected, bool Refused, double? E
 
 public static class TcpConnect
 {
+    /// <summary>
+    /// <paramref name="source"/>, when given, binds the socket to that local address first, so the
+    /// connection leaves through the adapter that owns it rather than whichever one Windows'
+    /// routing would pick - see <see cref="IcmpPing"/>'s source-pinned send for why that matters.
+    /// </summary>
     public static async Task<TcpOutcome> TryConnectAsync(
         IPAddress address,
         int port,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IPAddress? source = null)
     {
         using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        if (!TryBind(socket, source))
+        {
+            return new TcpOutcome(false, false, null, SocketError.AddressNotAvailable);
+        }
+
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
@@ -69,12 +80,13 @@ public static class TcpConnect
         IPAddress address,
         IReadOnlyList<int> ports,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IPAddress? source = null)
     {
         using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         List<Task<(int Port, TcpOutcome Outcome)>> pending = ports
-            .Select(async port => (port, await TryConnectAsync(address, port, timeout, raceCts.Token).ConfigureAwait(false)))
+            .Select(async port => (port, await TryConnectAsync(address, port, timeout, raceCts.Token, source).ConfigureAwait(false)))
             .ToList();
 
         try
@@ -120,5 +132,28 @@ public static class TcpConnect
             addresses.Select(a => FirstAnsweringPortAsync(a, ports, timeout, cancellationToken))).ConfigureAwait(false);
 
         return [.. addresses.Zip(results, (address, result) => (address, result))];
+    }
+
+    /// <summary>
+    /// Binds to <paramref name="source"/> when one is given and it matches the socket's family.
+    /// Returns false when the bind itself fails - the address has gone away mid-cycle - which the
+    /// callers report as a failed connect rather than an exception.
+    /// </summary>
+    internal static bool TryBind(Socket socket, IPAddress? source)
+    {
+        if (source is null || source.AddressFamily != socket.AddressFamily)
+        {
+            return true;
+        }
+
+        try
+        {
+            socket.Bind(new IPEndPoint(source, 0));
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
     }
 }

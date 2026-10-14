@@ -53,7 +53,8 @@ public static class DnsUdpClient
         string name,
         DnsRecordType type,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IPAddress? source = null)
     {
         long startedAt = Environment.TickCount64;
 
@@ -62,6 +63,11 @@ public static class DnsUdpClient
             byte[] query = BuildQuery(name, type, out ushort transactionId);
 
             using var socket = new Socket(server.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            if (!TcpConnect.TryBind(socket, source))
+            {
+                return new DnsQueryResult(false, -1, [], [], Environment.TickCount64 - startedAt, "Local address not available");
+            }
+
             using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             budget.CancelAfter(timeout);
 
@@ -104,6 +110,59 @@ public static class DnsUdpClient
         {
             return new DnsQueryResult(false, -1, [], [], Environment.TickCount64 - startedAt, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Asks every server in <paramref name="servers"/> the same question at once and returns the
+    /// first successful answer with the server that gave it, cancelling the rest. When none
+    /// answers, returns the last failure and a null server. Racing rather than asking in turn keeps
+    /// a dead server from costing a full timeout before the next one is even tried.
+    /// </summary>
+    public static async Task<(IPAddress? Server, DnsQueryResult Result)> QueryFirstAnswerAsync(
+        IReadOnlyList<IPAddress> servers,
+        string name,
+        DnsRecordType type,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        IPAddress? source = null)
+    {
+        DnsQueryResult last = new(false, -1, [], [], 0, "No servers");
+        if (servers.Count == 0)
+        {
+            return (null, last);
+        }
+
+        using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        List<Task<(IPAddress Server, DnsQueryResult Result)>> pending = servers
+            .Select(async server => (server, await QueryAsync(server, name, type, timeout, race.Token, source).ConfigureAwait(false)))
+            .ToList();
+
+        try
+        {
+            while (pending.Count > 0)
+            {
+                Task<(IPAddress Server, DnsQueryResult Result)> finished = await Task.WhenAny(pending).ConfigureAwait(false);
+                pending.Remove(finished);
+
+                (IPAddress server, DnsQueryResult result) = await finished.ConfigureAwait(false);
+                if (result.Success && (type != DnsRecordType.A || result.Addresses.Count > 0))
+                {
+                    return (server, result);
+                }
+
+                last = result;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        finally
+        {
+            race.Cancel();
+        }
+
+        return (null, last);
     }
 
     private static byte[] BuildQuery(string name, DnsRecordType type, out ushort transactionId)
