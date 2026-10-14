@@ -67,7 +67,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private readonly List<ConditionRow> _conditionRows = [];
     private TextBox _kumaUrl = null!;
     private TextBox _publicIpTargets = null!;
-    private TextBox _publicDnsResolvers = null!;
+    private TextBox _customDnsServers = null!;
     private Label _publicIpError = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
@@ -515,8 +515,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _publicIpTargets = MakeAddressField();
         AddRow(_publicIpCard, "settings.publicIp.targets", _publicIpTargets);
 
-        _publicDnsResolvers = MakeAddressField();
-        AddRow(_publicIpCard, "settings.publicIp.dnsResolvers", _publicDnsResolvers);
+        _customDnsServers = MakeAddressField();
+        AddRow(_publicIpCard, "settings.publicIp.customDns", _customDnsServers);
 
         _publicIpError = new Label
         {
@@ -542,9 +542,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     /// </summary>
     private void OnPublicAddressesChanged(object? sender, EventArgs e)
     {
-        string? targetsError = ApplyAddressField(_publicIpTargets, list => Services.Settings.PublicIpTargets = list);
-        string? resolversError = ApplyAddressField(_publicDnsResolvers, list => Services.Settings.PublicDnsResolvers = list);
-        _publicIpError.Text = targetsError ?? resolversError ?? string.Empty;
+        string? targetsError = ApplyAddressField(_publicIpTargets, list => Services.Settings.PublicIpTargets = list, allowEmpty: false, maxCount: null);
+        string? customError = ApplyAddressField(_customDnsServers, list => Services.Settings.CustomDnsServers = list, allowEmpty: true, maxCount: AppSettings.MaxCustomDnsServers);
+        _publicIpError.Text = targetsError ?? customError ?? string.Empty;
         Services.Settings.Save();
     }
 
@@ -553,10 +553,10 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     /// not one rejects the field as a whole rather than being silently dropped, so what is saved
     /// is always exactly what the field shows. Returns the error to show, or null once stored.
     /// </summary>
-    private string? ApplyAddressField(TextBox box, Action<List<string>> store)
+    private string? ApplyAddressField(TextBox box, Action<List<string>> store, bool allowEmpty, int? maxCount)
     {
         string[] entries = box.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (entries.Length == 0)
+        if (entries.Length == 0 && !allowEmpty)
         {
             return Loc.Get("settings.publicIp.error.empty");
         }
@@ -567,6 +567,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         }
 
         List<string> normalized = [.. AppSettings.ParseIPv4List(entries).Select(a => a.ToString())];
+        if (maxCount is { } max && normalized.Count > max)
+        {
+            return Loc.Format("settings.publicIp.error.tooMany", max);
+        }
+
         store(normalized);
         box.Text = string.Join(", ", normalized);
         return null;
@@ -1140,12 +1145,12 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         }
 
         _publicIpTargets.Leave -= OnPublicAddressesChanged;
-        _publicDnsResolvers.Leave -= OnPublicAddressesChanged;
+        _customDnsServers.Leave -= OnPublicAddressesChanged;
         _publicIpTargets.Text = string.Join(", ", settings.ParsedPublicIpTargets());
-        _publicDnsResolvers.Text = string.Join(", ", settings.ParsedPublicDnsResolvers());
+        _customDnsServers.Text = string.Join(", ", settings.ParsedCustomDnsServers());
         _publicIpError.Text = string.Empty;
         _publicIpTargets.Leave += OnPublicAddressesChanged;
-        _publicDnsResolvers.Leave += OnPublicAddressesChanged;
+        _customDnsServers.Leave += OnPublicAddressesChanged;
 
         _kumaUrl.Leave -= OnKumaSettingsChanged;
         _kumaInterval.ValueChanged -= OnKumaSettingsChanged;
@@ -1390,7 +1395,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _kumaError.BackColor = p.Surface;
         _kumaError.ForeColor = p.Error;
 
-        foreach (TextBox box in new[] { _publicIpTargets, _publicDnsResolvers })
+        foreach (TextBox box in new[] { _publicIpTargets, _customDnsServers })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;

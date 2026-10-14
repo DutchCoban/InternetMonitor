@@ -61,6 +61,8 @@ public static class PlainLanguage
         RootCause.IpConfiguration when snapshot.FactsFor<IpAddressFacts>(StepId.IpAddress) is { IsApipa: true } => ".apipa",
 
         RootCause.Dns when snapshot.FactsFor<DnsFacts>(StepId.Dns) is { PublicResolversWorked: true } => ".ownResolver",
+        RootCause.Dns when snapshot.FactsFor<DnsFacts>(StepId.Dns) is { CustomServersWorked: true } => ".customOnly",
+        RootCause.Dns when snapshot.FactsFor<DnsFacts>(StepId.Dns) is { DnsPortBlockedSuspected: true } => ".blocked",
 
         // Which probe is being filtered changes the advice: a router that ignores pings is a
         // configuration choice, while a network that drops all ICMP is usually a policy upstream.

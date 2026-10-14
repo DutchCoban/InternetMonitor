@@ -177,22 +177,20 @@ public sealed class AppSettings
         return parsed.Count > 0 ? parsed : ParseIPv4List(DefaultPublicIpTargets);
     }
 
-    /// <summary>The default for <see cref="PublicDnsResolvers"/>.</summary>
-    public static readonly IReadOnlyList<string> DefaultPublicDnsResolvers = ["9.9.9.9", "8.8.8.8", "1.1.1.1"];
+    /// <summary>How many <see cref="CustomDnsServers"/> step 6 will try.</summary>
+    public const int MaxCustomDnsServers = 2;
 
     /// <summary>
-    /// The resolvers step 6 asks when the adapter's own DNS servers fail: if these answer, the
-    /// network's DNS server is the problem; if they don't either, DNS as a whole is. Text for the
-    /// same reason as <see cref="PublicIpTargets"/>.
+    /// The user's own last-resort DNS servers for step 6, tried only after the adapter's DNS
+    /// servers and the public resolvers (9.9.9.9, 1.1.1.1, 8.8.8.8) have all failed. Empty by
+    /// default - the adapter's own servers are what the computer really uses, so this is an
+    /// optional extra, not a replacement.
     /// </summary>
-    public List<string> PublicDnsResolvers { get; set; } = [.. DefaultPublicDnsResolvers];
+    public List<string> CustomDnsServers { get; set; } = [];
 
-    /// <summary><see cref="PublicDnsResolvers"/> as addresses, falling back to the defaults when none are valid.</summary>
-    public IReadOnlyList<IPAddress> ParsedPublicDnsResolvers()
-    {
-        List<IPAddress> parsed = ParseIPv4List(PublicDnsResolvers);
-        return parsed.Count > 0 ? parsed : ParseIPv4List(DefaultPublicDnsResolvers);
-    }
+    /// <summary><see cref="CustomDnsServers"/> as addresses: the valid IPv4 entries, at most <see cref="MaxCustomDnsServers"/>.</summary>
+    public IReadOnlyList<IPAddress> ParsedCustomDnsServers() =>
+        [.. ParseIPv4List(CustomDnsServers).Take(MaxCustomDnsServers)];
 
     /// <summary>The valid IPv4 addresses among <paramref name="entries"/>, in order, without duplicates.</summary>
     public static List<IPAddress> ParseIPv4List(IEnumerable<string> entries) =>

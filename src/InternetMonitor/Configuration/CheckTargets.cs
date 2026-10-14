@@ -57,15 +57,22 @@ public sealed record CheckTargets
     public string DnsProbeHostname { get; init; } = "www.ripe.net";
 
     /// <summary>
-    /// Resolvers used only to cross-check a failed lookup. If these answer where the system
-    /// resolver did not, the problem is the configured DNS server rather than DNS as such.
+    /// Resolvers asked one after the other, in this order, only when the adapter's own DNS
+    /// servers fail. The first that resolves the name proves the fault is the adapter's DNS
+    /// server rather than DNS as such. Fixed on purpose: this is the yardstick, not a preference.
     /// </summary>
     public IReadOnlyList<IPAddress> PublicResolvers { get; init; } =
     [
         IPAddress.Parse("9.9.9.9"),
-        IPAddress.Parse("8.8.8.8"),
         IPAddress.Parse("1.1.1.1"),
+        IPAddress.Parse("8.8.8.8"),
     ];
+
+    /// <summary>
+    /// The user's own last-resort DNS servers (Settings, at most two), tried only when the
+    /// adapter's servers and every public resolver have failed. Empty by default.
+    /// </summary>
+    public IReadOnlyList<IPAddress> CustomDnsServers { get; init; } = [];
 
     /// <summary>
     /// The endpoints step 7 checks. The first is the general internet reachability check; the rest

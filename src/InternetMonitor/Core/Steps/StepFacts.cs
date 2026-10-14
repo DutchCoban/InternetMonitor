@@ -74,10 +74,17 @@ public sealed record DnsFacts(
     double? ElapsedMs,
     IReadOnlyList<IPAddress> ConfiguredServers,
 
-    // Null when the system lookup succeeded and no cross-check was needed. True means public
-    // resolvers answered a query the configured one could not, which narrows the fault from
-    // "DNS is broken" to "your DNS server specifically".
-    bool? PublicResolversWorked) : StepFacts;
+    // Null when the adapter's own DNS servers answered and no cross-check was needed. True means
+    // a public resolver answered a query the adapter's servers could not, which narrows the fault
+    // from "DNS is broken" to "this adapter's DNS server specifically".
+    bool? PublicResolversWorked,
+
+    // True when a public resolver gave no DNS answer but did accept a connection on port 443:
+    // the server is reachable, so DNS traffic (port 53) is most likely being blocked on the way.
+    bool DnsPortBlockedSuspected = false,
+
+    // Null when the user configured no last-resort DNS servers, or they were never needed.
+    bool? CustomServersWorked = null) : StepFacts;
 
 public sealed record TargetEndpointResult(
     string Name,
