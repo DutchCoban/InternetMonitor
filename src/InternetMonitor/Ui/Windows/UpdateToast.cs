@@ -73,14 +73,8 @@ public sealed class UpdateToast : Form
         {
             if (_releaseUrl is { Length: > 0 } url)
             {
-                try
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
-                }
-                catch (System.ComponentModel.Win32Exception)
-                {
-                    // Nothing sensible to do if the shell can't open a browser - the toast just closes below regardless.
-                }
+                // Nothing sensible to do if the shell can't open a browser - the toast just closes below regardless.
+                ShellOpen.Open(url);
             }
 
             Close();

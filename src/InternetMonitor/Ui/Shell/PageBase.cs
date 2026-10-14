@@ -6,7 +6,7 @@ using InternetMonitor.Ui.Theming;
 namespace InternetMonitor.Ui.Shell;
 
 /// <summary>
-/// Base class for the six pages the nav rail switches between.
+/// Base class for the pages the nav rail switches between.
 ///
 /// Pages are built once and kept alive, not rebuilt on every navigation: a page holds chart state,
 /// scroll position and selections the user expects to still be there when they come back. They do

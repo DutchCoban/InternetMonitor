@@ -29,6 +29,7 @@ public enum Glyph
     Pulse,
     Steps,
     Search,
+    Report,
 }
 
 /// <summary>
@@ -266,6 +267,15 @@ internal static class Icons
             case Glyph.Search:
                 g.DrawEllipse(pen, 3.5f, 3.5f, 13f, 13f);
                 g.DrawLine(pen, 14.7f, 14.7f, 20.5f, 20.5f);
+                break;
+
+            case Glyph.Report:
+                // A sheet with a small bar chart on it: a document made of measurements.
+                g.DrawRoundedRect(pen, 4f, 2.5f, 16f, 19f, 2f);
+                g.DrawLine(pen, 8.5f, 17.5f, 8.5f, 13.5f);
+                g.DrawLine(pen, 12f, 17.5f, 12f, 9f);
+                g.DrawLine(pen, 15.5f, 17.5f, 15.5f, 11.5f);
+                g.DrawLine(pen, 8f, 6.5f, 16f, 6.5f);
                 break;
         }
     }

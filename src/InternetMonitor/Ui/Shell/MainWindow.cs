@@ -65,6 +65,7 @@ public sealed class MainWindow : Form
         _rail.AddItem(new NavRail.Item("incidents", Glyph.Incidents));
         _rail.AddItem(new NavRail.Item("tools", Glyph.Tools));
         _rail.AddItem(new NavRail.Item("settings", Glyph.Settings));
+        _rail.AddItem(new NavRail.Item("reports", Glyph.Report));
         _rail.SelectionChanged += ShowPage;
 
         _pages["status"] = new StatusPage(services);
@@ -73,6 +74,7 @@ public sealed class MainWindow : Form
         _pages["incidents"] = new IncidentsPage(services);
         _pages["tools"] = new ToolsPage(services);
         _pages["settings"] = new SettingsPage(services);
+        _pages["reports"] = new ReportsPage(services);
 
         foreach (PageBase page in _pages.Values)
         {

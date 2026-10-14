@@ -1,8 +1,6 @@
 using InternetMonitor.App;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
-using InternetMonitor.Core.Export;
-using InternetMonitor.Core.History;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
@@ -39,7 +37,6 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
     private Card _publicIpCard = null!;
-    private Card _exportCard = null!;
     private Card _settingsBackupCard = null!;
 
     private ComboBox _language = null!;
@@ -74,12 +71,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private AppButton _kumaAbout = null!;
     private EndpointList _endpoints = null!;
     private AppButton _addEndpoint = null!;
-    private AppButton _exportAll = null!;
-    private AppButton _exportAi = null!;
-    private AppButton _exportPlain = null!;
     private AppButton _exportSettings = null!;
     private AppButton _importSettings = null!;
-    private readonly List<AppButton> _exportButtons = [];
     private readonly List<AppButton> _settingsBackupButtons = [];
 
     private readonly List<(Label Label, Control Field)> _rows = [];
@@ -115,20 +108,15 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _endpointsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Target };
         BuildEndpointsSection();
 
-        _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
-        BuildExportSection();
-
         _settingsBackupCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
         BuildSettingsBackupSection();
 
-        // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge. Export and
-        // the configuration backup card are added first - and so end up lowest - because they are
-        // occasional actions, not something that belongs among the frequently-changed settings
-        // above them. The configuration backup card sits right below Export, added even earlier so
-        // it ends up even lower, since the two are closely related but deliberately kept apart - one
-        // exports the monitor's *data*, the other its *configuration*.
+        // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge. The
+        // configuration backup card is added first - and so ends up lowest - because it is an
+        // occasional action, not something that belongs among the frequently-changed settings
+        // above it. Exporting the monitor's *data* lives on the Reports page; this card only
+        // backs up and restores its *configuration*.
         Controls.Add(_settingsBackupCard);
-        Controls.Add(_exportCard);
         Controls.Add(_endpointsCard);
         Controls.Add(_publicIpCard);
         Controls.Add(_integrationsCard);
@@ -379,19 +367,9 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         RefreshLogDirectoryText();
     }
 
-    private void OpenLogFolder()
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Services.DiagnosticLog.ResolvedDirectory()) { UseShellExecute = true });
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            // The folder does not exist yet (nothing has logged there) or no shell handler is
-            // registered - not worth surfacing for a convenience shortcut the user can open
-            // themselves via Explorer.
-        }
-    }
+    // The folder may not exist yet (nothing has logged there) - not worth surfacing for a
+    // convenience shortcut the user can open themselves via Explorer.
+    private void OpenLogFolder() => ShellOpen.Open(Services.DiagnosticLog.ResolvedDirectory());
 
     private void RefreshLogDirectoryText() => _logDirectory.Text = Services.DiagnosticLog.ResolvedDirectory();
 
@@ -604,18 +582,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _integrationsCard.Controls.Add(_kumaAbout);
     }
 
-    private static void OpenUptimeKumaProjectPage()
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/louislam/uptime-kuma") { UseShellExecute = true });
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            // No default browser configured, or the shell call otherwise failed - not worth
-            // surfacing for an informational link the user can open themselves.
-        }
-    }
+    private static void OpenUptimeKumaProjectPage() => ShellOpen.Open("https://github.com/louislam/uptime-kuma");
 
     private void OnKumaSettingsChanged(object? sender, EventArgs e)
     {
@@ -712,18 +679,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         LayoutCards();
     }
 
-    // ---- Export ---------------------------------------------------------------------------------
-
-    private void BuildExportSection()
-    {
-        _exportAll = AddExportButton(_exportCard, _exportButtons, ExportAllData);
-        _exportAi = AddExportButton(_exportCard, _exportButtons, ExportForAi);
-        _exportPlain = AddExportButton(_exportCard, _exportButtons, ExportPlainData);
-    }
+    // ---- Configuration backup -------------------------------------------------------------------
 
     /// <summary>
-    /// The configuration backup/restore pair, kept in its own card - see the comment on
-    /// <see cref="Build"/> for why this is deliberately separate from <see cref="BuildExportSection"/>.
+    /// The configuration backup/restore pair. Data exports live on the Reports page - see the
+    /// comment on <see cref="Build"/>.
     /// </summary>
     private void BuildSettingsBackupSection()
     {
@@ -740,97 +700,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         return button;
     }
 
-    private void ExportAllData()
-    {
-        byte[]? logBytes = null;
-        try
-        {
-            if (File.Exists(Services.DiagnosticLog.LogPath))
-            {
-                logBytes = File.ReadAllBytes(Services.DiagnosticLog.LogPath);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Export still proceeds without the log - better than failing the whole export over a
-            // file that happened to be locked or unreadable at that moment.
-        }
-
-        byte[] zip = DataExportBuilder.Build(Services.Settings, Services.Incidents.All, BuildHistorySnapshot(), logBytes);
-
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "ZIP (*.zip)|*.zip",
-            FileName = $"internetmonitor-export-{DateTime.Now:yyyy-MM-dd}.zip",
-        };
-
-        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-        {
-            return;
-        }
-
-        try
-        {
-            File.WriteAllBytes(dialog.FileName, zip);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Not worth surfacing further for a manual export the user can just retry.
-        }
-    }
-
-    private void ExportForAi()
-    {
-        string markdown = AiExportBuilder.Build(Services.Incidents.All, BuildHistorySnapshot(), Services.Settings);
-
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "Markdown (*.md)|*.md",
-            FileName = $"internetmonitor-ai-export-{DateTime.Now:yyyy-MM-dd}.md",
-        };
-
-        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-        {
-            return;
-        }
-
-        try
-        {
-            File.WriteAllText(dialog.FileName, markdown);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Not worth surfacing further for a manual export the user can just retry.
-        }
-    }
-
-    private void ExportPlainData()
-    {
-        string markdown = AiExportBuilder.BuildPlain(Services.Incidents.All, BuildHistorySnapshot(), Services.Settings);
-
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "Markdown (*.md)|*.md",
-            FileName = $"internetmonitor-data-export-{DateTime.Now:yyyy-MM-dd}.md",
-        };
-
-        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-        {
-            return;
-        }
-
-        try
-        {
-            File.WriteAllText(dialog.FileName, markdown);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Not worth surfacing further for a manual export the user can just retry.
-        }
-    }
-
     /// <summary>
-    /// Unlike every other export on this card, this one is deliberately unredacted - confirmed
+    /// Unlike the data exports on the Reports page, this one is deliberately unredacted - confirmed
     /// with the user to match v1's own settings export exactly. It is a literal backup/restore
     /// mechanism, not something meant to be shared, and a Kuma push URL or endpoint header with
     /// its secret blanked out would not actually restore anything on import.
@@ -897,17 +768,6 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         ReconfigureNetworkHealth();
 
         LoadFromSettings();
-    }
-
-    private Dictionary<string, IReadOnlyList<MetricPoint>> BuildHistorySnapshot()
-    {
-        var history = new Dictionary<string, IReadOnlyList<MetricPoint>>();
-        foreach (ChartableSeries series in SeriesNames.Chartable)
-        {
-            history[series.Id] = Services.History.Get(series.Id);
-        }
-
-        return history;
     }
 
     // ---- Shared row layout ----------------------------------------------------------------------
@@ -1002,8 +862,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     /// <summary>
     /// Wraps a card's export/import buttons left-to-right, same wrap-on-overflow approach as
     /// <see cref="ChipGroup"/> - labels long enough to vary a lot by language, a fixed side-by-side
-    /// row would overflow a narrower window. Shared by <see cref="_exportCard"/> (three data
-    /// exports) and <see cref="_settingsBackupCard"/> (configuration export/import).
+    /// row would overflow a narrower window.
     /// </summary>
     private void LayoutExportButtons(Card card, List<AppButton> buttons)
     {
@@ -1073,7 +932,6 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         int contentHeight = _addEndpoint.Height + Sp(2) + _endpoints.Height;
         _endpointsCard.Height = content.Top + contentHeight + _endpointsCard.Inset;
 
-        LayoutExportButtons(_exportCard, _exportButtons);
         LayoutExportButtons(_settingsBackupCard, _settingsBackupButtons);
     }
 
@@ -1279,8 +1137,6 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _publicIpCard.Subtitle = Loc.Get("settings.section.publicIp.subtitle");
         _endpointsCard.Title = Loc.Get("settings.section.endpoints");
         _endpointsCard.Subtitle = Loc.Get("settings.section.endpoints.subtitle");
-        _exportCard.Title = Loc.Get("settings.section.export");
-        _exportCard.Subtitle = Loc.Get("settings.section.export.subtitle");
         _settingsBackupCard.Title = Loc.Get("settings.section.configBackup");
         _settingsBackupCard.Subtitle = Loc.Get("settings.section.configBackup.subtitle");
 
@@ -1317,12 +1173,6 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _addEndpoint.Text = Loc.Get("settings.endpoint.add");
         _addEndpoint.SizeToContent();
 
-        _exportAll.Text = Loc.Get("settings.export.all");
-        _exportAll.SizeToContent();
-        _exportAi.Text = Loc.Get("settings.export.ai");
-        _exportAi.SizeToContent();
-        _exportPlain.Text = Loc.Get("settings.export.plain");
-        _exportPlain.SizeToContent();
         _exportSettings.Text = Loc.Get("settings.export.settings");
         _exportSettings.SizeToContent();
         _importSettings.Text = Loc.Get("settings.import.settings");
