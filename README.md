@@ -25,7 +25,10 @@ combined into a single diagnosis, working outward through the network stack so a
 is attributed to its most likely cause instead of being reported as a generic "internet is down":
 
 1. **Network adapter** - is an adapter present, operational, and actually carrying traffic?
-2. **Cable / link** - does the adapter report a physical link at all?
+2. **Cable / link** - does the adapter report a physical link at all? Over Wi-Fi it also reads
+   the radio side: network name, access point, signal (% and dBm), band and channel, Wi-Fi
+   generation and link rate. Below 40% signal the step becomes a warning, and an outage that starts
+   over a weak signal is explained as such (see [Wi-Fi details](#wi-fi-details)).
 3. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
 4. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
 5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). They're pinged at once and the first answer settles it - a single unreachable endpoint doesn't mean internet is down, and the step doesn't wait out its timeout; the diagnosis only escalates once none of them respond.
@@ -39,7 +42,7 @@ is attributed to its most likely cause instead of being reported as a generic "i
    there but silent on DNS means DNS traffic (port 53) is most likely being blocked. As a last
    resort, up to two DNS servers of your own (Settings → Public internet, optional) are tried. The
    step reports which link in the chain failed or worked.
-7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request.
+7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request. When the built-in check fails, one plain-HTTP request for Windows' own connectivity test page tells a **login page** (hotel, train, guest Wi-Fi) apart from a dead connection - see [Login pages](#login-pages).
 
 All seven steps describe **one path**: the adapter Windows routes internet traffic over is
 chosen once per cycle, and steps 4-7 send everything from that adapter's own address and resolve
@@ -61,7 +64,7 @@ tray icon is live (both configurable in Settings → Check interval) - history i
 the slower, background rate regardless, so retention and chart density don't change depending on
 whether you happen to have the window open.
 
-## Five screens
+## Six screens
 
 - **Status** (left-click the tray icon): a simple green/red/amber overview with a plain-language
   explanation and a seven-step timeline - is the network, internet, DNS, and each configured
@@ -71,7 +74,9 @@ whether you happen to have the window open.
   detail.
 - **History**: a zoomable, pannable chart per check (mouse wheel to zoom, drag to pan,
   double-click to reset), switchable between any chartable series and a 15 min/1 hour/6 hour/24
-  hour/7 day/all-time range. Kept for 30 days.
+  hour/7 day/all-time range. Kept for 30 days. Besides the checks themselves this includes the
+  Wi-Fi signal (with a marker wherever you switched to another access point), this computer's own
+  traffic, and the speed test results.
 - **Incidents**: a run of consecutive failed diagnosis cycles (debounced, so a brief blip doesn't
   create noise) grouped into a single incident with a unique ID (`INC-yyyyMMdd-####`), a
   classification, a start/end time, and a snapshot of every probe's result at the start and at
@@ -86,6 +91,40 @@ whether you happen to have the window open.
   and manufacturer - looked up via two free, alternating MAC-vendor APIs, toggleable in Settings -
   for each; addresses that don't answer a ping also get a TCP-port sweep, toggleable, so a device
   that ignores ICMP but has an open port still shows up); and a **Speed test** (see below).
+- **Reports**: the [report for your provider](#report-for-your-provider) and the
+  [data exports](#exporting-data).
+
+## Wi-Fi details
+
+On a Wi-Fi connection step 2 reads the connection through Windows' Native Wifi API. The History
+page charts the signal over time and marks every switch to another access point, and the incident
+analysis notices another network, another access point (a roam), and a sharp signal drop (30+
+points below the best of the last five minutes). An outage that starts over a weak signal is
+explained as most likely caused by that signal rather than by the router or the provider.
+
+Since Windows 11 24H2 the network name and access point count as location data: Windows only
+reveals them when location access for desktop apps is on (Settings → Privacy & security →
+Location). With it off, the diagnostics say so; signal and band are shown where Windows still
+provides them.
+
+## Login pages
+
+On hotel, train and guest Wi-Fi the network intercepts traffic until you log in. The HTTPS
+reachability check then just fails, which says nothing useful. So when it fails, the app requests
+`http://www.msftconnecttest.com/connecttest.txt` - the page Windows itself uses for its "action
+needed" notice - and if a redirect or a different page comes back, the cause becomes **Login
+page**: the Status page says "Login required" (in the warning colour, since nothing is broken) with
+an **Open login page** button, and the tray and incident pop-up follow suit. The button opens
+Windows' own redirect address, never a link the network supplied. Only a redirect, a 511, or a 200
+with the wrong page count as a login page; an interrupted probe is never mistaken for one.
+
+## Latency under load
+
+Every cycle also reads how much traffic this computer's adapter carried since the previous one -
+from the adapter's byte counters, so it costs no traffic. When a latency warning coincides with
+the line being 70%+ full (judged against the last speed test, else the link speed), the warning
+says so: your own downloads queueing in the router (bufferbloat) is a different fix from a slow
+provider. Only this computer's traffic is visible; another device filling the line is not.
 
 ## Network health monitoring
 
@@ -97,15 +136,33 @@ an unexpected (rogue) DHCP server on the network - each with its own threshold a
 
 The Tools page's third tab runs a [LibreSpeed](https://librespeed.org/) test (ping, jitter,
 download, upload) against a fixed public server - no server picker, to keep this feature's
-configuration surface small. "Run now" is always available; Settings → Tools also has an optional
-automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default). Either way, a result is
-recorded into History (as two series, download and upload) and included in "Export all data" -
-there is no separate speed-test-only export.
+configuration surface small. While the download and upload run, an ICMP ping to `9.9.9.9` measures
+how much the round trip grows with the line full, graded A (under 5 ms extra) to F (200 ms or
+more) - the usual bufferbloat scale. "Run now" is always available; Settings → Tools also has an
+optional automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default). Either way, a
+result is recorded into History (download, upload, ping and the extra ping under load) and
+included in "Export all data" and the provider report.
+
+## Report for your provider
+
+Reports → *Report for your provider* builds one self-contained HTML page for the last 7 or 30 days
+and opens it in your browser (print it to PDF to send it on), or saves it. It shows:
+
+- how much of the period was actually measured - time the computer was off or the app not running
+  is left out, not counted as up or down;
+- availability, counting only outages on the provider's side (the internet beyond the router, the
+  provider's DNS); outages in this computer, the home network or a login page are listed
+  separately, so the report can't be dismissed over a local problem;
+- every outage, and a summary per cause;
+- latency per day (average and 95th percentile);
+- every speed test against the subscription speed you enter on the same page, with the extra ping
+  under load.
+
+It contains no network names, addresses or hardware identifiers - only times, durations and speeds.
 
 ## Exporting data
 
-Settings → Export covers four kinds of export, and a fifth is available per-incident from the
-Incidents screen:
+Reports → Export covers three kinds of export, and two more are available elsewhere:
 
 - **Export all data** - a zip of settings (redacted), incidents, history, and the diagnostic log.
 - **Export for AI analysis** - a Markdown report with instructions aimed at an AI assistant.
@@ -283,6 +340,10 @@ None of these live inside the application directory, so the app itself can be re
   is rare in practice. This check has no retry: a network settings change (even just the DNS
   server) can make the gateway genuinely unreachable at the OS level for a few seconds, and
   that's real, momentary state worth showing, not a measurement error to hide.
+- Wi-Fi network names and access points need location access for desktop apps on Windows 11
+  24H2 and later - see [Wi-Fi details](#wi-fi-details).
+- "The line was busy" only sees this computer's traffic; another device filling the line looks like
+  an idle line from here.
 - The DNS step queries the adapter's DNS servers directly over plain UDP port 53, not through
   Windows' own resolver. That's what lets it test exactly that adapter's servers and report which
   one answered, but it also means a setup that only resolves through Windows' encrypted DNS
@@ -321,7 +382,8 @@ None of these live inside the application directory, so the app itself can be re
   lookup sends each device's MAC prefix - never the full address - to macvendorlookup.com and
   macvendors.com (same toggle group); and the update checker sends nothing but a plain request to
   GitHub's public release API. All three are on by default except where noted, and every one is
-  switchable.
+  switchable. When the reachability check fails, the login-page probe requests Microsoft's
+  connectivity test page - the same request Windows makes itself.
 - **Speed Test moves real data to a third-party server.** Unlike every other check, a speed test
   (manual or automatic) transfers real download/upload traffic to a public LibreSpeed server, not
   just small probe packets. It never runs unless "Run now" is clicked or the automatic interval is

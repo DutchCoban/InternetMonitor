@@ -71,7 +71,7 @@ public abstract class PageBase : Panel
 
     /// <summary>
     /// Builds the page's controls. Called once, the first time the page is shown, so start-up does
-    /// not pay for five pages the user may never open.
+    /// not pay for pages the user may never open.
     /// </summary>
     protected abstract void Build();
 
