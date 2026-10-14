@@ -1,21 +1,64 @@
 # Internet Monitor
 
-A lightweight Windows tray application that monitors network and internet connectivity,
-diagnoses *where* a problem sits in the network stack (not just "internet is down"), and keeps
-a historical record of outages. It ships as a single self-contained `.exe` with no external
-dependencies to install.
+**Is it your Wi-Fi, your router, or your provider? Internet Monitor tells you - and gives you the proof.**
 
-Internet Monitor is a generic network diagnostics tool - no organization's endpoints or
-branding are built into it. Any application-specific checks (an internal API, a company
-website, ...) are added by the user through Settings. It's an independent open-source project,
-not affiliated with or endorsed by any company.
+[![Latest release](https://img.shields.io/github/v/release/DutchCoban/InternetMonitor?label=download&style=for-the-badge)](https://github.com/DutchCoban/InternetMonitor/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/DutchCoban/InternetMonitor/total?style=for-the-badge)](https://github.com/DutchCoban/InternetMonitor/releases)
+![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge)
+[![MIT license](https://img.shields.io/github/license/DutchCoban/InternetMonitor?style=for-the-badge)](LICENSE)
 
-This repository went through a ground-up rewrite: v1 (still kept under `InternetMonitor/` for
-reference) was the original; **v2** (`src/InternetMonitor/`, what the rest of this README
-describes, and what ships from here on) replaced it with a redesigned interface and an adaptive
-check cadence, and is still under **active development** rather than a one-time port - most of
-v1's functionality is back or improved on, a handful of pieces aren't (yet, or possibly at all) -
-see [Project status](#project-status) for exactly what and why.
+When the internet drops, "it doesn't work" is all you usually have to go on. Internet Monitor sits
+quietly in your system tray and checks your connection every few seconds, step by step from your
+network adapter out to the wider internet. When something breaks, it tells you in plain language
+**where** it broke, **why**, and **what you can do about it** - and it keeps a record of every
+outage, so the next time you call your provider you have dates, durations and speed tests instead
+of "it's been flaky lately".
+
+**[⬇ Download Internet Monitor](https://github.com/DutchCoban/InternetMonitor/releases/latest)** -
+one `.exe`, nothing to install, free and open source.
+
+![The Status screen: every step of the connection, checked every few seconds](docs/screenshots/status.png)
+
+## Why you'll want it
+
+- **It pinpoints the cause.** Network adapter, cable or Wi-Fi, IP address, router, internet, DNS,
+  or one specific service - not just "offline". Seven checks, one plain-language verdict.
+- **It gives you evidence for your provider.** One click builds a report with availability, every
+  outage and where it most likely originated, latency per day, and your speed tests measured
+  against your subscription. Print it to PDF and send it.
+- **It understands Wi-Fi.** Signal strength, band, channel and every switch between access points
+  - and it tells you when a weak signal, not your provider, is the real problem.
+- **It catches what other tools miss.** Lag that only appears when someone is downloading
+  (bufferbloat), DNS being blocked, pings being filtered while the internet works fine, hotel and
+  train Wi-Fi waiting for you to log in, packet loss, and a rogue DHCP server on your network.
+- **The tools are built in.** Traceroute that shows who owns every hop, a scan of every device on
+  your network, and a speed test with a bufferbloat grade.
+- **It's ready for AI.** Export everything as one document, with instructions, to paste into the
+  AI assistant of your choice for a second opinion.
+- **It respects your privacy.** No account, no telemetry; your data stays on your PC. The AI
+  export replaces network names and hardware addresses with stand-ins.
+- **It stays out of your way.** A single `.exe` that runs without admin rights, follows Windows'
+  light or dark theme, speaks English, Dutch, German and Polish, and can keep itself up to date.
+
+<p align="center">
+  <img src="docs/screenshots/provider-report.png" alt="A report for your provider: availability, outages and where they originated" width="49%">
+  <img src="docs/screenshots/reports.png" alt="The Reports page: the provider report and the data exports" width="49%">
+</p>
+
+## Get started in a minute
+
+1. **[Download `InternetMonitor.exe`](https://github.com/DutchCoban/InternetMonitor/releases/latest)**
+   from the latest release.
+2. **Run it.** There is no installer; put the file wherever you like. The app isn't code-signed,
+   so Windows SmartScreen may warn the first time - choose *More info* → *Run anyway*.
+3. **Click the icon in the system tray** to open the Status screen. That's it - monitoring has
+   started. Turn on *Settings → Start automatically with Windows* to keep it running.
+
+Requires Windows 10 or 11 (64-bit). Nothing else to install - the .NET runtime is built in.
+
+---
+
+The rest of this page describes everything Internet Monitor does in detail.
 
 ## What it checks
 
@@ -240,36 +283,27 @@ and how to set up a push monitor to get a URL from.
 
 ## Project status
 
-v2 is a from-scratch rewrite, not an incremental update, and it's still being actively built out -
-this section exists so that's never a surprise. Settings, incident history, and per-check history
-all carry over automatically from an existing v1 installation regardless of what's below; nothing
-here affects that.
+Internet Monitor is under active development. The current generation, v2 (`src/InternetMonitor/`),
+is a ground-up rewrite of the original v1 (kept under `InternetMonitor/` for reference) with a
+redesigned interface. Upgrading from v1 is seamless: settings, incident history and per-check
+history - including v1's Wi-Fi signal history - carry over automatically.
 
-**Already in v2, beyond what v1 had**: an adaptive (3s/15s, both configurable) check cadence
-instead of a fixed 15-second cycle; network-health monitoring (TCP retransmissions, packet loss,
-TTL errors, rogue DHCP); traceroute hop ownership; LAN-scan manufacturer lookup and a TCP fallback
-for devices that ignore ICMP (plus the same TCP fallback for traceroute, see
-[Known limitations](#known-limitations)); four export formats plus a settings backup; and a fully
-automatic self-update option (v1 only ever linked to the release page).
+**New in v2 compared with v1**: an adaptive check cadence; one consistent path through all seven
+checks on machines with several adapters; DNS diagnosis that tells your DNS server, blocked DNS
+traffic and a dead connection apart; login-page detection; Wi-Fi access-point switches and
+weak-signal diagnosis; latency-under-load detection and a bufferbloat grade; a report for your
+provider; network-health monitoring (TCP retransmissions, packet loss, TTL errors, rogue DHCP);
+traceroute hop ownership; LAN-scan manufacturer lookup with a TCP fallback; an AI-ready export;
+and fully automatic self-update.
 
-**Back in v2 after initially being left out**: the Speed Test (LibreSpeed) check - manual and
-automatic, see [Speed test](#speed-test) above. Its return is the precedent for the rest of this
-list: "not yet in v2" has not meant "gone for good" so far, and there's no reason to assume it
-always will.
-
-**Not currently in v2** - each was left out of the initial rewrite because it measured something a
-general-purpose tool shouldn't assume every user wants running by default, not because it was
-rejected outright. Whether any of these come back depends on whether anyone (including future me)
-decides it's worth the added settings-surface and maintenance:
+**Not (yet) back from v1**:
 
 - Continuous named ping targets with their own per-target latency graphs.
-- The Wi-Fi signal row (SSID/BSSID/signal quality/link speed/PHY type).
 - Quiet hours (suppressing incident pop-ups during a configured daily window).
-- The SLA/uptime report (percentage uptime over 7/30/90 days, with exclusions).
-- Configurable history retention - v1 offered 15 minutes to 32 days; v2 is a fixed 30 days.
+- Configurable history retention - v1 offered 15 minutes to 32 days; v2 keeps a fixed 30 days.
 
-If you're relying on one of these in v1 and it matters to you whether/when it returns, open an
-issue - that's a better signal than silence either way.
+Missing something, or found a problem? [Open an issue](https://github.com/DutchCoban/InternetMonitor/issues) -
+that's the best way to influence what comes next.
 
 ## Project structure
 
@@ -402,4 +436,5 @@ None of these live inside the application directory, so the app itself can be re
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE). Internet Monitor is an independent open-source project, not
+affiliated with or endorsed by any company; no organisation's endpoints or branding are built in.
