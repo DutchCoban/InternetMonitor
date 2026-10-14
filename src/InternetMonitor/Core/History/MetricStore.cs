@@ -54,6 +54,13 @@ public sealed class MetricStore : IAsyncDisposable
     /// <summary>The minimum spacing between recorded points for one series. See the class summary.</summary>
     public TimeSpan MinimumSampleInterval { get; set; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Completes once the files on disk have been read. Live charts can start drawing before that
+    /// and fill in as history arrives, but anything that summarises the whole period - a report,
+    /// an export - has to wait for it, or it would summarise a fraction of the data.
+    /// </summary>
+    public Task Loaded => _loadTask;
+
     public void SetRetention(TimeSpan retention)
     {
         lock (_lock)

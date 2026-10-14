@@ -1,6 +1,9 @@
+using System.Reflection;
 using InternetMonitor.App;
+using InternetMonitor.Configuration;
 using InternetMonitor.Core.Export;
 using InternetMonitor.Core.History;
+using InternetMonitor.Core.Reports;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
 
@@ -14,6 +17,15 @@ namespace InternetMonitor.Ui.Shell.Pages;
 /// </summary>
 public sealed class ReportsPage(AppServices services) : PageBase(services)
 {
+    private Card _reportCard = null!;
+    private ComboBox _period = null!;
+    private NumericUpDown _subscribedDown = null!;
+    private NumericUpDown _subscribedUp = null!;
+    private AppButton _createReport = null!;
+    private AppButton _saveReport = null!;
+    private readonly List<AppButton> _reportButtons = [];
+    private readonly List<(Label Label, Control Field)> _rows = [];
+
     private Card _exportCard = null!;
     private AppButton _exportAll = null!;
     private AppButton _exportAi = null!;
@@ -24,6 +36,9 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
     protected override void Build()
     {
+        _reportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Report };
+        BuildReportSection();
+
         _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
         _exportAll = AddButton(_exportCard, _exportButtons, ExportAllData);
         _exportAi = AddButton(_exportCard, _exportButtons, ExportForAi);
@@ -31,6 +46,118 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
         // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge.
         Controls.Add(_exportCard);
+        Controls.Add(_reportCard);
+    }
+
+    // ---- Provider report ------------------------------------------------------------------------
+
+    private void BuildReportSection()
+    {
+        AppSettings settings = Services.Settings;
+
+        _period = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
+        _period.SelectedIndexChanged += (_, _) =>
+        {
+            if (_period.SelectedItem is PeriodItem item)
+            {
+                Services.Settings.ReportPeriodDays = item.Days;
+                Services.Settings.Save();
+            }
+        };
+        AddRow(_reportCard, "reports.provider.period", _period);
+
+        _subscribedDown = MakeSpeedField(settings.SubscribedDownloadMbps);
+        _subscribedDown.ValueChanged += (_, _) =>
+        {
+            Services.Settings.SubscribedDownloadMbps = (int)_subscribedDown.Value;
+            Services.Settings.Save();
+        };
+        AddRow(_reportCard, "reports.provider.download", _subscribedDown);
+
+        _subscribedUp = MakeSpeedField(settings.SubscribedUploadMbps);
+        _subscribedUp.ValueChanged += (_, _) =>
+        {
+            Services.Settings.SubscribedUploadMbps = (int)_subscribedUp.Value;
+            Services.Settings.Save();
+        };
+        AddRow(_reportCard, "reports.provider.upload", _subscribedUp);
+
+        _createReport = AddButton(_reportCard, _reportButtons, () => _ = CreateReportAsync(open: true));
+        _createReport.Variant = ButtonVariant.Primary;
+        _createReport.Glyph = Glyph.Report;
+        _saveReport = AddButton(_reportCard, _reportButtons, () => _ = CreateReportAsync(open: false));
+    }
+
+    private NumericUpDown MakeSpeedField(int value) => new()
+    {
+        Minimum = 0,
+        Maximum = 100_000,
+        Value = Math.Clamp(value, 0, 100_000),
+        Width = Dp(90),
+        TextAlign = HorizontalAlignment.Right,
+    };
+
+    private void AddRow(Card card, string labelKey, Control field)
+    {
+        var label = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body), Tag = labelKey };
+        card.Controls.Add(label);
+        card.Controls.Add(field);
+        _rows.Add((label, field));
+    }
+
+    /// <summary>
+    /// Builds the report and either opens it in the browser straight away (from a temporary file)
+    /// or asks where to save it. The history has to be fully loaded first - a report made in the
+    /// first seconds after start-up would otherwise cover a fraction of the period.
+    /// </summary>
+    private async Task CreateReportAsync(bool open)
+    {
+        await Services.History.Loaded.ConfigureAwait(true);
+
+        DateTimeOffset to = DateTimeOffset.UtcNow;
+        DateTimeOffset from = to.AddDays(-Services.Settings.ReportPeriodDays);
+        ProviderReportData data = ProviderReportData.Compute(Services.Incidents.All, Services.History.Get, from, to, TimeZoneInfo.Local);
+        string version = (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3);
+        string html = ProviderReportHtml.Render(
+            data,
+            new ProviderReportOptions(Services.Settings.SubscribedDownloadMbps, Services.Settings.SubscribedUploadMbps, version, DateTimeOffset.Now, TimeZoneInfo.Local),
+            Loc);
+        string fileName = $"internetmonitor-report-{DateTime.Now:yyyy-MM-dd}.html";
+
+        if (!open)
+        {
+            SaveAs("HTML (*.html)|*.html", fileName, path => File.WriteAllText(path, html));
+            return;
+        }
+
+        try
+        {
+            string directory = Path.Combine(Path.GetTempPath(), "InternetMonitor");
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, fileName);
+            await File.WriteAllTextAsync(path, html).ConfigureAwait(true);
+            ShellOpen.Open(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The temp folder being unwritable is not worth a dialog; "Save as" still works.
+        }
+    }
+
+    private void PopulatePeriodItems()
+    {
+        _period.Items.Clear();
+        foreach (int days in AppSettings.AllowedReportPeriodDays)
+        {
+            _period.Items.Add(new PeriodItem(days, Loc.Format("reports.provider.periodDays", days)));
+        }
+
+        _period.SelectedItem = _period.Items.Cast<PeriodItem>().FirstOrDefault(i => i.Days == Services.Settings.ReportPeriodDays);
+    }
+
+    private sealed record PeriodItem(int Days, string Display)
+    {
+        public override string ToString() => Display;
     }
 
     private static AppButton AddButton(Card card, List<AppButton> buttons, Action onClick)
@@ -135,6 +262,28 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
     private void LayoutCards()
     {
+        // The report card: label/field rows first, then its two buttons on a line below them.
+        Rectangle content = _reportCard.DisplayRectangle;
+        int rowHeight = Dp(36);
+        int width = Math.Max(Dp(200), content.Width);
+        int y = content.Top;
+        foreach ((Label label, Control field) in _rows)
+        {
+            label.Bounds = new Rectangle(content.Left, y, Math.Max(0, width - field.Width - Sp(3)), rowHeight);
+            field.Location = new Point(content.Left + width - field.Width, y + ((rowHeight - field.Height) / 2));
+            y += rowHeight;
+        }
+
+        int x = content.Left;
+        y += Sp(2);
+        foreach (AppButton button in _reportButtons)
+        {
+            button.Location = new Point(x, y);
+            x += button.Width + Sp(2);
+        }
+
+        _reportCard.Height = y + Dp(32) + _reportCard.Inset;
+
         LayoutButtons(_exportCard, _exportButtons);
     }
 
@@ -156,6 +305,20 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
             return;
         }
 
+        _reportCard.Title = Loc.Get("reports.provider.title");
+        _reportCard.Subtitle = Loc.Get("reports.provider.subtitle");
+        foreach ((Label label, _) in _rows)
+        {
+            label.Text = Loc.Get((string)label.Tag!);
+        }
+
+        PopulatePeriodItems();
+        _createReport.Text = Loc.Get("reports.provider.create");
+        _createReport.SizeToContent();
+        _saveReport.Text = Loc.Get("reports.provider.saveAs");
+        _saveReport.SizeToContent();
+        ApplyControlColors();
+
         _exportCard.Title = Loc.Get("settings.section.export");
         _exportCard.Subtitle = Loc.Get("settings.section.export.subtitle");
 
@@ -167,5 +330,22 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         _exportPlain.SizeToContent();
 
         LayoutCards();
+    }
+
+    protected override void OnThemeChanged() => ApplyControlColors();
+
+    /// <summary>Stock WinForms controls take no part in the theme on their own; see <see cref="PageBase.OnThemeChanged"/>.</summary>
+    private void ApplyControlColors()
+    {
+        Palette p = Theme.Current;
+        foreach ((Label label, Control field) in _rows)
+        {
+            label.ForeColor = p.TextSecondary;
+            label.BackColor = p.Surface;
+            field.BackColor = p.SurfaceAlt;
+            field.ForeColor = p.TextPrimary;
+        }
+
+        _period.FlatStyle = FlatStyle.Flat;
     }
 }

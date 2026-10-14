@@ -130,6 +130,25 @@ public sealed class AppSettings
         set => _speedTestIntervalHours = Array.IndexOf(AllowedSpeedTestIntervalHours, value) >= 0 ? value : _speedTestIntervalHours;
     }
 
+    // ---- Provider report -----------------------------------------------------------------------
+
+    /// <summary>The subscription's advertised download speed in Mbit/s, for the provider report; 0 = not entered.</summary>
+    public int SubscribedDownloadMbps { get; set; }
+
+    /// <summary>The subscription's advertised upload speed in Mbit/s, for the provider report; 0 = not entered.</summary>
+    public int SubscribedUploadMbps { get; set; }
+
+    public static readonly int[] AllowedReportPeriodDays = [7, 30];
+
+    private int _reportPeriodDays = 30;
+
+    /// <summary>How far back the provider report looks. Thirty days is also what history keeps.</summary>
+    public int ReportPeriodDays
+    {
+        get => _reportPeriodDays;
+        set => _reportPeriodDays = Array.IndexOf(AllowedReportPeriodDays, value) >= 0 ? value : _reportPeriodDays;
+    }
+
     // ---- Updates -------------------------------------------------------------------------------
 
     /// <summary>
