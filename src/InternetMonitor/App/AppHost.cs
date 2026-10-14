@@ -72,6 +72,7 @@ public sealed class AppHost : ApplicationContext
             return defaultTargets with
             {
                 PublicIpTargets = publicIpTargets,
+                PublicResolvers = _settings.ParsedPublicDnsResolvers(),
                 Targets =
                 [
                     .. defaultTargets.Targets,

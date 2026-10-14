@@ -445,8 +445,9 @@
   "step.dns.noServers": "Geen DNS-server op deze adapter",
   "step.dns.noServers.detail": "Deze adapter heeft geen DNS-server verkregen of ingesteld, dus namen kunnen via deze verbinding niet worden opgezocht.",
   "settings.section.publicIp": "Publiek internet",
-  "settings.section.publicIp.subtitle": "De adressen die stap 5 pingt om te bepalen of het internet bereikbaar is.",
+  "settings.section.publicIp.subtitle": "De adressen die stap 5 pingt, en de DNS-resolvers waarmee stap 6 controleert of een DNS-storing aan je eigen netwerk ligt.",
   "settings.publicIp.targets": "Testadressen (IPv4, kommagescheiden)",
   "settings.publicIp.error.empty": "Geef minstens één adres op.",
-  "settings.publicIp.error.invalid": "Geen geldig IPv4-adres: {0}"
+  "settings.publicIp.error.invalid": "Geen geldig IPv4-adres: {0}",
+  "settings.publicIp.dnsResolvers": "Publieke DNS-resolvers (bij DNS-storing)"
 }

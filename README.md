@@ -31,8 +31,9 @@ is attributed to its most likely cause instead of being reported as a generic "i
 5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). A single unreachable endpoint doesn't mean internet is down; the diagnosis only escalates once none of them respond.
 6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved by the DNS servers
    this adapter has, obtained via DHCP or set by hand? Those servers are asked directly. On
-   failure, the same question goes to three public resolvers (`9.9.9.9`, `1.1.1.1`, `8.8.8.8`): if
-   they answer, it's your network's DNS server; if they don't either, it's DNS as a whole.
+   failure, the same question goes to public resolvers (`9.9.9.9`, `8.8.8.8` and `1.1.1.1` by
+   default, configurable in Settings → Public internet): if they answer, it's your network's DNS
+   server; if they don't either, it's DNS as a whole.
 7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request.
 
 All seven steps describe **one path**: the adapter Windows routes internet traffic over is

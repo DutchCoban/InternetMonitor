@@ -67,6 +67,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private readonly List<ConditionRow> _conditionRows = [];
     private TextBox _kumaUrl = null!;
     private TextBox _publicIpTargets = null!;
+    private TextBox _publicDnsResolvers = null!;
     private Label _publicIpError = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
@@ -507,13 +508,15 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         Services.Settings.TtlExceeded,
         Services.Settings.RogueDhcp);
 
-    // ---- Public internet (step 5) ---------------------------------------------------------------
+    // ---- Public internet (steps 5 and 6) --------------------------------------------------------
 
     private void BuildPublicIpRows()
     {
-        _publicIpTargets = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(260), Font = Theme.Font(FontRole.Body) };
-        _publicIpTargets.Leave += OnPublicIpTargetsChanged;
+        _publicIpTargets = MakeAddressField();
         AddRow(_publicIpCard, "settings.publicIp.targets", _publicIpTargets);
+
+        _publicDnsResolvers = MakeAddressField();
+        AddRow(_publicIpCard, "settings.publicIp.dnsResolvers", _publicDnsResolvers);
 
         _publicIpError = new Label
         {
@@ -525,29 +528,48 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _publicIpCard.Controls.Add(_publicIpError);
     }
 
+    private TextBox MakeAddressField()
+    {
+        var box = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(260), Font = Theme.Font(FontRole.Body) };
+        box.Leave += OnPublicAddressesChanged;
+        return box;
+    }
+
+    /// <summary>
+    /// Validates both address fields together, saves whichever is valid, and shows the first
+    /// error - checking both on every edit keeps the one error line honest about a field that is
+    /// still wrong after the other one was fixed.
+    /// </summary>
+    private void OnPublicAddressesChanged(object? sender, EventArgs e)
+    {
+        string? targetsError = ApplyAddressField(_publicIpTargets, list => Services.Settings.PublicIpTargets = list);
+        string? resolversError = ApplyAddressField(_publicDnsResolvers, list => Services.Settings.PublicDnsResolvers = list);
+        _publicIpError.Text = targetsError ?? resolversError ?? string.Empty;
+        Services.Settings.Save();
+    }
+
     /// <summary>
     /// Accepts a comma-, semicolon- or space-separated list of IPv4 addresses. Any entry that is
-    /// not one is rejected as a whole rather than silently dropped, so what is saved is always
-    /// exactly what the field shows.
+    /// not one rejects the field as a whole rather than being silently dropped, so what is saved
+    /// is always exactly what the field shows. Returns the error to show, or null once stored.
     /// </summary>
-    private void OnPublicIpTargetsChanged(object? sender, EventArgs e)
+    private string? ApplyAddressField(TextBox box, Action<List<string>> store)
     {
-        string[] entries = _publicIpTargets.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        List<System.Net.IPAddress> parsed = AppSettings.ParseIPv4List(entries);
-        string? invalid = entries.FirstOrDefault(entry => AppSettings.ParseIPv4List([entry]).Count == 0);
-
-        if (entries.Length == 0 || invalid is not null)
+        string[] entries = box.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (entries.Length == 0)
         {
-            _publicIpError.Text = invalid is null
-                ? Loc.Get("settings.publicIp.error.empty")
-                : Loc.Format("settings.publicIp.error.invalid", invalid);
-            return;
+            return Loc.Get("settings.publicIp.error.empty");
         }
 
-        _publicIpError.Text = string.Empty;
-        Services.Settings.PublicIpTargets = [.. parsed.Select(a => a.ToString())];
-        Services.Settings.Save();
-        _publicIpTargets.Text = string.Join(", ", Services.Settings.PublicIpTargets);
+        if (entries.FirstOrDefault(entry => AppSettings.ParseIPv4List([entry]).Count == 0) is { } invalid)
+        {
+            return Loc.Format("settings.publicIp.error.invalid", invalid);
+        }
+
+        List<string> normalized = [.. AppSettings.ParseIPv4List(entries).Select(a => a.ToString())];
+        store(normalized);
+        box.Text = string.Join(", ", normalized);
+        return null;
     }
 
     // ---- Integrations ---------------------------------------------------------------------------
@@ -1117,10 +1139,13 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             row.Window.Value = Math.Clamp(threshold.WindowMinutes, row.Window.Minimum, row.Window.Maximum);
         }
 
-        _publicIpTargets.Leave -= OnPublicIpTargetsChanged;
+        _publicIpTargets.Leave -= OnPublicAddressesChanged;
+        _publicDnsResolvers.Leave -= OnPublicAddressesChanged;
         _publicIpTargets.Text = string.Join(", ", settings.ParsedPublicIpTargets());
+        _publicDnsResolvers.Text = string.Join(", ", settings.ParsedPublicDnsResolvers());
         _publicIpError.Text = string.Empty;
-        _publicIpTargets.Leave += OnPublicIpTargetsChanged;
+        _publicIpTargets.Leave += OnPublicAddressesChanged;
+        _publicDnsResolvers.Leave += OnPublicAddressesChanged;
 
         _kumaUrl.Leave -= OnKumaSettingsChanged;
         _kumaInterval.ValueChanged -= OnKumaSettingsChanged;
@@ -1365,8 +1390,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _kumaError.BackColor = p.Surface;
         _kumaError.ForeColor = p.Error;
 
-        _publicIpTargets.BackColor = p.SurfaceAlt;
-        _publicIpTargets.ForeColor = p.TextPrimary;
+        foreach (TextBox box in new[] { _publicIpTargets, _publicDnsResolvers })
+        {
+            box.BackColor = p.SurfaceAlt;
+            box.ForeColor = p.TextPrimary;
+        }
         _publicIpError.BackColor = p.Surface;
         _publicIpError.ForeColor = p.Error;
     }

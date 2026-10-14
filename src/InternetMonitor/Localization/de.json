@@ -445,8 +445,9 @@
   "step.dns.noServers": "Kein DNS-Server auf diesem Adapter",
   "step.dns.noServers.detail": "Dieser Adapter hat weder einen bezogenen noch einen eingestellten DNS-Server, daher können über diese Verbindung keine Namen aufgelöst werden.",
   "settings.section.publicIp": "Öffentliches Internet",
-  "settings.section.publicIp.subtitle": "Die Adressen, die Schritt 5 anpingt, um festzustellen, ob das Internet erreichbar ist.",
+  "settings.section.publicIp.subtitle": "Die Adressen, die Schritt 5 anpingt, und die DNS-Resolver, mit denen Schritt 6 prüft, ob eine DNS-Störung am eigenen Netzwerk liegt.",
   "settings.publicIp.targets": "Testadressen (IPv4, kommagetrennt)",
   "settings.publicIp.error.empty": "Geben Sie mindestens eine Adresse ein.",
-  "settings.publicIp.error.invalid": "Keine gültige IPv4-Adresse: {0}"
+  "settings.publicIp.error.invalid": "Keine gültige IPv4-Adresse: {0}",
+  "settings.publicIp.dnsResolvers": "Öffentliche DNS-Resolver (bei DNS-Störung)"
 }

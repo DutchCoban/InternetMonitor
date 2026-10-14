@@ -445,8 +445,9 @@
   "step.dns.noServers": "Brak serwera DNS na tej karcie",
   "step.dns.noServers.detail": "Ta karta sieciowa nie ma serwera DNS (ani uzyskanego, ani ustawionego), więc przez to połączenie nie można rozwiązywać nazw.",
   "settings.section.publicIp": "Publiczny internet",
-  "settings.section.publicIp.subtitle": "Adresy, które krok 5 pinguje, aby sprawdzić, czy internet jest osiągalny.",
+  "settings.section.publicIp.subtitle": "Adresy pingowane w kroku 5 oraz serwery DNS, którymi krok 6 sprawdza, czy awaria DNS dotyczy Twojej sieci.",
   "settings.publicIp.targets": "Adresy testowe (IPv4, oddzielone przecinkami)",
   "settings.publicIp.error.empty": "Podaj co najmniej jeden adres.",
-  "settings.publicIp.error.invalid": "Nieprawidłowy adres IPv4: {0}"
+  "settings.publicIp.error.invalid": "Nieprawidłowy adres IPv4: {0}",
+  "settings.publicIp.dnsResolvers": "Publiczne serwery DNS (przy awarii DNS)"
 }

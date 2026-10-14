@@ -445,8 +445,9 @@
   "step.dns.noServers": "No DNS server on this adapter",
   "step.dns.noServers.detail": "This adapter has no DNS server, obtained or configured, so names cannot be resolved over this connection.",
   "settings.section.publicIp": "Public internet",
-  "settings.section.publicIp.subtitle": "The addresses step 5 pings to decide whether the internet is reachable.",
+  "settings.section.publicIp.subtitle": "The addresses step 5 pings, and the DNS resolvers step 6 uses to check whether a DNS failure is your own network's.",
   "settings.publicIp.targets": "Test addresses (IPv4, comma-separated)",
   "settings.publicIp.error.empty": "Enter at least one address.",
-  "settings.publicIp.error.invalid": "Not a valid IPv4 address: {0}"
+  "settings.publicIp.error.invalid": "Not a valid IPv4 address: {0}",
+  "settings.publicIp.dnsResolvers": "Public DNS resolvers (on DNS failure)"
 }
