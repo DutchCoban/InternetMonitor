@@ -14,6 +14,11 @@ namespace InternetMonitor.Core.Steps.Checks;
 ///
 /// For a wireless adapter the same state means "not associated with an access point", which is the
 /// honest wireless equivalent of an unplugged cable, and is worded that way.
+///
+/// A connected Wi-Fi adapter also gets its radio side read (<see cref="WlanInfo"/>): signal, band,
+/// channel and access point. "Connected" over a two-bar signal is a different situation from a
+/// solid one, so a weak signal makes this step a warning - it is the most common cause of a
+/// connection that works, but badly.
 /// </summary>
 public sealed class LinkCheck : IStepCheck
 {
@@ -57,7 +62,11 @@ public sealed class LinkCheck : IStepCheck
 
         bool connecting = info.Link == PhysicalLinkState.Connecting;
 
-        var facts = new LinkFacts(info.Link, managed, wireless, adapter.Name);
+        WifiInfo? wifi = wireless && connected && Guid.TryParse(adapter.Id, out Guid interfaceId)
+            ? WlanInfo.Query(interfaceId)
+            : null;
+
+        var facts = new LinkFacts(info.Link, managed, wireless, adapter.Name, wifi);
         var measurements = new List<Measurement>
         {
             new(loc.Get("measure.linkState"), loc.Get($"linkState.{info.Link.ToString().ToLowerInvariant()}")),
@@ -69,6 +78,11 @@ public sealed class LinkCheck : IStepCheck
             measurements.Add(new Measurement(loc.Get("measure.linkSpeed"), $"{speed / 1_000_000} Mbit/s"));
         }
 
+        if (wifi is not null)
+        {
+            AddWifiMeasurements(measurements, wifi, loc);
+        }
+
         (StepState state, string headlineKey, string? detailKey) = (connected, connecting, wireless) switch
         {
             (true, _, true) => (StepState.Ok, "step.link.wifiAssociated", null),
@@ -78,11 +92,27 @@ public sealed class LinkCheck : IStepCheck
             _ => (StepState.Failed, "step.link.disconnected", "step.link.disconnected.detail"),
         };
 
+        object[] headlineArgs = [];
+        object[] detailArgs = [];
+        if (state == StepState.Ok && wifi?.SignalPercent is { } signal)
+        {
+            (headlineKey, headlineArgs) = wifi.Band is { } band
+                ? ("step.link.wifiSignal", [signal, band])
+                : ("step.link.wifiSignalNoBand", new object[] { signal });
+
+            if (facts.WeakSignal(context.Targets.WeakWifiSignalPercent))
+            {
+                state = StepState.Warning;
+                detailKey = "step.link.weakSignal.detail";
+                detailArgs = [signal];
+            }
+        }
+
         return Task.FromResult(new StepResult(
             Id,
             state,
-            loc.Get(headlineKey),
-            detailKey is null ? null : loc.Get(detailKey),
+            loc.Format(headlineKey, headlineArgs),
+            detailKey is null ? null : loc.Format(detailKey, detailArgs),
             connected ? 1 : 0,
             watch.Elapsed,
             DateTimeOffset.UtcNow,
@@ -90,7 +120,53 @@ public sealed class LinkCheck : IStepCheck
             facts)
         {
             HeadlineKey = headlineKey,
+            HeadlineArgs = headlineArgs,
             DetailKey = detailKey,
+            DetailArgs = detailArgs,
         });
+    }
+
+    private static void AddWifiMeasurements(List<Measurement> measurements, WifiInfo wifi, LocalizationManager loc)
+    {
+        if (wifi.Ssid is { } ssid)
+        {
+            measurements.Add(new Measurement(loc.Get("measure.wifiNetwork"), ssid));
+        }
+
+        if (wifi.Bssid is { } bssid)
+        {
+            measurements.Add(new Measurement(loc.Get("measure.wifiAccessPoint"), bssid));
+        }
+
+        if (wifi.SignalPercent is { } signal)
+        {
+            measurements.Add(new Measurement(
+                loc.Get("measure.wifiSignal"),
+                wifi.RssiDbm is { } rssi ? $"{signal}% ({rssi} dBm)" : $"{signal}%"));
+        }
+
+        if (wifi.Band is { } band)
+        {
+            measurements.Add(new Measurement(
+                loc.Get("measure.wifiBand"),
+                wifi.Channel is { } channel ? loc.Format("measure.wifiBand.channel", band, channel) : band));
+        }
+
+        if (wifi.Generation is { } generation)
+        {
+            measurements.Add(new Measurement(loc.Get("measure.wifiStandard"), generation));
+        }
+
+        if (wifi.RxMbps is { } rx && wifi.TxMbps is { } tx)
+        {
+            measurements.Add(new Measurement(loc.Get("measure.wifiRate"), $"{rx:F0} / {tx:F0} Mbit/s"));
+        }
+
+        // Windows withholds the network name and access point when location access is off; say
+        // so, rather than leaving the user to wonder why those two rows are missing.
+        if (wifi.AccessDenied)
+        {
+            measurements.Add(new Measurement(loc.Get("measure.wifiDetails"), loc.Get("measure.wifiDetails.denied")));
+        }
     }
 }

@@ -128,6 +128,12 @@ public sealed record CheckTargets
 
     public TimeSpan TargetTimeout { get; init; } = TimeSpan.FromSeconds(3);
 
+    /// <summary>
+    /// Below this Windows signal quality a Wi-Fi link is reported as weak. Around 40% is where the
+    /// taskbar drops to two bars and real-world throughput and stability visibly fall off.
+    /// </summary>
+    public int WeakWifiSignalPercent { get; init; } = 40;
+
     /// <summary>Above this, a latency reading is reported as degraded rather than healthy.</summary>
     public int LatencyWarningMs { get; init; } = 300;
 

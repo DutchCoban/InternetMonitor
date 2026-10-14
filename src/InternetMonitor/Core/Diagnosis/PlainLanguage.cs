@@ -49,6 +49,9 @@ public static class PlainLanguage
             LocalizationManager.GetEnglish($"{prefix}.todo"));
     }
 
+    // Step 2's own threshold. Not a user setting, so the defaults are the values in force.
+    private static readonly int WeakWifiSignalPercent = new Configuration.CheckTargets().WeakWifiSignalPercent;
+
     private static string Prefix(RootCause cause, StepSnapshot snapshot) => $"explain.{cause.Key()}{Variant(cause, snapshot)}";
 
     /// <summary>
@@ -74,6 +77,13 @@ public static class PlainLanguage
         RootCause.Target when snapshot.FactsFor<TargetFacts>(StepId.Target) is { } target
             && target.Endpoints.Any(e => !e.Reachable && e.FailedStage == Net.HttpStage.Tls) => ".tls",
 
+        // Connected, but over a weak signal. Checked after the specific cases above on purpose:
+        // when a public DNS server did answer, or a server sent back a 5xx, traffic evidently got
+        // through the radio and the more specific explanation is the right one. Otherwise a weak
+        // signal is the likeliest cause, and far more useful than blaming the router or provider.
+        RootCause.Gateway or RootCause.Internet or RootCause.Dns or RootCause.Target
+            when snapshot.FactsFor<LinkFacts>(StepId.Link)?.WeakSignal(WeakWifiSignalPercent) == true => ".weakWifi",
+
         _ => string.Empty,
     };
 
@@ -83,6 +93,9 @@ public static class PlainLanguage
     /// </summary>
     private static object[] Arguments(RootCause cause, StepSnapshot snapshot) => cause switch
     {
+        _ when Variant(cause, snapshot) == ".weakWifi" =>
+            [snapshot.FactsFor<LinkFacts>(StepId.Link)?.Wifi?.SignalPercent ?? 0],
+
         RootCause.Adapter => [snapshot.FactsFor<AdapterFacts>(StepId.Adapter)?.Name ?? "-"],
 
         RootCause.Link => [snapshot.FactsFor<LinkFacts>(StepId.Link)?.AdapterName ?? "-"],

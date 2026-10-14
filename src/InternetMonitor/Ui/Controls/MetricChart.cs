@@ -33,6 +33,7 @@ public sealed class MetricChart : ThemedControl
     private double? _warnThreshold;
     private double? _errorThreshold;
     private bool _stateSeries;
+    private bool _markMetadataChanges;
     private int _stateBucketCount = 1;
     private bool _compact;
 
@@ -89,11 +90,13 @@ public sealed class MetricChart : ThemedControl
         string unit,
         bool stateSeries = false,
         double? warnThreshold = null,
-        double? errorThreshold = null)
+        double? errorThreshold = null,
+        bool markMetadataChanges = false)
     {
         _points = points;
         _unit = unit;
         _stateSeries = stateSeries;
+        _markMetadataChanges = markMetadataChanges;
         _warnThreshold = warnThreshold;
         _errorThreshold = errorThreshold;
 
@@ -442,6 +445,11 @@ public sealed class MetricChart : ThemedControl
             DrawSeries(g, p, plot, max);
         }
 
+        if (_markMetadataChanges && !Compact)
+        {
+            DrawMetadataChanges(g, p, plot);
+        }
+
         if (!Compact)
         {
             DrawTimeAxis(g, p, plot);
@@ -573,6 +581,43 @@ public sealed class MetricChart : ThemedControl
 
             using var pen = new Pen(p.Accent, DpF(1.8f)) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
             g.DrawLines(pen, [.. segment]);
+        }
+    }
+
+    /// <summary>
+    /// A thin dotted line with a small diamond on top wherever a point's metadata differs from the
+    /// previous point's - for the Wi-Fi signal series, a switch to another access point. Read from
+    /// the full point list, not the downsampled visible one: a downsample keeps the shape of the
+    /// line, not every point where the metadata happened to change.
+    /// </summary>
+    private void DrawMetadataChanges(Graphics g, Palette p, Rectangle plot)
+    {
+        using var pen = new Pen(p.TextMuted.WithAlpha(150), 1f) { DashStyle = DashStyle.Dot };
+        using var brush = new SolidBrush(p.TextSecondary);
+        float size = DpF(4f);
+
+        string? previous = null;
+        foreach (MetricPoint point in _points)
+        {
+            if (point.Metadata is not { Length: > 0 } metadata)
+            {
+                continue;
+            }
+
+            bool changed = previous is not null && metadata != previous;
+            previous = metadata;
+            if (!changed || point.Timestamp < _viewStart || point.Timestamp > _viewEnd)
+            {
+                continue;
+            }
+
+            float x = ToX(point.Timestamp);
+            g.DrawLine(pen, x, plot.Top + size, x, plot.Bottom);
+            g.FillPolygon(brush, new[]
+            {
+                new PointF(x, plot.Top), new PointF(x + size, plot.Top + size),
+                new PointF(x, plot.Top + (size * 2)), new PointF(x - size, plot.Top + size),
+            });
         }
     }
 

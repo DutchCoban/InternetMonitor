@@ -33,7 +33,15 @@ public sealed record LinkFacts(
     PhysicalLinkState Link,
     OperationalStatus? ManagedStatus,
     bool IsWireless,
-    string? AdapterName) : StepFacts;
+    string? AdapterName,
+
+    // The radio side of a connected Wi-Fi adapter: signal, band, access point. Null for a cable,
+    // or when Windows could not report it.
+    WifiInfo? Wifi = null) : StepFacts
+{
+    /// <summary>Connected over Wi-Fi with a signal below the given Windows signal quality.</summary>
+    public bool WeakSignal(int thresholdPercent) => Wifi?.SignalPercent is { } signal && signal < thresholdPercent;
+}
 
 public sealed record IpAddressFacts(
     IPAddress? Address,

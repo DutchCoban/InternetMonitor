@@ -136,13 +136,16 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
             return;
         }
 
-        bool isState = series.IsState;
+        // The good/warning/bad bands are latency thresholds, so they only belong under a series
+        // measured in milliseconds - not under a speed in Mbps or a signal in percent.
+        bool latency = !series.IsState && series.Unit == "ms";
         _chart.SetSeries(
             Services.History.Get(series.Id),
             series.Unit,
-            isState,
-            isState ? null : Services.Targets.LatencyWarningMs,
-            isState ? null : Services.Targets.LatencyErrorMs);
+            series.IsState,
+            latency ? Services.Targets.LatencyWarningMs : null,
+            latency ? Services.Targets.LatencyErrorMs : null,
+            series.MarksMetadataChanges);
 
         _chart.SetRange(_selectedRange);
     }

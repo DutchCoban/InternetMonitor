@@ -1,5 +1,6 @@
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
+using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Diagnosis;
 
@@ -10,6 +11,9 @@ public enum ChangeKind
     DnsServers,
     Adapter,
     LinkState,
+    WifiNetwork,
+    WifiAccessPoint,
+    WifiSignal,
 }
 
 public sealed record EnvironmentChange(ChangeKind Kind, string? From, string? To, DateTimeOffset AtUtc)
@@ -41,6 +45,10 @@ public sealed record EnvironmentChange(ChangeKind Kind, string? From, string? To
 ///
 /// A short rolling window is kept rather than only the last change, so an incident can report
 /// everything that moved in the minutes before it opened.
+///
+/// For Wi-Fi it also notices the radio side moving: another network, another access point on the
+/// same network (a roam), and the signal falling sharply. Those are compared only while Wi-Fi
+/// details are actually known - a cable, or Windows withholding them, is not a change.
 /// </summary>
 public sealed class ChangeDetector
 {
@@ -55,7 +63,20 @@ public sealed class ChangeDetector
     private string? _lastDnsServers;
     private string? _lastAdapter;
     private string? _lastLinkState;
+    private string? _lastSsid;
+    private string? _lastBssid;
     private bool _primed;
+
+    /// <summary>
+    /// A drop of at least this many percentage points below the best signal of the last
+    /// <see cref="SignalWindow"/> is worth reporting: a few points either way is ordinary radio
+    /// noise, thirty is someone walking into another room or a microwave switching on.
+    /// </summary>
+    private const int SignalDropPoints = 30;
+
+    private static readonly TimeSpan SignalWindow = TimeSpan.FromMinutes(5);
+    private readonly Queue<(DateTimeOffset At, int Percent)> _signals = new();
+    private DateTimeOffset _lastSignalDropAt = DateTimeOffset.MinValue;
 
     /// <summary>
     /// Compares a snapshot against the previous one and records what moved. Returns only the
@@ -72,6 +93,7 @@ public sealed class ChangeDetector
         string? dnsServers = ip is null ? null : string.Join(", ", ip.DnsServers);
         string? adapterName = adapter?.Name;
         string? linkState = link?.Link.ToString();
+        WifiInfo? wifi = link?.Wifi;
 
         var found = new List<EnvironmentChange>();
 
@@ -84,6 +106,8 @@ public sealed class ChangeDetector
                 _primed = true;
                 (_lastAddress, _lastGateway, _lastDnsServers, _lastAdapter, _lastLinkState) =
                     (address, gateway, dnsServers, adapterName, linkState);
+                (_lastSsid, _lastBssid) = (wifi?.Ssid, wifi?.Bssid);
+                RecordSignal(snapshot.TakenUtc, wifi?.SignalPercent);
                 return [];
             }
 
@@ -103,6 +127,7 @@ public sealed class ChangeDetector
             Check(ChangeKind.DnsServers, ref _lastDnsServers, dnsServers);
             Check(ChangeKind.Adapter, ref _lastAdapter, adapterName);
             Check(ChangeKind.LinkState, ref _lastLinkState, linkState);
+            CheckWifi(found, wifi, snapshot.TakenUtc);
 
             _changes.AddRange(found);
 
@@ -115,6 +140,56 @@ public sealed class ChangeDetector
         }
 
         return found;
+    }
+
+    /// <summary>
+    /// The Wi-Fi part of <see cref="Observe"/>. A different network name is reported as such; a
+    /// different access point only when the name stayed the same, because a new network implies a
+    /// new access point and saying both is the same news twice. The access point's address itself
+    /// is left out of the text - "another access point" is what helps, the MAC address does not.
+    /// </summary>
+    private void CheckWifi(List<EnvironmentChange> found, WifiInfo? wifi, DateTimeOffset at)
+    {
+        if (wifi?.Ssid is { } ssid)
+        {
+            if (_lastSsid is not null && ssid != _lastSsid)
+            {
+                found.Add(new EnvironmentChange(ChangeKind.WifiNetwork, _lastSsid, ssid, at));
+            }
+            else if (wifi.Bssid is { } bssid && _lastBssid is not null && bssid != _lastBssid)
+            {
+                found.Add(new EnvironmentChange(ChangeKind.WifiAccessPoint, null, null, at));
+            }
+
+            _lastSsid = ssid;
+            _lastBssid = wifi.Bssid ?? _lastBssid;
+        }
+
+        int? signal = wifi?.SignalPercent;
+        if (signal is { } now && _signals.Count > 0)
+        {
+            int best = _signals.Max(s => s.Percent);
+            if (best - now >= SignalDropPoints && at - _lastSignalDropAt > SignalWindow)
+            {
+                found.Add(new EnvironmentChange(ChangeKind.WifiSignal, $"{best}%", $"{now}%", at));
+                _lastSignalDropAt = at;
+            }
+        }
+
+        RecordSignal(at, signal);
+    }
+
+    private void RecordSignal(DateTimeOffset at, int? signal)
+    {
+        if (signal is { } percent)
+        {
+            _signals.Enqueue((at, percent));
+        }
+
+        while (_signals.Count > 0 && at - _signals.Peek().At > SignalWindow)
+        {
+            _signals.Dequeue();
+        }
     }
 
     /// <summary>Everything that changed in the window leading up to <paramref name="before"/>.</summary>

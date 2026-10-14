@@ -349,6 +349,15 @@ public sealed class AppHost : ApplicationContext
 
             _history.Sample(series, result.TimestampUtc, value);
         }
+
+        // The Wi-Fi signal is not step 2's chart value (that stays the 0/1 link state), so it gets
+        // its own series. The access point goes along as metadata: the History chart marks where it
+        // changed, which is how a roam between access points becomes visible after the fact.
+        if (snapshot[StepId.Link] is { State: not StepState.Skipped } link
+            && link.Facts is LinkFacts { Wifi.SignalPercent: { } signal } facts)
+        {
+            _history.Sample(SeriesNames.WifiSignal, link.TimestampUtc, signal, facts.Wifi.Bssid);
+        }
     }
 
     /// <summary>
