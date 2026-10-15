@@ -29,8 +29,13 @@ one `.exe`, nothing to install, free and open source.
 - **It understands Wi-Fi.** Signal strength, band, channel and every switch between access points
   - and it tells you when a weak signal, not your provider, is the real problem.
 - **It catches what other tools miss.** Lag that only appears when someone is downloading
-  (bufferbloat), DNS being blocked, pings being filtered while the internet works fine, hotel and
-  train Wi-Fi waiting for you to log in, packet loss, and a rogue DHCP server on your network.
+  (bufferbloat), IPv6 that your provider hands out but that doesn't work, DNS being blocked, pings
+  being filtered while the internet works fine, hotel and train Wi-Fi waiting for you to log in, a
+  VPN or a phone's hotspot in the way, packet loss and jitter, and a rogue DHCP server on your
+  network.
+- **It shows the last day at a glance.** A strip on the Status screen colours the last 24 hours
+  quarter by quarter and the last seven days with their availability; click a red block to open
+  what happened.
 - **The tools are built in.** Traceroute that shows who owns every hop, a scan of every device on
   your network, and a speed test with a bufferbloat grade.
 - **It's ready for AI.** Export everything as one document, with instructions, to paste into the
@@ -71,10 +76,14 @@ is attributed to its most likely cause instead of being reported as a generic "i
 2. **Cable / link** - does the adapter report a physical link at all? Over Wi-Fi it also reads
    the radio side: network name, access point, signal (% and dBm), band and channel, Wi-Fi
    generation and link rate. Below 40% signal the step becomes a warning, and an outage that starts
-   over a weak signal is explained as such (see [Wi-Fi details](#wi-fi-details)).
+   over a weak signal is explained as such (see [Wi-Fi details](#wi-fi-details)). It also says when
+   Windows treats the connection as metered - mobile data or a phone's hotspot (see
+   [VPN and mobile connections](#vpn-and-mobile-connections)).
 3. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
+   It also shows whether the network offers IPv6 (only the prefix is shown) and whether a VPN is
+   active, carrying all traffic or only some.
 4. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
-5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). They're pinged at once and the first answer settles it - a single unreachable endpoint doesn't mean internet is down, and the step doesn't wait out its timeout; the diagnosis only escalates once none of them respond.
+5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). They're pinged at once and the first answer settles it - a single unreachable endpoint doesn't mean internet is down, and the step doesn't wait out its timeout; the diagnosis only escalates once none of them respond. With IPv6 on offer, the same resolvers are also pinged over IPv6.
 6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved by the DNS servers
    this adapter has, obtained via DHCP or set by hand? Those servers are asked directly, and an
    unanswered query is sent once more halfway through the timeout, so one lost packet is not an
@@ -85,7 +94,7 @@ is attributed to its most likely cause instead of being reported as a generic "i
    there but silent on DNS means DNS traffic (port 53) is most likely being blocked. As a last
    resort, up to two DNS servers of your own (Settings → Public internet, optional) are tried. The
    step reports which link in the chain failed or worked.
-7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request. When the built-in check fails, one plain-HTTP request for Windows' own connectivity test page tells a **login page** (hotel, train, guest Wi-Fi) apart from a dead connection - see [Login pages](#login-pages).
+7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request. When the built-in check fails, one plain-HTTP request for Windows' own connectivity test page tells a **login page** (hotel, train, guest Wi-Fi) apart from a dead connection - see [Login pages](#login-pages). With IPv6 on offer, one more request goes out over IPv6 - see [IPv6](#ipv6).
 
 All seven steps describe **one path**: the adapter Windows routes internet traffic over is
 chosen once per cycle, and steps 4-7 send everything from that adapter's own address and resolve
@@ -105,27 +114,31 @@ claiming the connection is down.
 The check cycle runs every 3 seconds while a window is open and every 15 seconds while only the
 tray icon is live (both configurable in Settings → Check interval) - history is always sampled at
 the slower, background rate regardless, so retention and chart density don't change depending on
-whether you happen to have the window open.
+whether you happen to have the window open. History is kept for 30 days by default; Settings →
+Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
 
 ## Six screens
 
 - **Status** (left-click the tray icon): a simple green/red/amber overview with a plain-language
-  explanation and a seven-step timeline - is the network, internet, DNS, and each configured
-  endpoint working, and which step is being re-checked right now?
+  explanation, the last 24 hours in quarter-hour blocks and the last seven days with their
+  availability (click a coloured block to open its incident), and a seven-step timeline - is the
+  network, internet, DNS, and each configured endpoint working, and which step is being re-checked
+  right now?
 - **Diagnostics** (right-click → Diagnostics): every probe's raw measurements, the derived
   diagnosis, a network-health summary (see below), and a table you can expand per step for exact
   detail.
 - **History**: a zoomable, pannable chart per check (mouse wheel to zoom, drag to pan,
   double-click to reset), switchable between any chartable series and a 15 min/1 hour/6 hour/24
-  hour/7 day/all-time range. Kept for 30 days. Besides the checks themselves this includes the
-  Wi-Fi signal (with a marker wherever you switched to another access point), this computer's own
-  traffic, and the speed test results.
+  hour/7 day/30 day/all-time range. Kept for 30 days by default, up to 90. Besides the checks
+  themselves this includes the Wi-Fi signal (with a marker wherever you switched to another access
+  point), packet loss and jitter, IPv6, this computer's own traffic, and the speed test results.
 - **Incidents**: a run of consecutive failed diagnosis cycles (debounced, so a brief blip doesn't
   create noise) grouped into a single incident with a unique ID (`INC-yyyyMMdd-####`), a
   classification, a start/end time, and a snapshot of every probe's result at the start and at
   resolution. Incident text (headline, explanation, step snapshots) is always recorded in English
   regardless of the active display language, so an exported incident reads the same no matter who
-  opens it later.
+  opens it later. A search box and filters narrow the list down by where an incident originated
+  (provider, home network, this computer) and when (ongoing, 24 hours, 7 or 30 days).
 - **Tools**: a live-filling **Traceroute** (each hop optionally annotated with who owns it - your
   own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings - and,
   when ICMP doesn't reach the destination at all, a plain TCP connect to the destination to tell
@@ -146,9 +159,12 @@ points below the best of the last five minutes). An outage that starts over a we
 explained as most likely caused by that signal rather than by the router or the provider.
 
 Since Windows 11 24H2 the network name and access point count as location data: Windows only
-reveals them when location access for desktop apps is on (Settings → Privacy & security →
-Location). With it off, the diagnostics say so; signal and band are shown where Windows still
-provides them.
+reveals them when location access is on (Settings → Privacy & security → Location). With location
+services off, Windows withholds the connection details altogether - but it still reports the signal
+strength in dBm and the channel, so the app derives the signal percentage from the first (marked
+"≈") and the band from the second. The weak-signal warning and the signal chart keep working; only
+the network name and access-point switches are missing. Step 2's details then link straight to the
+location settings.
 
 ## Login pages
 
@@ -169,6 +185,39 @@ the line being 70%+ full (judged against the last speed test, else the link spee
 says so: your own downloads queueing in the router (bufferbloat) is a different fix from a slow
 provider. Only this computer's traffic is visible; another device filling the line is not.
 
+## Packet loss and jitter
+
+Once a minute, ten pings a tenth of a second apart go to the first public address of step 5. The
+share without an answer is the packet loss, and how much the round trip varied from one to the next
+is the jitter - the numbers that explain choppy calls and stuttering games on a connection that is
+technically up. Both are charted in History and summarised per day in the provider report. A minute
+in which nothing came back at all is not recorded: that is an outage (recorded as one) or a network
+that filters ping. This runs always, independent of the network-health monitoring below.
+
+## IPv6
+
+Many providers hand out IPv6 next to IPv4. When IPv6 is offered but broken, browsers try it first
+and only fall back after a delay, so sites load slowly or only sometimes - a fault that shows
+nowhere else. When the adapter has a global IPv6 address, step 5 also pings public resolvers over
+IPv6 and step 7 fetches Windows' own IPv6 test page (`ipv6.msftconnecttest.com`). If that fails
+while IPv4 works, step 7 becomes a warning with its own cause and advice (restart the router, or
+tell the provider). It is not counted as an outage - IPv4 carried on - but the provider report
+mentions it. On an IPv4-only network step 3 just says IPv6 is not offered.
+
+## VPN and mobile connections
+
+- **VPN.** Step 3 lists an active VPN and whether Windows routes all internet traffic through it.
+  Through a full tunnel, a latency warning says the round trip is via the VPN's server, and an
+  internet, DNS or target failure advises trying without the VPN first. A VPN connecting or
+  disconnecting is recorded as a change before an incident. The VPN's name never leaves the
+  computer: the AI export only says whether it carried all traffic.
+- **Metered connections.** Windows marks mobile data and phone hotspots as metered (and you can
+  mark a Wi-Fi network as metered yourself). Step 2 says so, automatic speed tests are skipped on
+  such a connection unless you allow it in Settings, and a manual test first shows how much data it
+  will roughly use. High latency on a metered connection is explained as normal for mobile data.
+  The provider report leaves time on a metered connection, and outages that started in it, out of
+  the line's availability.
+
 ## Network health monitoring
 
 Off by default (Settings → Network health). When enabled, flags packet-level conditions that sit
@@ -182,13 +231,14 @@ download, upload) against a fixed public server - no server picker, to keep this
 configuration surface small. While the download and upload run, an ICMP ping to `9.9.9.9` measures
 how much the round trip grows with the line full, graded A (under 5 ms extra) to F (200 ms or
 more) - the usual bufferbloat scale. "Run now" is always available; Settings → Tools also has an
-optional automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default). Either way, a
+optional automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default), skipped on a
+metered connection unless allowed. Either way, a
 result is recorded into History (download, upload, ping and the extra ping under load) and
 included in "Export all data" and the provider report.
 
 ## Report for your provider
 
-Reports → *Report for your provider* builds one self-contained HTML page for the last 7 or 30 days
+Reports → *Report for your provider* builds one self-contained HTML page for the last 7, 30 or 90 days
 and opens it in your browser (print it to PDF to send it on), or saves it. It shows:
 
 - how much of the period was actually measured - time the computer was off or the app not running
@@ -197,7 +247,9 @@ and opens it in your browser (print it to PDF to send it on), or saves it. It sh
   provider's DNS); outages in this computer, the home network or a login page are listed
   separately, so the report can't be dismissed over a local problem;
 - every outage, and a summary per cause;
-- latency per day (average and 95th percentile);
+- latency per day (average and 95th percentile), and packet loss and jitter per day;
+- time spent on a metered connection (a phone's hotspot), which does not count against the line,
+  and how often IPv6 failed, if the network offers it;
 - every speed test against the subscription speed you enter on the same page, with the extra ping
   under load.
 
@@ -291,8 +343,9 @@ history - including v1's Wi-Fi signal history - carry over automatically.
 **New in v2 compared with v1**: an adaptive check cadence; one consistent path through all seven
 checks on machines with several adapters; DNS diagnosis that tells your DNS server, blocked DNS
 traffic and a dead connection apart; login-page detection; Wi-Fi access-point switches and
-weak-signal diagnosis; latency-under-load detection and a bufferbloat grade; a report for your
-provider; network-health monitoring (TCP retransmissions, packet loss, TTL errors, rogue DHCP);
+weak-signal diagnosis; latency-under-load detection and a bufferbloat grade; packet loss and
+jitter; IPv6, VPN and metered-connection awareness; an uptime strip and searchable incidents; a
+report for your provider; configurable history retention (up to 90 days); network-health monitoring (TCP retransmissions, packet loss, TTL errors, rogue DHCP);
 traceroute hop ownership; LAN-scan manufacturer lookup with a TCP fallback; an AI-ready export;
 and fully automatic self-update.
 
@@ -300,7 +353,6 @@ and fully automatic self-update.
 
 - Continuous named ping targets with their own per-target latency graphs.
 - Quiet hours (suppressing incident pop-ups during a configured daily window).
-- Configurable history retention - v1 offered 15 minutes to 32 days; v2 keeps a fixed 30 days.
 
 Missing something, or found a problem? [Open an issue](https://github.com/DutchCoban/InternetMonitor/issues) -
 that's the best way to influence what comes next.
@@ -326,9 +378,10 @@ For a new contributor, the call chain from startup to a diagnosis on screen is:
   crossing from a background thread onto the UI thread is marshalled via `SynchronizationContext`.
 
 Besides the main cycle, a handful of things run on their own schedule: `Core/Monitors/KumaPusher.cs`
-(the heartbeat push), `Core/Monitors/NetworkHealthMonitor.cs` (packet-level conditions),
+(the heartbeat push), `Core/Monitors/LineQualitySampler.cs` (packet loss and jitter, once a minute),
+`Core/Monitors/NetworkHealthMonitor.cs` (packet-level conditions),
 `Core/Updates/UpdateChecker.cs` (the daily GitHub check), `Core/Monitors/SpeedTestScheduler.cs`
-(the optional automatic Speed Test) - all four follow the same `Reconfigure(...)`-driven
+(the optional automatic Speed Test) - the last four follow the same `Reconfigure(...)`-driven
 live-restart shape, so a Settings change takes effect immediately without restarting the app.
 Traceroute (`Core/Tools/Traceroute/`), the LAN scanner (`Core/Tools/LanScan/`) and the Speed Test
 itself (`Core/Tools/SpeedTest/`) are the genuinely on-demand tools, triggered only from the Tools
@@ -382,8 +435,12 @@ None of these live inside the application directory, so the app itself can be re
   is rare in practice. This check has no retry: a network settings change (even just the DNS
   server) can make the gateway genuinely unreachable at the OS level for a few seconds, and
   that's real, momentary state worth showing, not a measurement error to hide.
-- Wi-Fi network names and access points need location access for desktop apps on Windows 11
-  24H2 and later - see [Wi-Fi details](#wi-fi-details).
+- Wi-Fi network names and access points need location access on Windows 11 24H2 and later - see
+  [Wi-Fi details](#wi-fi-details). Without it, the band comes from the channel number, which
+  cannot tell a 6 GHz channel from a 2.4 or 5 GHz one with the same number.
+- The IPv6 check needs `ipv6.msftconnecttest.com` to resolve; a DNS server that withholds AAAA
+  records leaves IPv6 untested rather than reported as broken (browsers then don't try IPv6
+  either).
 - "The line was busy" only sees this computer's traffic; another device filling the line looks like
   an idle line from here.
 - The DNS step queries the adapter's DNS servers directly over plain UDP port 53, not through
