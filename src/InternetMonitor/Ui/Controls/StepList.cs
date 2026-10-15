@@ -388,6 +388,10 @@ public sealed class StepList : ThemedControl
         g.DrawArc(arc, bounds, (float)(_phase * 360), 90f);
     }
 
+    /// <summary>
+    /// A row's right-hand side: the headline (or pending/running) in the state's colour, with the
+    /// step's duration right-aligned once it has finished.
+    /// </summary>
     private void DrawStatusText(Graphics g, Palette p, LocalizationManager loc, StepResult result, int x, int y)
     {
         int right = Width - Sp(3);
@@ -426,6 +430,7 @@ public sealed class StepList : ThemedControl
         g.DrawTextCrisp(text, Theme.Font(FontRole.Body), color, new Rectangle(x, y, available, RowHeight));
     }
 
+    /// <summary>An expanded row: the detail sentence, then every measurement as a label/value line.</summary>
     private void DrawExpanded(Graphics g, Palette p, StepResult result, int x, int y, int height)
     {
         int lineHeight = Dp(18);

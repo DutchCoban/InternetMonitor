@@ -118,6 +118,12 @@ public static class UptimeTimeline
         return blocks;
     }
 
+    /// <summary>
+    /// The last <see cref="DayCount"/> local calendar days, today up to now. Each day runs from local
+    /// midnight to local midnight (23 or 25 hours on a daylight-saving change) and is computed with
+    /// <see cref="ProviderReportData.Compute"/>: red below 99.9% availability on the provider's side,
+    /// orange when it stayed above that but other outages happened, grey when hardly anything was measured.
+    /// </summary>
     private static List<UptimeDay> ComputeDays(
         IReadOnlyList<Incident> incidents,
         Func<string, IReadOnlyList<MetricPoint>> history,

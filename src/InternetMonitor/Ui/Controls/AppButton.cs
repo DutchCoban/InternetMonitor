@@ -190,6 +190,7 @@ public sealed class AppButton : ThemedControl, IButtonControl
         }
     }
 
+    /// <summary>Steps the hover highlight towards its target and stops the timer once it is there.</summary>
     private void OnAnimationTick(object? sender, EventArgs e)
     {
         float target = _hovered && Enabled ? 1f : 0f;

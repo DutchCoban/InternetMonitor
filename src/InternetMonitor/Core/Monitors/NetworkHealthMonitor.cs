@@ -207,6 +207,11 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// One tick of the counter loop. The Windows counters only ever grow, so each sample is the
+    /// difference since the previous tick (clamped at 0, for a counter reset); the first tick only
+    /// sets the baseline. Packet loss is a ping to every configured address, as a percentage.
+    /// </summary>
     private async Task PollCountersOnceAsync(CancellationToken cancellationToken)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -309,6 +314,10 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         tracker.Samples.RemoveAll(s => s.At < cutoff);
     }
 
+    /// <summary>
+    /// Opens an incident when a condition crosses its threshold within its window, and closes it
+    /// once it no longer does. Counts are summed over the window; packet loss, already a rate, is averaged.
+    /// </summary>
     private void EvaluateCondition(ConditionTracker tracker, DateTimeOffset now)
     {
         if (!tracker.Threshold.Enabled)
@@ -351,6 +360,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         IncidentClosed?.Invoke(active);
     }
 
+    /// <summary>A network-health incident, worded from the <c>networkHealth.{key}.*</c> texts with the count and window.</summary>
     private Incident BuildIncident(ConditionTracker tracker, int countInWindow, DateTimeOffset now)
     {
         LocalizationManager loc = LocalizationManager.Instance;
@@ -371,6 +381,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         };
     }
 
+    /// <summary>Snapshots every condition for the Diagnostics page and raises <see cref="StatusChanged"/>.</summary>
     private void PublishStatus()
     {
         _lastUpdatedUtc = DateTimeOffset.UtcNow;

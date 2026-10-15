@@ -163,6 +163,11 @@ public sealed class StepPipeline : IDisposable
         CompleteCycle(context.Throughput);
     }
 
+    /// <summary>
+    /// Runs steps 1 to 3 one after the other, publishing each as it finishes. They only read local
+    /// state, and each depends on the one before, so the first failure stops here; the returned step
+    /// lets the caller mark everything after it as skipped.
+    /// </summary>
     private async Task<StepId?> RunLocalChecksAsync(StepContext context, CancellationToken cancellationToken)
     {
         foreach (IStepCheck check in _localChecks)

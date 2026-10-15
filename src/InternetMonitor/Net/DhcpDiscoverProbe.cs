@@ -96,6 +96,11 @@ public static class DhcpDiscoverProbe
         }
     }
 
+    /// <summary>
+    /// A minimal DHCPDISCOVER: the BOOTP header with the broadcast flag set (so servers answer to
+    /// the broadcast address - this probe has no address of its own to be answered at), a random
+    /// locally-administered client MAC, the magic cookie, and only the message-type option.
+    /// </summary>
     private static byte[] BuildDiscover(uint transactionId)
     {
         var packet = new byte[240 + 4];

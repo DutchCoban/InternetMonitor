@@ -303,6 +303,7 @@ public sealed class AppSettings
 
     // ---- Persistence --------------------------------------------------------------------------
 
+    /// <summary>Reads settings.json, or returns defaults when it is missing or unreadable - see the class summary.</summary>
     public static AppSettings Load()
     {
         try

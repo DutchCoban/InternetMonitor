@@ -147,6 +147,10 @@ public sealed class IncidentTracker
         _store.Update(active);
     }
 
+    /// <summary>
+    /// Ends the active incident: records the end, every step's state at that moment and a closing
+    /// timeline entry (in English, like all incident text), saves it and resets the good-cycle count.
+    /// </summary>
     private void Close(StepSnapshot snapshot)
     {
         if (_active is not { } active)

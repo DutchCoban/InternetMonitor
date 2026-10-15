@@ -102,6 +102,7 @@ public sealed class Toggle : ThemedControl
         Invalidate();
     }
 
+    /// <summary>Slides the knob a step towards its target and stops the timer once it is there.</summary>
     private void OnAnimationTick(object? sender, EventArgs e)
     {
         float target = _checked ? 1f : 0f;

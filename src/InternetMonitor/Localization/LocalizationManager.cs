@@ -184,6 +184,10 @@ public sealed class LocalizationManager
         return JsonSerializer.Deserialize<Dictionary<string, string>>(stream) ?? [];
     }
 
+    /// <summary>
+    /// Debug builds only: fails loudly when the language files do not have exactly the same keys, so
+    /// a missing translation is found while developing rather than shown as a raw key.
+    /// </summary>
     [Conditional("DEBUG")]
     private void AssertKeysMatchInDebug()
     {

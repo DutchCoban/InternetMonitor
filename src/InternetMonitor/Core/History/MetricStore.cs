@@ -171,6 +171,7 @@ public sealed class MetricStore : IAsyncDisposable
         }
     }
 
+    /// <summary>Binary search for the first point at or after <paramref name="from"/>; the list is in time order.</summary>
     private static int LowerBound(List<MetricPoint> points, DateTimeOffset from)
     {
         int low = 0;
@@ -239,6 +240,11 @@ public sealed class MetricStore : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Reads one series file, dropping malformed lines and points older than the retention. When
+    /// anything was dropped the file is rewritten, so it does not keep growing between starts -
+    /// the flush loop only ever appends.
+    /// </summary>
     private async Task<List<MetricPoint>> ReadAndCompactAsync(string path)
     {
         string[] lines = await File.ReadAllLinesAsync(path).ConfigureAwait(false);

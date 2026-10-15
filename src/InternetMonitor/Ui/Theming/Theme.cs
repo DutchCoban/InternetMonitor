@@ -263,6 +263,10 @@ public static class Theme
     private static readonly Lazy<string> MonoFamily = new(() =>
         FirstInstalled("Cascadia Mono", "Consolas", "Lucida Console") ?? FontFamily.GenericMonospace.Name);
 
+    /// <summary>
+    /// The first of the candidate font families installed on this machine - Segoe UI Variable only
+    /// exists on Windows 11, so Windows 10 falls back to Segoe UI. Null when none is.
+    /// </summary>
     private static string? FirstInstalled(params string[] candidates)
     {
         try

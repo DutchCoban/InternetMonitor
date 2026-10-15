@@ -30,6 +30,10 @@ public sealed class EndpointList : ThemedControl
     public override Size GetPreferredSize(Size proposedSize) =>
         new(proposedSize.Width, Math.Max(RowHeight, _endpoints.Count * RowHeight));
 
+    /// <summary>
+    /// Rebuilds the list: the old toggles and remove buttons are unhooked and disposed rather than
+    /// reused, since the endpoints can have changed in number and order.
+    /// </summary>
     public void SetEndpoints(IReadOnlyList<EndpointConfig> endpoints)
     {
         foreach (Toggle toggle in _toggles)

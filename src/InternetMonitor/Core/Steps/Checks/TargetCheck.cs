@@ -219,6 +219,11 @@ public sealed class TargetCheck : IStepCheck
         return null;
     }
 
+    /// <summary>
+    /// The IPv6 request, only when step 3 found a global IPv6 address: the name is looked up (AAAA)
+    /// over the adapter's IPv4 DNS servers, the connection leaves from the IPv6 address. Null when
+    /// there is nothing to test.
+    /// </summary>
     private static async Task<HttpOutcome?> CheckIpv6Async(StepContext context, CancellationToken cancellationToken)
     {
         if (context.GlobalIpv6 is not { } source)
@@ -320,6 +325,10 @@ public sealed class TargetCheck : IStepCheck
     /// it is built once here rather than re-joined at each call site.</summary>
     private static string PortLabel(TargetEndpoint target) => $"{target.Host}:{target.Port}";
 
+    /// <summary>
+    /// A TcpPort target: resolve the host through the adapter's DNS servers unless it is an address,
+    /// then one connect. A refused connection counts as reachable - see the class summary.
+    /// </summary>
     private static async Task<TargetEndpointResult> CheckTcpPortAsync(
         TargetEndpoint target,
         TimeSpan timeout,
@@ -348,6 +357,10 @@ public sealed class TargetCheck : IStepCheck
             : new TargetEndpointResult(target.Name, TargetKind.TcpPort, label, false, null, null, HttpStage.Tcp, outcome.Error?.ToString() ?? "Timed out", null, address, outcome.ElapsedMs);
     }
 
+    /// <summary>
+    /// The per-stage timings of one request as measurement rows; a stage that was never reached is
+    /// left out, and a cached DNS answer says so instead of showing 0 ms.
+    /// </summary>
     private static void AddTimingMeasurements(List<Measurement> measurements, LocalizationManager loc, HttpTimings timings)
     {
         void Add(string key, TimeSpan? value)

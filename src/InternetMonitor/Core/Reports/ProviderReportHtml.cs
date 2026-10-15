@@ -273,6 +273,10 @@ public static class ProviderReportHtml
     private const int PadTop = 12;
     private const int PadRight = 24;
 
+    /// <summary>
+    /// Two lines per day - average and 95th percentile - as inline SVG. The x axis labels at most
+    /// about ten days, so a 90-day report stays readable.
+    /// </summary>
     private static string LatencyChart(IReadOnlyList<DayLatency> days, LocalizationManager loc)
     {
         double max = NiceMax(days.Max(d => d.P95Ms));
@@ -302,6 +306,10 @@ public static class ProviderReportHtml
             ("p95", loc.Get("report.p.legend.p95")));
     }
 
+    /// <summary>
+    /// One bar per speed test against the subscription line and its 80% line; a bar below 80% is
+    /// drawn in the warning colour.
+    /// </summary>
     private static string SpeedChart(IReadOnlyList<SpeedTestEntry> tests, double subscribed, LocalizationManager loc)
     {
         double max = NiceMax(Math.Max(subscribed, tests.Max(t => t.DownloadMbps)));

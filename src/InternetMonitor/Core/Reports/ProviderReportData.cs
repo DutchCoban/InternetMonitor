@@ -205,6 +205,10 @@ public sealed record ProviderReportData(
     /// <summary>Longer than this between two samples means the app was not running in between.</summary>
     private static readonly TimeSpan MaxSampleGap = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Groups the loss and jitter samples by local calendar day. A day with loss samples but no
+    /// jitter (every burst had at most one reply) gets a null jitter rather than a zero.
+    /// </summary>
     private static List<DayQuality> ComputeQualityByDay(IReadOnlyList<MetricPoint> loss, IReadOnlyList<MetricPoint> jitter, TimeZoneInfo timeZone)
     {
         DateOnly DayOf(MetricPoint p) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(p.Timestamp, timeZone).DateTime);

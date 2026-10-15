@@ -70,6 +70,10 @@ public sealed class LineQualitySampler : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// One burst: the echoes go one after another, not at once, so each round trip is measured on
+    /// its own and jitter compares consecutive ones. Null when there is no address to ping from or to.
+    /// </summary>
     private async Task<LineQualitySample?> MeasureAsync(CancellationToken cancellationToken)
     {
         if (_target() is not { } target || _source() is not { } source)

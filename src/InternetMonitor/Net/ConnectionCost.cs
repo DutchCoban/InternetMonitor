@@ -57,6 +57,10 @@ public static class ConnectionCost
             (flags & (CostOverDataLimit | CostApproachingDataLimit)) != 0);
     }
 
+    /// <summary>
+    /// The cost flags, from the cache while it is fresh. The COM call runs outside the lock: two
+    /// threads may both ask Windows at an expiry, which is harmless, rather than one waiting on the other.
+    /// </summary>
     private static uint? CachedCost()
     {
         lock (Gate)
@@ -76,6 +80,10 @@ public static class ConnectionCost
         return cost;
     }
 
+    /// <summary>
+    /// Asks the Network List Manager once. Created and released per call rather than kept, so no COM
+    /// object outlives the thread (and apartment) that made it. Null on any COM failure.
+    /// </summary>
     private static uint? ReadCost()
     {
         object? manager = null;

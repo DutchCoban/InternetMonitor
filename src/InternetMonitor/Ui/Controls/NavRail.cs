@@ -165,6 +165,7 @@ public sealed class NavRail : ThemedControl
     protected override bool IsInputKey(Keys keyData) =>
         keyData is Keys.Up or Keys.Down || base.IsInputKey(keyData);
 
+    /// <summary>Up and down arrows move between pages, as in any list; the ends do not wrap around.</summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);

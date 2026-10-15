@@ -152,6 +152,10 @@ internal static class GdiExtensions
         TextRenderer.DrawText(g, text, font, bounds, color, flags | TextFormatFlags.NoPadding);
     }
 
+    /// <summary>
+    /// Text via GDI+ <see cref="Graphics.DrawString"/>, which follows the Graphics transform - the
+    /// counterpart of <see cref="DrawTextCrisp"/> for rotated or scaled text. Currently unused.
+    /// </summary>
     public static void DrawTextSmooth(
         this Graphics g,
         string text,

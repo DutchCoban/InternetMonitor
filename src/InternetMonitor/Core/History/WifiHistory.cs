@@ -13,6 +13,11 @@ namespace InternetMonitor.Core.History;
 /// </summary>
 public static class WifiHistory
 {
+    /// <summary>
+    /// The access point (BSSID, lower case) a Wi-Fi signal point was measured on. v2 stores the BSSID
+    /// itself as metadata; v1 stored a URL-encoded JSON object, of which only the BSSID is used here,
+    /// so a v1 change of link speed is not mistaken for a switch of access point. Null when unknown.
+    /// </summary>
     public static string? AccessPointOf(string? metadata)
     {
         if (metadata is not { Length: > 0 })

@@ -103,6 +103,10 @@ public static class IncidentFilter
         return words.All(w => haystack.Contains(w, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Everything the search box looks in, as one string: the cause name in both the display language
+    /// and English, since incidents are recorded in English but people type in their own.
+    /// </summary>
     private static string SearchText(Incident incident)
     {
         string causeKey = $"cause.{incident.Cause.Key()}";

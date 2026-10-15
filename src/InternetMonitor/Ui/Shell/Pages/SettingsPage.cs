@@ -664,6 +664,10 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
     private void OnEndpointEditRequested(EndpointConfig endpoint) => OpenEndpointEditor(endpoint);
 
+    /// <summary>
+    /// Adds or edits one endpoint (matched by id) and saves. The checks pick it up on the next cycle,
+    /// since the pipeline rebuilds its targets from the settings every cycle.
+    /// </summary>
     private void OpenEndpointEditor(EndpointConfig? existing)
     {
         using EndpointEditWindow window = existing is null ? EndpointEditWindow.ForNew() : EndpointEditWindow.ForEdit(existing);
@@ -983,6 +987,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
     // ---- Loading / applying settings ------------------------------------------------------------
 
+    /// <summary>
+    /// Fills every control from the current settings. Each control's change handler is unhooked while
+    /// it is set (or the toggle is set without notifying), so loading never writes the settings back,
+    /// re-applies them, or - for the language - triggers a full re-localisation.
+    /// </summary>
     private void LoadFromSettings()
     {
         AppSettings settings = Services.Settings;
@@ -1096,6 +1105,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         }
     }
 
+    /// <summary>Selects the item with this key, or the first item when the stored value is no longer offered.</summary>
     private static void SelectComboItem(ComboBox box, string key)
     {
         for (int i = 0; i < box.Items.Count; i++)

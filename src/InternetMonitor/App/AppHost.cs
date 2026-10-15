@@ -446,6 +446,10 @@ public sealed class AppHost : ApplicationContext
         },
         null);
 
+    /// <summary>
+    /// Brings the window up from the tray: shown, restored to how it was left (maximised or not) when
+    /// minimised, and in front.
+    /// </summary>
     private void ShowWindow()
     {
         if (_window.IsDisposed)

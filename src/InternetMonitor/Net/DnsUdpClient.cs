@@ -196,6 +196,11 @@ public static class DnsUdpClient
     private static AddressFamily FamilyOf(DnsRecordType type) =>
         type == DnsRecordType.Aaaa ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
 
+    /// <summary>
+    /// Builds one query in DNS wire format: a 12-byte header, then the name as length-prefixed
+    /// labels ending in a zero byte, then the record type and class IN. The transaction id is random
+    /// and never 0, so a stray or late reply to another query can be told apart.
+    /// </summary>
     private static byte[] BuildQuery(string name, DnsRecordType type, out ushort transactionId)
     {
         transactionId = (ushort)Random.Shared.Next(1, ushort.MaxValue);

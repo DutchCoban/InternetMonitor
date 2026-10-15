@@ -251,6 +251,10 @@ public sealed class MacVendorLookup : IDisposable
         }
     }
 
+    /// <summary>
+    /// Writes the cache when something was added since the last save. Best effort: a cache that could
+    /// not be written is simply looked up again next time.
+    /// </summary>
     public void SaveCache()
     {
         if (!_dirty)
@@ -266,6 +270,7 @@ public sealed class MacVendorLookup : IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
+            // Left dirty, so the next save tries again.
         }
     }
 

@@ -211,6 +211,11 @@ public static class TlsTimedRequest
         }
     }
 
+    /// <summary>
+    /// Sends the GET and reads only the first packet of the reply, enough for the status line. The
+    /// body is never read: the question is whether the server answered and how fast, and reading a
+    /// page of unknown size would make the timing depend on that size.
+    /// </summary>
     private static async Task<int> ReadStatusLineAsync(
         Stream stream,
         Uri uri,

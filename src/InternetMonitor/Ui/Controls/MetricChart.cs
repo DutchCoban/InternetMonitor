@@ -85,6 +85,10 @@ public sealed class MetricChart : ThemedControl
         Math.Max(1, Width - AxisLeft - Sp(2)),
         Math.Max(1, Height - AxisBottom - FooterHeight - Sp(2)));
 
+    /// <summary>
+    /// Shows a new series in the current view window, or in a fresh one when there is none yet. Callers
+    /// that want a particular range call <see cref="SetRange"/> afterwards, as the History page does.
+    /// </summary>
     public void SetSeries(
         IReadOnlyList<MetricPoint> points,
         string unit,
@@ -308,6 +312,10 @@ public sealed class MetricChart : ThemedControl
         }
     }
 
+    /// <summary>
+    /// The visible point nearest to <paramref name="x"/> for the hover card, or -1 when the pointer is
+    /// outside the plot or more than 24 dp from any point.
+    /// </summary>
     private int NearestVisibleIndex(int x)
     {
         if (_visible.Count == 0 || !PlotBounds.Contains(x, PlotBounds.Top + 1))
@@ -713,6 +721,10 @@ public sealed class MetricChart : ThemedControl
         }
     }
 
+    /// <summary>
+    /// The line under the chart: min/average/max/p95 of what is in view, or the share of time up for a
+    /// state series.
+    /// </summary>
     private void DrawFooter(Graphics g, Palette p)
     {
         if (Downsample.Summarize(_visible) is not { } stats)

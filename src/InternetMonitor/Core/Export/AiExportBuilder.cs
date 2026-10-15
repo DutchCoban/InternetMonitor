@@ -189,6 +189,10 @@ public static class AiExportBuilder
 
     // ---- Sections -------------------------------------------------------------------------------
 
+    /// <summary>
+    /// When, from which version and with which settings the data was collected - what an AI needs to
+    /// read the numbers in the rest of the document.
+    /// </summary>
     private static void AppendContext(Doc doc, AppSettings settings, string appVersion, DateTimeOffset from, DateTimeOffset to)
     {
         doc.Line("## About this export").Blank()
@@ -217,6 +221,10 @@ public static class AiExportBuilder
             .Blank();
     }
 
+    /// <summary>
+    /// The provider report's headline figures: coverage, availability, outages per side and per cause,
+    /// and speed tests below 80% of the subscription.
+    /// </summary>
     private static void AppendSummary(Doc doc, ProviderReportData report, AppSettings settings)
     {
         doc.Line("## Summary of the period").Blank()
@@ -257,6 +265,10 @@ public static class AiExportBuilder
         }
     }
 
+    /// <summary>
+    /// When outages start, by local hour and weekday (Monday first) - the shape of evening congestion
+    /// or a nightly router restart.
+    /// </summary>
     private static void AppendOutagePatterns(Doc doc, ProviderReportData report)
     {
         if (report.Outages.Count == 0)
@@ -355,6 +367,10 @@ public static class AiExportBuilder
         }
     }
 
+    /// <summary>
+    /// Latency per local day for the four round-trip series, and the public-internet latency by hour of
+    /// day over the whole period.
+    /// </summary>
     private static void AppendLatency(Doc doc, Func<string, IReadOnlyList<MetricPoint>> series, DateTimeOffset from, DateTimeOffset to)
     {
         (string Name, string Id)[] latencySeries =
@@ -408,6 +424,7 @@ public static class AiExportBuilder
         }
     }
 
+    /// <summary>Packet loss and jitter per day, from the provider report's figures. Left out before the series existed.</summary>
     private static void AppendLineQuality(Doc doc, ProviderReportData report)
     {
         if (report.QualityByDay.Count == 0)
@@ -432,6 +449,7 @@ public static class AiExportBuilder
         doc.Blank();
     }
 
+    /// <summary>Every speed test in the period, against the subscription and with its bufferbloat grade.</summary>
     private static void AppendSpeedTests(Doc doc, ProviderReportData report, AppSettings settings)
     {
         doc.Line("## Speed tests").Blank();
@@ -456,6 +474,10 @@ public static class AiExportBuilder
         doc.Blank();
     }
 
+    /// <summary>
+    /// Signal statistics, time spent at weak/medium/good signal, and every switch of access point -
+    /// the access points under their stand-in names. Left out when no Wi-Fi signal was recorded in the period.
+    /// </summary>
     private static void AppendWifi(Doc doc, IReadOnlyList<MetricPoint> wifi, DateTimeOffset from, DateTimeOffset to)
     {
         List<MetricPoint> points = [.. wifi.Where(p => p.Timestamp >= from && p.Timestamp <= to)];
@@ -502,6 +524,10 @@ public static class AiExportBuilder
         doc.Blank();
     }
 
+    /// <summary>
+    /// This computer's own traffic, and how often it filled most of the line - context for latency
+    /// that rises under load.
+    /// </summary>
     private static void AppendTraffic(Doc doc, IReadOnlyList<MetricPoint> down, IReadOnlyList<MetricPoint> up, ProviderReportData report, DateTimeOffset from, DateTimeOffset to)
     {
         double[] d = [.. down.Where(p => p.Timestamp >= from && p.Timestamp <= to).Select(p => p.Value).Order()];
@@ -523,6 +549,10 @@ public static class AiExportBuilder
         doc.Blank();
     }
 
+    /// <summary>
+    /// One row per recorded series over everything kept - not only the summary period - including v1's
+    /// legacy series, so nothing in the history is invisible to the reader.
+    /// </summary>
     private static void AppendSeriesStatistics(Doc doc, IReadOnlyDictionary<string, IReadOnlyList<MetricPoint>> history)
     {
         doc.Line("## All recorded series (entire history kept)").Blank();
@@ -557,6 +587,7 @@ public static class AiExportBuilder
         doc.Blank();
     }
 
+    /// <summary>The packet-level warnings by condition. Left out when monitoring is off and none were ever recorded.</summary>
     private static void AppendNetworkHealth(Doc doc, IReadOnlyList<Incident> incidents, AppSettings settings)
     {
         if (!settings.NetworkHealthMonitoringEnabled && !incidents.Any(i => i.ConditionKey is not null))

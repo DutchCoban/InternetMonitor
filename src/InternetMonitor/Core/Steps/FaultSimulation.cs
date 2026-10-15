@@ -62,6 +62,10 @@ public static class FaultSimulation
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Forces a step to fail, or stops forcing it, and raises <see cref="Changed"/> so a fresh cycle
+    /// shows the effect straight away.
+    /// </summary>
     public static void Toggle(StepId step, bool fail)
     {
         lock (Gate)

@@ -105,6 +105,7 @@ public sealed class DiagnosticLogger
         });
     }
 
+    /// <summary>One log line for a new incident, at any level but Off.</summary>
     public void LogIncidentOpened(Incident incident)
     {
         if (_settings.DiagnosticLogLevel == DiagnosticLogLevel.Off)
@@ -138,6 +139,7 @@ public sealed class DiagnosticLogger
         });
     }
 
+    /// <summary>One step's part of a cycle line; the measurements only at Full, where size is not a concern.</summary>
     private static object BuildStepEntry(StepResult result, DiagnosticLogLevel level)
     {
         Dictionary<string, string>? measurements = null;

@@ -56,6 +56,8 @@ public sealed class EndpointEditWindow : Form
         BackColor = _palette.Bg;
         Icon = InternetMonitor.Ui.TrayIconFactory.AppIcon.Value;
 
+        // Fields for both kinds are created up front; LayoutFields shows the ones that belong to
+        // the selected kind, so switching kind never loses what was typed in the other.
         _nameLabel = MakeLabel(_loc.Get("settings.endpoint.name"));
         _name = MakeTextBox(existing?.Name ?? string.Empty);
 
@@ -69,6 +71,7 @@ public sealed class EndpointEditWindow : Form
         _urlLabel = MakeLabel(_loc.Get("settings.endpoint.url"));
         _url = MakeTextBox(existing is { Kind: EndpointKind.Url } ? existing.Url : "https://");
 
+        // 0 means "any response counts" - see OnSaveClicked.
         _expectedStatusLabel = MakeLabel(_loc.Get("settings.endpoint.expectedStatus"));
         _expectedStatus = MakeNumeric(0, 599, existing?.ExpectedStatusCode ?? 0);
 

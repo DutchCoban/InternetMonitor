@@ -16,6 +16,10 @@ public sealed record IpOwner(string? AsNumber, string? AsName, string? NetworkNa
 {
     public bool HasAnything => AsNumber is not null || AsName is not null || NetworkName is not null;
 
+    /// <summary>
+    /// "AS15169  GOOGLE   US" - whatever is known about the hop's owner, the network name left out
+    /// when it only repeats the AS name.
+    /// </summary>
     public string Describe()
     {
         var parts = new List<string>(3);

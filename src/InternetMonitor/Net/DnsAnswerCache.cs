@@ -35,6 +35,10 @@ public sealed class DnsAnswerCache
 
     public static DnsAnswerCache Shared { get; } = new(DefaultLifetime);
 
+    /// <summary>
+    /// A still-fresh answer for exactly this name, server list and source address. An expired entry
+    /// is removed on the way, so the cache never grows past what is being looked up.
+    /// </summary>
     public bool TryGet(string hostname, IReadOnlyList<IPAddress> servers, IPAddress? source, out IReadOnlyList<IPAddress> addresses)
     {
         string key = Key(hostname, servers, source);

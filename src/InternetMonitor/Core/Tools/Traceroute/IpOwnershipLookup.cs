@@ -199,6 +199,10 @@ public sealed class IpOwnershipLookup : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Asks rdap.org, which redirects to the registry responsible for the address, for the network's
+    /// name and country. Only those two fields are read; null on any failure or timeout.
+    /// </summary>
     private async Task<IpOwner?> QueryRdapAsync(IPAddress address, CancellationToken cancellationToken)
     {
         try
@@ -268,6 +272,10 @@ public sealed class IpOwnershipLookup : IDisposable
         }
     }
 
+    /// <summary>
+    /// Writes the cache when something was added since the last save. Best effort: a cache that could
+    /// not be written is simply looked up again next time.
+    /// </summary>
     public void SaveCache()
     {
         if (!_dirty)
@@ -283,6 +291,7 @@ public sealed class IpOwnershipLookup : IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
+            // Left dirty, so the next save tries again.
         }
     }
 

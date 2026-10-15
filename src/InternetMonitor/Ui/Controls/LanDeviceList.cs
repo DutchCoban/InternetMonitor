@@ -201,6 +201,10 @@ public sealed class LanDeviceList : ThemedControl
             new Rectangle(x, y, Math.Max(0, width), HeaderHeight),
             extra | TextFormatFlags.VerticalCenter);
 
+    /// <summary>
+    /// One device in the scan's columns; a manufacturer still being looked up shows a spinner, and
+    /// anything unknown a muted dash.
+    /// </summary>
     private void DrawRow(Graphics g, Palette p, LanDevice device, int ipX, int hostX, int macX, int vendorX, int right, int msWidth, int y)
     {
         g.DrawTextCrisp(

@@ -439,6 +439,10 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
     private void OnCycleCompleted(StepSnapshot snapshot) => Post(() => RefreshFromSnapshot(snapshot));
 
+    /// <summary>
+    /// Updates the banner from a cycle: the analyser's severity, and the first failure's headline or
+    /// else the cause's name. Null means no cycle has finished yet.
+    /// </summary>
     private void RefreshFromSnapshot(StepSnapshot? snapshot)
     {
         if (snapshot is null)

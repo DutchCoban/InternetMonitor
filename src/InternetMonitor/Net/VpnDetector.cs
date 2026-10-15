@@ -33,6 +33,10 @@ public static class VpnDetector
 
     private static readonly string[] TransitionTunnelMarkers = ["teredo", "6to4", "isatap", "ip-https"];
 
+    /// <summary>
+    /// The active VPN, if any. A full tunnel wins over a split one when several are up, because it
+    /// is the one that changes what every check measures.
+    /// </summary>
     public static VpnInfo? Detect()
     {
         NetworkInterface[] all;
@@ -79,6 +83,10 @@ public static class VpnDetector
             || VpnMarkers.Any(m => haystack.Contains(m, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// The adapter's IPv4 interface index - the number GetBestInterface reports - or null for an
+    /// adapter without an IPv4 address, which cannot be carrying the VPN's IPv4 traffic.
+    /// </summary>
     private static uint? Ipv4Index(NetworkInterface nic)
     {
         try

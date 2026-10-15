@@ -192,6 +192,10 @@ public static class WlanInfo
         _ => null,
     };
 
+    /// <summary>
+    /// One WlanQueryInterface opcode whose answer is a single 32-bit value (RSSI, channel). Null
+    /// when Windows refuses or does not support it.
+    /// </summary>
     private static int? QueryInt(IntPtr client, Guid interfaceId, int opcode)
     {
         if (WlanQueryInterface(client, ref interfaceId, opcode, IntPtr.Zero, out int size, out IntPtr data, out _) != ErrorSuccess)
