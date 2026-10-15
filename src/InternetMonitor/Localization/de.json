@@ -598,5 +598,20 @@
   "speedtest.metered": "Getaktete Verbindung: ein Test kann viele Daten verbrauchen.",
   "speedtest.metered.estimate": "Getaktete Verbindung: ein Test verbraucht etwa {0} MB.",
   "report.p.side.metered": "Mobile Verbindung / Hotspot",
-  "report.p.metered": "Während {0} der gemessenen Zeit war dieser Computer über eine getaktete Verbindung online (mobile Daten oder der Hotspot eines Handys). Diese Zeit und darin begonnene Störungen zählen nicht zur Verfügbarkeit des Anschlusses."
+  "report.p.metered": "Während {0} der gemessenen Zeit war dieser Computer über eine getaktete Verbindung online (mobile Daten oder der Hotspot eines Handys). Diese Zeit und darin begonnene Störungen zählen nicht zur Verfügbarkeit des Anschlusses.",
+  "measure.vpn": "VPN",
+  "measure.vpn.full": "{0} (gesamter Datenverkehr)",
+  "measure.vpn.split": "{0} (nur ein Teil des Datenverkehrs)",
+  "step.latency.vpn": "Der gesamte Datenverkehr läuft über ein VPN, das ist also die Antwortzeit über den VPN-Server - sie ist meist höher als ohne.",
+  "change.vpnConnected": "Ein VPN wurde verbunden",
+  "change.vpnDisconnected": "Ein VPN wurde getrennt",
+  "explain.internet.vpn.what": "Die Verbindung fiel aus, während der gesamte Datenverkehr über ein VPN lief.",
+  "explain.internet.vpn.cause": "Wenn ein VPN den gesamten Datenverkehr trägt, läuft alles hinter dem Router - auch die Namensauflösung - zuerst über den VPN-Server. Der Router hat geantwortet, also ist die VPN-Verbindung oder ihr Server mindestens so wahrscheinlich die Ursache wie der Anschluss selbst.",
+  "explain.internet.vpn.todo": "Trenne das VPN und prüfe, ob das Internet ohne funktioniert. Wenn ja, verbinde dich neu, probiere einen anderen VPN-Server oder wende dich an den Anbieter des VPN. Wenn nein, liegt das Problem am Anschluss.",
+  "explain.dns.vpn.what": "Die Verbindung fiel aus, während der gesamte Datenverkehr über ein VPN lief.",
+  "explain.dns.vpn.cause": "Wenn ein VPN den gesamten Datenverkehr trägt, läuft alles hinter dem Router - auch die Namensauflösung - zuerst über den VPN-Server. Der Router hat geantwortet, also ist die VPN-Verbindung oder ihr Server mindestens so wahrscheinlich die Ursache wie der Anschluss selbst.",
+  "explain.dns.vpn.todo": "Trenne das VPN und prüfe, ob das Internet ohne funktioniert. Wenn ja, verbinde dich neu, probiere einen anderen VPN-Server oder wende dich an den Anbieter des VPN. Wenn nein, liegt das Problem am Anschluss.",
+  "explain.target.vpn.what": "Die Verbindung fiel aus, während der gesamte Datenverkehr über ein VPN lief.",
+  "explain.target.vpn.cause": "Wenn ein VPN den gesamten Datenverkehr trägt, läuft alles hinter dem Router - auch die Namensauflösung - zuerst über den VPN-Server. Der Router hat geantwortet, also ist die VPN-Verbindung oder ihr Server mindestens so wahrscheinlich die Ursache wie der Anschluss selbst.",
+  "explain.target.vpn.todo": "Trenne das VPN und prüfe, ob das Internet ohne funktioniert. Wenn ja, verbinde dich neu, probiere einen anderen VPN-Server oder wende dich an den Anbieter des VPN. Wenn nein, liegt das Problem am Anschluss."
 }

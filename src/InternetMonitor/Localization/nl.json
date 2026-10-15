@@ -598,5 +598,20 @@
   "speedtest.metered": "Gemeten verbinding: een test kan veel data verbruiken.",
   "speedtest.metered.estimate": "Gemeten verbinding: een test verbruikt ongeveer {0} MB.",
   "report.p.side.metered": "Mobiele verbinding / hotspot",
-  "report.p.metered": "Gedurende {0} van de gemeten tijd zat deze computer op een gemeten verbinding (mobiel internet of de hotspot van een telefoon). Die tijd, en storingen die daarin begonnen, tellen niet mee voor de beschikbaarheid van de lijn."
+  "report.p.metered": "Gedurende {0} van de gemeten tijd zat deze computer op een gemeten verbinding (mobiel internet of de hotspot van een telefoon). Die tijd, en storingen die daarin begonnen, tellen niet mee voor de beschikbaarheid van de lijn.",
+  "measure.vpn": "VPN",
+  "measure.vpn.full": "{0} (al het verkeer)",
+  "measure.vpn.split": "{0} (alleen een deel van het verkeer)",
+  "step.latency.vpn": "Al het verkeer gaat via een VPN, dus dit is de reactietijd via de server van de VPN - die is meestal hoger dan zonder.",
+  "change.vpnConnected": "Er werd een VPN verbonden",
+  "change.vpnDisconnected": "Een VPN werd verbroken",
+  "explain.internet.vpn.what": "De verbinding viel weg terwijl al het verkeer via een VPN liep.",
+  "explain.internet.vpn.cause": "Als een VPN al het verkeer draagt, gaat alles voorbij de router - ook het opzoeken van namen - eerst via de server van de VPN. De router antwoordde, dus de VPN-verbinding of de server ervan is minstens zo waarschijnlijk de oorzaak als de lijn zelf.",
+  "explain.internet.vpn.todo": "Verbreek de VPN en kijk of internet zonder werkt. Zo ja, maak opnieuw verbinding, probeer een andere VPN-server of neem contact op met wie de VPN levert. Zo nee, dan zit het probleem op de lijn.",
+  "explain.dns.vpn.what": "De verbinding viel weg terwijl al het verkeer via een VPN liep.",
+  "explain.dns.vpn.cause": "Als een VPN al het verkeer draagt, gaat alles voorbij de router - ook het opzoeken van namen - eerst via de server van de VPN. De router antwoordde, dus de VPN-verbinding of de server ervan is minstens zo waarschijnlijk de oorzaak als de lijn zelf.",
+  "explain.dns.vpn.todo": "Verbreek de VPN en kijk of internet zonder werkt. Zo ja, maak opnieuw verbinding, probeer een andere VPN-server of neem contact op met wie de VPN levert. Zo nee, dan zit het probleem op de lijn.",
+  "explain.target.vpn.what": "De verbinding viel weg terwijl al het verkeer via een VPN liep.",
+  "explain.target.vpn.cause": "Als een VPN al het verkeer draagt, gaat alles voorbij de router - ook het opzoeken van namen - eerst via de server van de VPN. De router antwoordde, dus de VPN-verbinding of de server ervan is minstens zo waarschijnlijk de oorzaak als de lijn zelf.",
+  "explain.target.vpn.todo": "Verbreek de VPN en kijk of internet zonder werkt. Zo ja, maak opnieuw verbinding, probeer een andere VPN-server of neem contact op met wie de VPN levert. Zo nee, dan zit het probleem op de lijn."
 }

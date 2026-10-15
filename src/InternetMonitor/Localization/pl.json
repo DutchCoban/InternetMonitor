@@ -598,5 +598,20 @@
   "speedtest.metered": "Połączenie taryfowe: test może zużyć dużo danych.",
   "speedtest.metered.estimate": "Połączenie taryfowe: test zużywa około {0} MB.",
   "report.p.side.metered": "Połączenie komórkowe / hotspot",
-  "report.p.metered": "Przez {0} mierzonego czasu ten komputer korzystał z połączenia taryfowego (dane komórkowe lub hotspot telefonu). Ten czas oraz awarie, które się w nim zaczęły, nie są wliczane do dostępności łącza."
+  "report.p.metered": "Przez {0} mierzonego czasu ten komputer korzystał z połączenia taryfowego (dane komórkowe lub hotspot telefonu). Ten czas oraz awarie, które się w nim zaczęły, nie są wliczane do dostępności łącza.",
+  "measure.vpn": "VPN",
+  "measure.vpn.full": "{0} (cały ruch)",
+  "measure.vpn.split": "{0} (tylko część ruchu)",
+  "step.latency.vpn": "Cały ruch przechodzi przez VPN, więc to czas odpowiedzi przez serwer VPN - zwykle jest wyższy niż bez niego.",
+  "change.vpnConnected": "Połączono VPN",
+  "change.vpnDisconnected": "Rozłączono VPN",
+  "explain.internet.vpn.what": "Połączenie przestało działać, gdy cały ruch przechodził przez VPN.",
+  "explain.internet.vpn.cause": "Gdy VPN przenosi cały ruch, wszystko za routerem - także wyszukiwanie nazw - przechodzi najpierw przez serwer VPN. Router odpowiedział, więc przyczyną jest co najmniej równie prawdopodobnie połączenie VPN lub jego serwer, co samo łącze.",
+  "explain.internet.vpn.todo": "Rozłącz VPN i sprawdź, czy internet działa bez niego. Jeśli tak, połącz się ponownie, wybierz inny serwer VPN lub skontaktuj się z dostawcą VPN. Jeśli nie, problem leży po stronie łącza.",
+  "explain.dns.vpn.what": "Połączenie przestało działać, gdy cały ruch przechodził przez VPN.",
+  "explain.dns.vpn.cause": "Gdy VPN przenosi cały ruch, wszystko za routerem - także wyszukiwanie nazw - przechodzi najpierw przez serwer VPN. Router odpowiedział, więc przyczyną jest co najmniej równie prawdopodobnie połączenie VPN lub jego serwer, co samo łącze.",
+  "explain.dns.vpn.todo": "Rozłącz VPN i sprawdź, czy internet działa bez niego. Jeśli tak, połącz się ponownie, wybierz inny serwer VPN lub skontaktuj się z dostawcą VPN. Jeśli nie, problem leży po stronie łącza.",
+  "explain.target.vpn.what": "Połączenie przestało działać, gdy cały ruch przechodził przez VPN.",
+  "explain.target.vpn.cause": "Gdy VPN przenosi cały ruch, wszystko za routerem - także wyszukiwanie nazw - przechodzi najpierw przez serwer VPN. Router odpowiedział, więc przyczyną jest co najmniej równie prawdopodobnie połączenie VPN lub jego serwer, co samo łącze.",
+  "explain.target.vpn.todo": "Rozłącz VPN i sprawdź, czy internet działa bez niego. Jeśli tak, połącz się ponownie, wybierz inny serwer VPN lub skontaktuj się z dostawcą VPN. Jeśli nie, problem leży po stronie łącza."
 }

@@ -78,6 +78,19 @@ public static class InterfaceSelector
         return null;
     }
 
+    /// <summary>The interface index Windows would route internet traffic over, or null when there is no route.</summary>
+    public static uint? GetRoutedIndex()
+    {
+        try
+        {
+            return GetBestInterface(RouteLookupDestination, out uint index) == 0 ? index : null;
+        }
+        catch (Exception ex) when (ex is EntryPointNotFoundException or DllNotFoundException)
+        {
+            return null;
+        }
+    }
+
     private static NetworkInterface? TryGetRoutedOnce()
     {
         IReadOnlyList<NetworkInterface> all = GetCandidates();

@@ -70,6 +70,8 @@ public sealed class IpAddressCheck : IStepCheck
         context.DnsServers = dnsServers;
 
         bool dhcpEnabled = TryGetDhcpEnabled(properties);
+        VpnInfo? vpn = VpnDetector.Detect();
+        context.Vpn = vpn;
 
         var facts = new IpAddressFacts(
             address,
@@ -77,7 +79,8 @@ public sealed class IpAddressCheck : IStepCheck
             isApipa,
             dhcpEnabled,
             dnsServers,
-            gateway);
+            gateway,
+            vpn);
 
         var measurements = new List<Measurement>();
         if (address is not null)
@@ -103,6 +106,13 @@ public sealed class IpAddressCheck : IStepCheck
         measurements.Add(new Measurement(
             loc.Get("measure.dhcp"),
             loc.Get(dhcpEnabled ? "measure.dhcp.on" : "measure.dhcp.off")));
+
+        if (vpn is not null)
+        {
+            measurements.Add(new Measurement(
+                loc.Get("measure.vpn"),
+                loc.Format(vpn.FullTunnel ? "measure.vpn.full" : "measure.vpn.split", vpn.Name)));
+        }
 
         (StepState state, string headlineKey, string? detailKey) = address switch
         {

@@ -53,7 +53,10 @@ public sealed record IpAddressFacts(
     bool IsApipa,
     bool DhcpEnabled,
     IReadOnlyList<IPAddress> DnsServers,
-    IPAddress? Gateway) : StepFacts;
+    IPAddress? Gateway,
+
+    // An active VPN connection, if any - see Net.VpnDetector.
+    VpnInfo? Vpn = null) : StepFacts;
 
 public sealed record GatewayFacts(
     IPAddress? Address,

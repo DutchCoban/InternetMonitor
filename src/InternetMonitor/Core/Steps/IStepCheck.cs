@@ -30,6 +30,9 @@ public sealed class StepContext(CheckTargets targets)
 
     /// <summary>Whether the connection is metered or mobile, as step 2 found it; null when unknown.</summary>
     public Net.ConnectionCostInfo? Cost { get; set; }
+
+    /// <summary>An active VPN, as step 3 found it; null when there is none.</summary>
+    public Net.VpnInfo? Vpn { get; set; }
 }
 
 /// <summary>

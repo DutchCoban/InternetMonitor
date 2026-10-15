@@ -8,7 +8,9 @@ namespace InternetMonitor.Core.Export;
 
 /// <summary>
 /// Replaces the identifiers in an export meant to be pasted into an AI tool - Wi-Fi network names,
-/// access point and MAC addresses - with stable stand-ins: "Wi-Fi network A", "AP-1", "MAC-1".
+/// access point and MAC addresses - with stable stand-ins: "Wi-Fi network A", "AP-1", "MAC-1". A
+/// VPN's adapter name (which names the employer or the VPN service) is reduced to whether it
+/// carried all traffic or only some.
 ///
 /// Stable is the point. Dropping the values would also drop the patterns that matter ("the drops
 /// started right after switching to the other access point"); a consistent stand-in keeps every
@@ -23,11 +25,17 @@ public sealed partial class Pseudonymizer
     private readonly Dictionary<string, string> _macs = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _apLabels;
     private readonly HashSet<string> _ssidLabels;
+    private readonly HashSet<string> _vpnLabels;
+    private readonly string[] _fullTunnelSuffixes;
 
     public Pseudonymizer()
     {
         _ssidLabels = [.. LocalizationManager.TranslationsOf("measure.wifiNetwork")];
         _apLabels = [.. LocalizationManager.TranslationsOf("measure.wifiAccessPoint")];
+        _vpnLabels = [.. LocalizationManager.TranslationsOf("measure.vpn")];
+
+        // "{0} (all traffic)" in every language, minus the name placeholder.
+        _fullTunnelSuffixes = [.. LocalizationManager.TranslationsOf("measure.vpn.full").Select(t => t.Replace("{0}", string.Empty, StringComparison.Ordinal))];
     }
 
     /// <summary>
@@ -104,6 +112,7 @@ public sealed partial class Pseudonymizer
     public string Measurement(string label, string value) =>
         _ssidLabels.Contains(label) ? NetworkName(value)
         : _apLabels.Contains(label) ? AccessPoint(value)
+        : _vpnLabels.Contains(label) ? (_fullTunnelSuffixes.Any(s => value.EndsWith(s, StringComparison.Ordinal)) ? "VPN (all traffic)" : "VPN (some traffic only)")
         : Text(value);
 
     /// <summary>

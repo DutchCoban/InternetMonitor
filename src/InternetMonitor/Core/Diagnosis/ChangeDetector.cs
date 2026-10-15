@@ -14,6 +14,8 @@ public enum ChangeKind
     WifiNetwork,
     WifiAccessPoint,
     WifiSignal,
+    VpnConnected,
+    VpnDisconnected,
 }
 
 public sealed record EnvironmentChange(ChangeKind Kind, string? From, string? To, DateTimeOffset AtUtc)
@@ -65,6 +67,7 @@ public sealed class ChangeDetector
     private string? _lastLinkState;
     private string? _lastSsid;
     private string? _lastBssid;
+    private bool _lastVpn;
     private bool _primed;
 
     /// <summary>
@@ -94,6 +97,7 @@ public sealed class ChangeDetector
         string? adapterName = adapter?.Name;
         string? linkState = link?.Link.ToString();
         WifiInfo? wifi = link?.Wifi;
+        bool vpn = ip?.Vpn is not null;
 
         var found = new List<EnvironmentChange>();
 
@@ -107,6 +111,7 @@ public sealed class ChangeDetector
                 (_lastAddress, _lastGateway, _lastDnsServers, _lastAdapter, _lastLinkState) =
                     (address, gateway, dnsServers, adapterName, linkState);
                 (_lastSsid, _lastBssid) = (wifi?.Ssid, wifi?.Bssid);
+                _lastVpn = vpn;
                 RecordSignal(snapshot.TakenUtc, wifi?.SignalPercent);
                 return [];
             }
@@ -128,6 +133,14 @@ public sealed class ChangeDetector
             Check(ChangeKind.Adapter, ref _lastAdapter, adapterName);
             Check(ChangeKind.LinkState, ref _lastLinkState, linkState);
             CheckWifi(found, wifi, snapshot.TakenUtc);
+
+            // Only while step 3 ran: without its facts there is no telling either way. The VPN's
+            // name stays out of the text, like an access point's address does.
+            if (ip is not null && vpn != _lastVpn)
+            {
+                found.Add(new EnvironmentChange(vpn ? ChangeKind.VpnConnected : ChangeKind.VpnDisconnected, null, null, snapshot.TakenUtc));
+                _lastVpn = vpn;
+            }
 
             _changes.AddRange(found);
 

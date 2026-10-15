@@ -84,6 +84,11 @@ public static class PlainLanguage
         RootCause.Gateway or RootCause.Internet or RootCause.Dns or RootCause.Target
             when snapshot.FactsFor<LinkFacts>(StepId.Link)?.WeakSignal(WeakWifiSignalPercent) == true => ".weakWifi",
 
+        // Everything going through a VPN: beyond the router, what failed may well be the VPN
+        // (its server, its DNS) rather than the line - the first thing to try is without it.
+        RootCause.Internet or RootCause.Dns or RootCause.Target
+            when snapshot.FactsFor<IpAddressFacts>(StepId.IpAddress)?.Vpn is { FullTunnel: true } => ".vpn",
+
         _ => string.Empty,
     };
 

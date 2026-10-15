@@ -598,5 +598,20 @@
   "speedtest.metered": "Metered connection: a test can use a lot of data.",
   "speedtest.metered.estimate": "Metered connection: a test uses about {0} MB.",
   "report.p.side.metered": "Mobile connection / hotspot",
-  "report.p.metered": "For {0} of the measured time this computer was on a metered connection (mobile data or a phone's hotspot). That time, and outages that started in it, do not count towards the availability of the line."
+  "report.p.metered": "For {0} of the measured time this computer was on a metered connection (mobile data or a phone's hotspot). That time, and outages that started in it, do not count towards the availability of the line.",
+  "measure.vpn": "VPN",
+  "measure.vpn.full": "{0} (all traffic)",
+  "measure.vpn.split": "{0} (some traffic only)",
+  "step.latency.vpn": "All traffic goes through a VPN, so this is the response time via the VPN's server - it is usually higher than without it.",
+  "change.vpnConnected": "A VPN connected",
+  "change.vpnDisconnected": "A VPN disconnected",
+  "explain.internet.vpn.what": "The connection failed while all traffic was going through a VPN.",
+  "explain.internet.vpn.cause": "With a VPN carrying all traffic, everything beyond the router - including name lookups - goes through the VPN's server first. The router answered, so the VPN connection or its server is at least as likely to be the cause as the line itself.",
+  "explain.internet.vpn.todo": "Disconnect the VPN and see whether the internet works without it. If it does, reconnect, try another VPN server, or contact whoever provides the VPN. If it does not, the problem is on the line.",
+  "explain.dns.vpn.what": "The connection failed while all traffic was going through a VPN.",
+  "explain.dns.vpn.cause": "With a VPN carrying all traffic, everything beyond the router - including name lookups - goes through the VPN's server first. The router answered, so the VPN connection or its server is at least as likely to be the cause as the line itself.",
+  "explain.dns.vpn.todo": "Disconnect the VPN and see whether the internet works without it. If it does, reconnect, try another VPN server, or contact whoever provides the VPN. If it does not, the problem is on the line.",
+  "explain.target.vpn.what": "The connection failed while all traffic was going through a VPN.",
+  "explain.target.vpn.cause": "With a VPN carrying all traffic, everything beyond the router - including name lookups - goes through the VPN's server first. The router answered, so the VPN connection or its server is at least as likely to be the cause as the line itself.",
+  "explain.target.vpn.todo": "Disconnect the VPN and see whether the internet works without it. If it does, reconnect, try another VPN server, or contact whoever provides the VPN. If it does not, the problem is on the line."
 }
