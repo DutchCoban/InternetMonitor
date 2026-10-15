@@ -97,8 +97,6 @@
   "chart.state.down": "Niet verbonden",
   "chart.footer.stats": "min {0}  ·  gem {1}  ·  max {2}  ·  p95 {3} {4}",
   "chart.footer.uptime": "{0}% van de tijd verbonden",
-  "status.latency.title": "Latency, afgelopen uur",
-  "status.latency.subtitle": "Retourtijd naar het publieke internet",
   "history.card.title": "Historie",
   "history.card.subtitle": "Scroll om te zoomen, sleep om te schuiven, dubbelklik om te resetten",
   "history.range.15m": "15 min",

@@ -97,8 +97,6 @@
   "chart.state.down": "Disconnected",
   "chart.footer.stats": "min {0}  ·  avg {1}  ·  max {2}  ·  p95 {3} {4}",
   "chart.footer.uptime": "{0}% of the time connected",
-  "status.latency.title": "Latency, last hour",
-  "status.latency.subtitle": "Round-trip time to the public internet",
   "history.card.title": "History",
   "history.card.subtitle": "Scroll to zoom, drag to pan, double-click to reset",
   "history.range.15m": "15 min",

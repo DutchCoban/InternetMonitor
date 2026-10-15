@@ -97,8 +97,6 @@
   "chart.state.down": "Getrennt",
   "chart.footer.stats": "Min {0}  ·  Ø {1}  ·  Max {2}  ·  p95 {3} {4}",
   "chart.footer.uptime": "{0}% der Zeit verbunden",
-  "status.latency.title": "Latenz, letzte Stunde",
-  "status.latency.subtitle": "Laufzeit zum öffentlichen Internet",
   "history.card.title": "Verlauf",
   "history.card.subtitle": "Scrollen zum Zoomen, ziehen zum Verschieben, Doppelklick setzt zurück",
   "history.range.15m": "15 Min",

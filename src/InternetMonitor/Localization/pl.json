@@ -97,8 +97,6 @@
   "chart.state.down": "Rozłączono",
   "chart.footer.stats": "min {0}  ·  śr {1}  ·  maks {2}  ·  p95 {3} {4}",
   "chart.footer.uptime": "{0}% czasu połączono",
-  "status.latency.title": "Opóźnienie, ostatnia godzina",
-  "status.latency.subtitle": "Czas odpowiedzi publicznego internetu",
   "history.card.title": "Historia",
   "history.card.subtitle": "Przewijaj, aby przybliżyć, przeciągnij, aby przesunąć, kliknij dwukrotnie, aby zresetować",
   "history.range.15m": "15 min",
