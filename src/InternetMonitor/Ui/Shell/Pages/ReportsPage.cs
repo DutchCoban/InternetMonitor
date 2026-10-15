@@ -150,12 +150,20 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
             Loc);
     }
 
+    /// <summary>
+    /// A period longer than history keeps is still offered - incidents are never pruned, so the
+    /// outage list covers it in full - but its label says how much of the measurements remain.
+    /// </summary>
     private void PopulatePeriodItems()
     {
+        int retention = Services.Settings.HistoryRetentionDays;
         _period.Items.Clear();
         foreach (int days in AppSettings.AllowedReportPeriodDays)
         {
-            _period.Items.Add(new PeriodItem(days, Loc.Format("reports.provider.periodDays", days)));
+            string display = days > retention
+                ? Loc.Format("reports.provider.periodDays.beyondRetention", days, retention)
+                : Loc.Format("reports.provider.periodDays", days);
+            _period.Items.Add(new PeriodItem(days, display));
         }
 
         _period.SelectedItem = _period.Items.Cast<PeriodItem>().FirstOrDefault(i => i.Days == Services.Settings.ReportPeriodDays);
@@ -354,6 +362,15 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         _exportPlain.SizeToContent();
 
         LayoutCards();
+    }
+
+    protected override void OnActivated()
+    {
+        // History retention can have changed in Settings since this page was built.
+        if (_period is not null)
+        {
+            PopulatePeriodItems();
+        }
     }
 
     protected override void OnThemeChanged() => ApplyControlColors();

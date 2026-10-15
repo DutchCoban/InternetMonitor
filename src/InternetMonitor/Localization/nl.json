@@ -573,5 +573,9 @@
   "reports.provider.download": "Downloadsnelheid abonnement (Mbit/s, 0 = onbekend)",
   "reports.provider.upload": "Uploadsnelheid abonnement (Mbit/s, 0 = onbekend)",
   "reports.provider.create": "Rapport maken",
-  "reports.provider.saveAs": "Opslaan als..."
+  "reports.provider.saveAs": "Opslaan als...",
+  "settings.historyRetention": "Geschiedenis bewaren",
+  "settings.historyRetention.option": "{0} dagen",
+  "history.range.30d": "30 dagen",
+  "reports.provider.periodDays.beyondRetention": "Afgelopen {0} dagen (metingen: laatste {1} dagen)"
 }

@@ -573,5 +573,9 @@
   "reports.provider.download": "Download-Geschwindigkeit laut Tarif (Mbit/s, 0 = unbekannt)",
   "reports.provider.upload": "Upload-Geschwindigkeit laut Tarif (Mbit/s, 0 = unbekannt)",
   "reports.provider.create": "Bericht erstellen",
-  "reports.provider.saveAs": "Speichern unter..."
+  "reports.provider.saveAs": "Speichern unter...",
+  "settings.historyRetention": "Verlauf aufbewahren",
+  "settings.historyRetention.option": "{0} Tage",
+  "history.range.30d": "30 Tage",
+  "reports.provider.periodDays.beyondRetention": "Letzte {0} Tage (Messungen: letzte {1} Tage)"
 }

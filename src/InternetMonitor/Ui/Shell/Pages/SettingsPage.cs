@@ -53,6 +53,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Toggle _lanScanTcpFallback = null!;
     private Toggle _speedTestAutoRun = null!;
     private ComboBox _speedTestInterval = null!;
+    private ComboBox _historyRetention = null!;
     private ComboBox _logLevel = null!;
     private Toggle _logSuccessfulChecks = null!;
     private Toggle _logDetailedMeasurements = null!;
@@ -219,6 +220,35 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             Services.History.MinimumSampleInterval = TimeSpan.FromSeconds(seconds);
         };
         AddRow(_cadenceCard, "settings.backgroundInterval", _backgroundInterval);
+
+        _historyRetention = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
+        _historyRetention.SelectedIndexChanged += OnHistoryRetentionChanged;
+        AddRow(_cadenceCard, "settings.historyRetention", _historyRetention);
+    }
+
+    private void OnHistoryRetentionChanged(object? sender, EventArgs e)
+    {
+        if (_historyRetention.SelectedItem is not ComboItem item || !int.TryParse(item.Key, out int days))
+        {
+            return;
+        }
+
+        Services.Settings.HistoryRetentionDays = days;
+        Services.Settings.Save();
+
+        // Takes effect at the next background prune; a shorter period drops the oldest points
+        // there and from the files on the next start.
+        Services.History.SetRetention(TimeSpan.FromDays(days));
+    }
+
+    private void PopulateHistoryRetentionItems()
+    {
+        LocalizationManager loc = LocalizationManager.Instance;
+        _historyRetention.Items.Clear();
+        foreach (int days in AppSettings.AllowedHistoryRetentionDays)
+        {
+            _historyRetention.Items.Add(new ComboItem(days.ToString(), loc.Format("settings.historyRetention.option", days)));
+        }
     }
 
     private NumericUpDown MakeIntervalField(int min, int max) => new()
@@ -969,6 +999,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _foregroundInterval.Value = settings.ForegroundIntervalSeconds;
         _backgroundInterval.Value = settings.BackgroundIntervalSeconds;
 
+        _historyRetention.SelectedIndexChanged -= OnHistoryRetentionChanged;
+        PopulateHistoryRetentionItems();
+        SelectComboItem(_historyRetention, settings.HistoryRetentionDays.ToString());
+        _historyRetention.SelectedIndexChanged += OnHistoryRetentionChanged;
+
         _tracerouteLookup.SetWithoutNotify(settings.TracerouteOwnerLookup);
         _lanScanVendorLookup.SetWithoutNotify(settings.LanScanVendorLookup);
         _lanScanTcpFallback.SetWithoutNotify(settings.LanScanTcpFallback);
@@ -1159,6 +1194,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         string previousTheme = (_theme.SelectedItem as ComboItem)?.Key ?? Services.Settings.Theme.ToString();
         string previousLogLevel = (_logLevel.SelectedItem as ComboItem)?.Key ?? Services.Settings.DiagnosticLogLevel.ToString();
         string previousSpeedTestInterval = (_speedTestInterval.SelectedItem as ComboItem)?.Key ?? Services.Settings.SpeedTestIntervalHours.ToString();
+        string previousRetention = (_historyRetention.SelectedItem as ComboItem)?.Key ?? Services.Settings.HistoryRetentionDays.ToString();
 
         PopulateThemeItems();
         SelectComboItem(_theme, previousTheme);
@@ -1169,6 +1205,11 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         PopulateSpeedTestIntervalItems();
         SelectComboItem(_speedTestInterval, previousSpeedTestInterval);
+
+        _historyRetention.SelectedIndexChanged -= OnHistoryRetentionChanged;
+        PopulateHistoryRetentionItems();
+        SelectComboItem(_historyRetention, previousRetention);
+        _historyRetention.SelectedIndexChanged += OnHistoryRetentionChanged;
 
         _addEndpoint.Text = Loc.Get("settings.endpoint.add");
         _addEndpoint.SizeToContent();
@@ -1205,7 +1246,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             label.BackColor = p.Surface;
         }
 
-        foreach (ComboBox box in new[] { _language, _theme, _logLevel, _speedTestInterval })
+        foreach (ComboBox box in new[] { _language, _theme, _logLevel, _speedTestInterval, _historyRetention })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;

@@ -88,7 +88,7 @@ public sealed class AppHost : ApplicationContext
         _pipeline = new StepPipeline(BuildTargets);
         _cadence = new CadenceController(_pipeline, () => _settings);
 
-        _history = new MetricStore
+        _history = new MetricStore(TimeSpan.FromDays(_settings.HistoryRetentionDays))
         {
             // History is sampled at the background rate regardless of how fast the pipeline is
             // actually running, so retention and chart density do not change depending on whether

@@ -21,6 +21,7 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
         ("6h", TimeSpan.FromHours(6)),
         ("24h", TimeSpan.FromHours(24)),
         ("7d", TimeSpan.FromDays(7)),
+        ("30d", TimeSpan.FromDays(30)),
         ("all", null),
     ];
 
@@ -120,12 +121,35 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
             SeriesNames.Chartable.Select(s => new ChipGroup.Chip(s.Id, Loc.Get(s.NameKey))),
             _selectedSeriesId);
 
-        _ranges.SetChips(
-            Ranges.Select(r => new ChipGroup.Chip(r.Id, Loc.Get($"history.range.{r.Id}"))),
-            Ranges.First(r => r.Range == _selectedRange).Id);
+        RefreshRangeChips();
     }
 
-    protected override void OnActivated() => LoadSeries();
+    protected override void OnActivated()
+    {
+        // Retention can have changed in Settings since this page was last shown.
+        RefreshRangeChips();
+        LoadSeries();
+    }
+
+    /// <summary>
+    /// Only the ranges shorter than what history keeps: at a 30-day retention "30 days" would just
+    /// be "All" under another name, and at 7 days "7 days" would be.
+    /// </summary>
+    private void RefreshRangeChips()
+    {
+        TimeSpan retention = TimeSpan.FromDays(Services.Settings.HistoryRetentionDays);
+        (string Id, TimeSpan? Range)[] visible = [.. Ranges.Where(r => r.Range is null || r.Range < retention)];
+
+        if (!visible.Any(r => r.Range == _selectedRange))
+        {
+            _selectedRange = null;
+            _chart.SetRange(null);
+        }
+
+        _ranges.SetChips(
+            visible.Select(r => new ChipGroup.Chip(r.Id, Loc.Get($"history.range.{r.Id}"))),
+            visible.First(r => r.Range == _selectedRange).Id);
+    }
 
     private void LoadSeries()
     {

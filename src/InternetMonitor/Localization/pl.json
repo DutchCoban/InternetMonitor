@@ -573,5 +573,9 @@
   "reports.provider.download": "Prędkość pobierania w abonamencie (Mbit/s, 0 = nieznana)",
   "reports.provider.upload": "Prędkość wysyłania w abonamencie (Mbit/s, 0 = nieznana)",
   "reports.provider.create": "Utwórz raport",
-  "reports.provider.saveAs": "Zapisz jako..."
+  "reports.provider.saveAs": "Zapisz jako...",
+  "settings.historyRetention": "Przechowuj historię przez",
+  "settings.historyRetention.option": "{0} dni",
+  "history.range.30d": "30 dni",
+  "reports.provider.periodDays.beyondRetention": "Ostatnie {0} dni (pomiary: ostatnie {1} dni)"
 }

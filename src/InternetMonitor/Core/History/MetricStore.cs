@@ -42,10 +42,21 @@ public sealed class MetricStore : IAsyncDisposable
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _flushLoop;
 
-    private TimeSpan _retention = TimeSpan.FromDays(30);
+    private TimeSpan _retention;
 
     public MetricStore()
+        : this(TimeSpan.FromDays(30))
     {
+    }
+
+    /// <summary>
+    /// Takes the retention up front rather than only through <see cref="SetRetention"/>: loading
+    /// starts here and prunes as it reads, so a retention set afterwards would come too late for
+    /// the files already read - a 90-day history would be cut to the default on every start.
+    /// </summary>
+    public MetricStore(TimeSpan retention)
+    {
+        _retention = retention;
         _directory = AppPaths.HistoryDir;
         _loadTask = Task.Run(LoadAllAsync);
         _flushLoop = RunFlushLoopAsync(_shutdown.Token);

@@ -29,8 +29,6 @@ namespace InternetMonitor.Core.Export;
 /// </summary>
 public static class AiExportBuilder
 {
-    /// <summary>How far back the summary sections look - the same window history is kept for.</summary>
-    private static readonly TimeSpan Window = TimeSpan.FromDays(30);
 
     private const string Instructions = """
         ## Instructions for the AI
@@ -142,7 +140,8 @@ public static class AiExportBuilder
     {
         TimeZoneInfo zone = timeZone ?? TimeZoneInfo.Local;
         DateTimeOffset to = now ?? DateTimeOffset.UtcNow;
-        DateTimeOffset from = to - Window;
+        // The summary sections look back as far as history is kept.
+        DateTimeOffset from = to - TimeSpan.FromDays(settings.HistoryRetentionDays);
         IReadOnlyList<MetricPoint> Series(string id) => history.TryGetValue(id, out IReadOnlyList<MetricPoint>? points) ? points : [];
 
         var names = new Pseudonymizer();
@@ -178,7 +177,7 @@ public static class AiExportBuilder
     {
         doc.Line("## About this export").Blank()
             .Item("Generated", doc.Both(to))
-            .Item("Summary period", $"{doc.Both(from)} to {doc.Both(to)} (last {Window.TotalDays:F0} days)")
+            .Item("Summary period", $"{doc.Both(from)} to {doc.Both(to)} (last {(to - from).TotalDays:F0} days)")
             .Item("Computer's time zone", $"{doc.Zone.Id} (UTC{doc.Zone.GetUtcOffset(to):hh\\:mm} now)");
         if (appVersion.Length > 0)
         {

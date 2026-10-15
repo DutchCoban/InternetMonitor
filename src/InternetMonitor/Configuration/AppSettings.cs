@@ -76,6 +76,24 @@ public sealed class AppSettings
         set => _backgroundIntervalSeconds = Math.Clamp(value, 5, 300);
     }
 
+    // ---- History ------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The only retention choices offered. Capped at 90 days: every point is kept at full
+    /// resolution in memory, and beyond that a machine that never sleeps would hold several
+    /// hundred thousand points per series for charts nobody zooms that far into.
+    /// </summary>
+    public static readonly int[] AllowedHistoryRetentionDays = [7, 30, 60, 90];
+
+    private int _historyRetentionDays = 30;
+
+    /// <summary>How long per-check history is kept. Incidents are never pruned - they are small, and they are the evidence.</summary>
+    public int HistoryRetentionDays
+    {
+        get => _historyRetentionDays;
+        set => _historyRetentionDays = Array.IndexOf(AllowedHistoryRetentionDays, value) >= 0 ? value : _historyRetentionDays;
+    }
+
     // ---- Window -------------------------------------------------------------------------------
 
     /// <summary>Last main-window size, so reopening lands where the user left it. Zero means "use the default".</summary>
@@ -138,11 +156,11 @@ public sealed class AppSettings
     /// <summary>The subscription's advertised upload speed in Mbit/s, for the provider report; 0 = not entered.</summary>
     public int SubscribedUploadMbps { get; set; }
 
-    public static readonly int[] AllowedReportPeriodDays = [7, 30];
+    public static readonly int[] AllowedReportPeriodDays = [7, 30, 90];
 
     private int _reportPeriodDays = 30;
 
-    /// <summary>How far back the provider report looks. Thirty days is also what history keeps.</summary>
+    /// <summary>How far back the provider report looks. Longer than <see cref="HistoryRetentionDays"/> is allowed; the report's coverage figure then shows how much of it was kept.</summary>
     public int ReportPeriodDays
     {
         get => _reportPeriodDays;

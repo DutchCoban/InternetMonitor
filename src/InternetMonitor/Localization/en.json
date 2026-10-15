@@ -573,5 +573,9 @@
   "reports.provider.download": "Subscription download speed (Mbit/s, 0 = unknown)",
   "reports.provider.upload": "Subscription upload speed (Mbit/s, 0 = unknown)",
   "reports.provider.create": "Create report",
-  "reports.provider.saveAs": "Save as..."
+  "reports.provider.saveAs": "Save as...",
+  "settings.historyRetention": "Keep history for",
+  "settings.historyRetention.option": "{0} days",
+  "history.range.30d": "30 days",
+  "reports.provider.periodDays.beyondRetention": "Last {0} days (measurements: last {1} days)"
 }
