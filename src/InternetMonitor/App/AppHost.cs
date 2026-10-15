@@ -34,6 +34,7 @@ public sealed class AppHost : ApplicationContext
     private readonly KumaPusher _kuma;
     private readonly DiagnosticLogger _diagnosticLog;
     private readonly NetworkHealthMonitor _networkHealth;
+    private readonly LineQualitySampler _lineQuality;
     private readonly ChangeDetector _changes;
     private readonly IncidentTracker _tracker;
     private readonly TrayController _tray;
@@ -116,6 +117,11 @@ public sealed class AppHost : ApplicationContext
             _settings.TtlExceeded,
             _settings.RogueDhcp);
 
+        _lineQuality = new LineQualitySampler(
+            () => _settings.ParsedPublicIpTargets().FirstOrDefault(),
+            () => _pipeline.LatestSnapshot?.FactsFor<IpAddressFacts>(StepId.IpAddress)?.Address);
+        _lineQuality.Sampled += RecordLineQuality;
+
         _updateChecker = new UpdateChecker(Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0));
         _updateChecker.CheckCompleted += OnUpdateCheckCompleted;
         _updateChecker.Reconfigure(_settings.CheckForUpdates);
@@ -150,6 +156,7 @@ public sealed class AppHost : ApplicationContext
         _networkHealth.IncidentOpened += OnIncidentOpened;
         _networkHealth.IncidentClosed += _diagnosticLog.LogIncidentResolved;
         _cadence.Start();
+        _lineQuality.Start();
 
         if (showWindowOnStart)
         {
@@ -367,6 +374,16 @@ public sealed class AppHost : ApplicationContext
         }
     }
 
+    /// <summary>Runs on the sampler's own loop; <see cref="MetricStore.Record"/> is safe off the UI thread.</summary>
+    private void RecordLineQuality(LineQualitySample sample)
+    {
+        _history.Record(SeriesNames.PacketLoss, sample.AtUtc, sample.LossPercent);
+        if (sample.JitterMs is { } jitter)
+        {
+            _history.Record(SeriesNames.Jitter, sample.AtUtc, Math.Round(jitter, 1));
+        }
+    }
+
     /// <summary>
     /// An automatic Speed Test run finished - record it through <see cref="SpeedTestRecorder"/>,
     /// exactly as a manual run (see <c>ToolsPage</c>) is, so History and the data exports don't need
@@ -463,6 +480,9 @@ public sealed class AppHost : ApplicationContext
             _networkHealth.IncidentOpened -= OnIncidentOpened;
             _networkHealth.IncidentClosed -= _diagnosticLog.LogIncidentResolved;
             _pipeline.Dispose();
+
+            _lineQuality.Sampled -= RecordLineQuality;
+            _lineQuality.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
             // Blocking on shutdown is acceptable and necessary: this is the final flush, and
             // letting the process exit without it loses up to two minutes of recorded history.

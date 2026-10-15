@@ -160,9 +160,9 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
             return;
         }
 
-        // The good/warning/bad bands are latency thresholds, so they only belong under a series
-        // measured in milliseconds - not under a speed in Mbps or a signal in percent.
-        bool latency = !series.IsState && series.Unit == "ms";
+        // The good/warning/bad bands are latency thresholds, so they only belong under a round
+        // trip - not under a speed, a signal, a loss percentage or a jitter.
+        bool latency = series.LatencyBands;
         _chart.SetSeries(
             Services.History.Get(series.Id),
             series.Unit,

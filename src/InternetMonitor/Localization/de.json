@@ -577,5 +577,15 @@
   "settings.historyRetention": "Verlauf aufbewahren",
   "settings.historyRetention.option": "{0} Tage",
   "history.range.30d": "30 Tage",
-  "reports.provider.periodDays.beyondRetention": "Letzte {0} Tage (Messungen: letzte {1} Tage)"
+  "reports.provider.periodDays.beyondRetention": "Letzte {0} Tage (Messungen: letzte {1} Tage)",
+  "series.packetLoss": "Paketverlust",
+  "series.jitter": "Jitter",
+  "report.p.loss": "Paketverlust",
+  "report.p.loss.note": "Durchschnitt aller Messungen",
+  "report.p.quality": "Paketverlust und Jitter pro Tag",
+  "report.p.quality.note": "Jede Minute gehen zehn Pings im Abstand von einer Zehntelsekunde an eine öffentliche Internetadresse. Paketverlust ist der Anteil ohne Antwort; Jitter ist, wie stark die Antwortzeit von Ping zu Ping schwankte. Ab etwa 1 % Verlust oder 30 ms Jitter beginnen Videoanrufe und Onlinespiele zu ruckeln. Minuten, in denen gar nichts zurückkam, sind Störungen und stehen oben, nicht hier.",
+  "report.p.col.day": "Tag",
+  "report.p.col.loss": "Paketverlust",
+  "report.p.col.lossMinutes": "Minuten mit Verlust",
+  "report.p.col.jitter": "Jitter"
 }

@@ -48,6 +48,8 @@ public static class AiExportBuilder
            - where problems originate - this computer, the home network/router, or the provider
              (see "How to read this data" for how each cause maps to a side);
            - Wi-Fi: weak signal, access-point switches, or signal drops shortly before incidents;
+           - packet loss and jitter: steady low-level loss (line or Wi-Fi quality) versus bursts
+             at particular times (congestion);
            - latency that rises with this computer's own traffic or under speed-test load
              (bufferbloat in the router) versus latency that rises on an idle line (provider);
            - speed tests that fall short of the subscription, and whether that is consistent or
@@ -96,6 +98,13 @@ public static class AiExportBuilder
         Wi-Fi signal is Windows' signal quality in percent; traffic and speed tests in Mbit/s;
         "extra ping under load" is how many milliseconds the round trip grew while a speed test
         filled the line (A under 5 ms, B under 30, C under 60, D under 200, F 200 or more).
+
+        **Packet loss and jitter.** Once a minute ten pings, 100 ms apart, go to the first public
+        address step 5 uses. Packet loss is the percentage without a reply; jitter is the mean
+        difference in round trip between consecutive replies. A burst where nothing at all came
+        back is not recorded (that is an outage, or ICMP being filtered), so these series describe
+        the quality of a working line. Around 1% loss or 30 ms jitter is where calls and games
+        start to suffer.
 
         **Language.** Incident headlines and explanations are recorded in English. Measurement
         labels and values were recorded in the app's display language at the time; fixed terms
@@ -162,6 +171,7 @@ public static class AiExportBuilder
         AppendOutagePatterns(doc, report);
         AppendIncidents(doc, incidents);
         AppendLatency(doc, Series, from, to);
+        AppendLineQuality(doc, report);
         AppendSpeedTests(doc, report, settings);
         AppendWifi(doc, Series(SeriesNames.WifiSignal), from, to);
         AppendTraffic(doc, Series(SeriesNames.TrafficDown), Series(SeriesNames.TrafficUp), report, from, to);
@@ -387,6 +397,30 @@ public static class AiExportBuilder
 
             doc.Blank();
         }
+    }
+
+    private static void AppendLineQuality(Doc doc, ProviderReportData report)
+    {
+        if (report.QualityByDay.Count == 0)
+        {
+            return;
+        }
+
+        doc.Line("## Packet loss and jitter").Blank()
+            .Item("Average packet loss", I($"{report.AverageLossPercent:F2}% over {report.QualityByDay.Sum(d => d.Bursts)} one-minute bursts"))
+            .Blank()
+            .Row("Date", "Loss %", "Bursts with loss", "Bursts", "Jitter ms").Rule(5);
+        foreach (DayQuality day in report.QualityByDay)
+        {
+            doc.Row(
+                day.Day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                I($"{day.LossPercent:F2}"),
+                I($"{day.BurstsWithLoss}"),
+                I($"{day.Bursts}"),
+                day.JitterMs is { } jitter ? I($"{jitter:F1}") : "-");
+        }
+
+        doc.Blank();
     }
 
     private static void AppendSpeedTests(Doc doc, ProviderReportData report, AppSettings settings)

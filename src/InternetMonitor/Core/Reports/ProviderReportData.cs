@@ -26,6 +26,10 @@ public sealed record OutageGroup(RootCause Cause, OutageSide Side, int Count, Ti
 
 public sealed record DayLatency(DateOnly Day, double AverageMs, double P95Ms, int Samples);
 
+/// <summary>One day's packet loss and jitter, averaged over that day's one-minute bursts (see <see cref="Monitors.LineQualitySampler"/>).</summary>
+/// <param name="BurstsWithLoss">How many bursts lost at least one echo - a steady 1% and a few bad minutes average the same.</param>
+public sealed record DayQuality(DateOnly Day, double LossPercent, double? JitterMs, int Bursts, int BurstsWithLoss);
+
 public sealed record SpeedTestEntry(DateTimeOffset AtUtc, double DownloadMbps, double UploadMbps, double? PingMs, double? BufferbloatMs);
 
 /// <summary>Everything the provider report says, computed - see <see cref="Compute"/>.</summary>
@@ -45,6 +49,19 @@ public sealed record ProviderReportData(
     IReadOnlyList<DayLatency> LatencyByDay,
     IReadOnlyList<SpeedTestEntry> SpeedTests)
 {
+    /// <summary>Packet loss and jitter per day; empty when the period predates the series.</summary>
+    public IReadOnlyList<DayQuality> QualityByDay { get; init; } = [];
+
+    /// <summary>Average packet loss over every burst in the period, or null without any.</summary>
+    public double? AverageLossPercent
+    {
+        get
+        {
+            int bursts = QualityByDay.Sum(d => d.Bursts);
+            return bursts > 0 ? QualityByDay.Sum(d => d.LossPercent * d.Bursts) / bursts : null;
+        }
+    }
+
     public TimeSpan Period => ToUtc - FromUtc;
 
     public double Coverage => Period > TimeSpan.Zero ? Math.Clamp(Monitored / Period, 0, 1) : 0;
@@ -115,7 +132,32 @@ public sealed record ProviderReportData(
             outages,
             groups,
             ComputeLatencyByDay(InPeriod(history(SeriesNames.For(Steps.StepId.PublicIp)!), fromUtc, toUtc), timeZone),
-            CollectSpeedTests(history, fromUtc, toUtc));
+            CollectSpeedTests(history, fromUtc, toUtc))
+        {
+            QualityByDay = ComputeQualityByDay(
+                InPeriod(history(SeriesNames.PacketLoss), fromUtc, toUtc),
+                InPeriod(history(SeriesNames.Jitter), fromUtc, toUtc),
+                timeZone),
+        };
+    }
+
+    private static List<DayQuality> ComputeQualityByDay(IReadOnlyList<MetricPoint> loss, IReadOnlyList<MetricPoint> jitter, TimeZoneInfo timeZone)
+    {
+        DateOnly DayOf(MetricPoint p) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(p.Timestamp, timeZone).DateTime);
+        Dictionary<DateOnly, double> jitterByDay = jitter.GroupBy(DayOf).ToDictionary(g => g.Key, g => g.Average(p => p.Value));
+
+        return
+        [
+            .. loss
+                .GroupBy(DayOf)
+                .Select(g => new DayQuality(
+                    g.Key,
+                    g.Average(p => p.Value),
+                    jitterByDay.TryGetValue(g.Key, out double j) ? j : null,
+                    g.Count(),
+                    g.Count(p => p.Value > 0)))
+                .OrderBy(d => d.Day),
+        ];
     }
 
     public static OutageSide SideOf(RootCause cause) => cause switch

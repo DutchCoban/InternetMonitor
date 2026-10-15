@@ -577,5 +577,15 @@
   "settings.historyRetention": "Przechowuj historię przez",
   "settings.historyRetention.option": "{0} dni",
   "history.range.30d": "30 dni",
-  "reports.provider.periodDays.beyondRetention": "Ostatnie {0} dni (pomiary: ostatnie {1} dni)"
+  "reports.provider.periodDays.beyondRetention": "Ostatnie {0} dni (pomiary: ostatnie {1} dni)",
+  "series.packetLoss": "Utrata pakietów",
+  "series.jitter": "Jitter",
+  "report.p.loss": "Utrata pakietów",
+  "report.p.loss.note": "średnio ze wszystkich pomiarów",
+  "report.p.quality": "Utrata pakietów i jitter dziennie",
+  "report.p.quality.note": "Co minutę dziesięć pingów w odstępie jednej dziesiątej sekundy trafia do publicznego adresu w internecie. Utrata pakietów to odsetek bez odpowiedzi; jitter to zmienność czasu odpowiedzi między kolejnymi pingami. Od około 1% utraty lub 30 ms jittera rozmowy wideo i gry online zaczynają się zacinać. Minuty, w których nic nie wróciło, to awarie i są wymienione wyżej, nie tutaj.",
+  "report.p.col.day": "Dzień",
+  "report.p.col.loss": "Utrata pakietów",
+  "report.p.col.lossMinutes": "Minuty z utratą",
+  "report.p.col.jitter": "Jitter"
 }

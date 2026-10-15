@@ -577,5 +577,15 @@
   "settings.historyRetention": "Geschiedenis bewaren",
   "settings.historyRetention.option": "{0} dagen",
   "history.range.30d": "30 dagen",
-  "reports.provider.periodDays.beyondRetention": "Afgelopen {0} dagen (metingen: laatste {1} dagen)"
+  "reports.provider.periodDays.beyondRetention": "Afgelopen {0} dagen (metingen: laatste {1} dagen)",
+  "series.packetLoss": "Pakketverlies",
+  "series.jitter": "Jitter",
+  "report.p.loss": "Pakketverlies",
+  "report.p.loss.note": "gemiddeld over alle metingen",
+  "report.p.quality": "Pakketverlies en jitter per dag",
+  "report.p.quality.note": "Elke minuut gaan er tien pings, een tiende seconde na elkaar, naar een publiek internetadres. Pakketverlies is het deel dat geen antwoord kreeg; jitter is hoeveel de reactietijd van ping tot ping verschilde. Vanaf ongeveer 1% verlies of 30 ms jitter gaan videogesprekken en online games haperen. Minuten waarin helemaal niets terugkwam zijn storingen en staan hierboven, niet hier.",
+  "report.p.col.day": "Dag",
+  "report.p.col.loss": "Pakketverlies",
+  "report.p.col.lossMinutes": "Minuten met verlies",
+  "report.p.col.jitter": "Jitter"
 }

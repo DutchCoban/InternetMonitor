@@ -60,6 +60,11 @@ public static class ProviderReportHtml
         Tile(html, loc.Get("report.p.providerOutages"), provider.Count.ToString(CultureInfo.InvariantCulture), loc.Format("report.p.totalDuration", Duration(providerTotal, loc)));
         Tile(html, loc.Get("report.p.longest"), provider.Count > 0 ? Duration(provider.Max(o => o.Duration), loc) : "-", null);
         Tile(html, loc.Get("report.p.coverage"), Percent(data.Coverage, data.Coverage < 0.1 ? 1 : 0), loc.Format("report.p.coverage.note", Duration(data.Monitored, loc)));
+        if (data.AverageLossPercent is { } loss)
+        {
+            Tile(html, loc.Get("report.p.loss"), loss.ToString(loss < 10 ? "F2" : "F1", CultureInfo.InvariantCulture) + "%", loc.Get("report.p.loss.note"));
+        }
+
         if (options.SubscribedDownloadMbps > 0 && data.SpeedTests.Count > 0)
         {
             Tile(html, loc.Get("report.p.belowPlan"), loc.Format("report.p.xOfY", belowPlan, data.SpeedTests.Count), loc.Get("report.p.belowPlan.note"));
@@ -127,6 +132,28 @@ public static class ProviderReportHtml
 
         html.Append("</section>");
 
+        // ---- Packet loss and jitter ----
+        if (data.QualityByDay.Count > 0)
+        {
+            html.Append("<section><h2>").Append(E(loc.Get("report.p.quality"))).Append("</h2>")
+                .Append("<p class=\"note\">").Append(E(loc.Get("report.p.quality.note"))).Append("</p>")
+                .Append("<table><thead><tr>")
+                .Append(Th(loc.Get("report.p.col.day"))).Append(Th(loc.Get("report.p.col.loss"), true))
+                .Append(Th(loc.Get("report.p.col.lossMinutes"), true)).Append(Th(loc.Get("report.p.col.jitter"), true))
+                .Append("</tr></thead><tbody>");
+            foreach (DayQuality day in data.QualityByDay)
+            {
+                html.Append(day.LossPercent >= NoticeableLossPercent ? "<tr class=\"provider\">" : "<tr>")
+                    .Append(Td(day.Day.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture)))
+                    .Append(Td(day.LossPercent.ToString("F2", CultureInfo.InvariantCulture) + "%", true))
+                    .Append(Td(loc.Format("report.p.xOfY", day.BurstsWithLoss, day.Bursts), true))
+                    .Append(Td(day.JitterMs is { } jitter ? jitter.ToString("F1", CultureInfo.InvariantCulture) + " ms" : "-", true))
+                    .Append("</tr>");
+            }
+
+            html.Append("</tbody></table></section>");
+        }
+
         // ---- Speed tests ----
         html.Append("<section><h2>").Append(E(loc.Get("report.p.speeds"))).Append("</h2>");
         html.Append("<p class=\"note\">").Append(E(options.SubscribedDownloadMbps > 0
@@ -179,6 +206,9 @@ public static class ProviderReportHtml
         string Th(string text, bool numeric = false) => (numeric ? "<th class=\"num\">" : "<th>") + E(text) + "</th>";
         string Td(string text, bool numeric = false) => (numeric ? "<td class=\"num\">" : "<td>") + E(text) + "</td>";
     }
+
+    /// <summary>A day averaging this much loss is highlighted: around 1% is where calls and games start to suffer.</summary>
+    private const double NoticeableLossPercent = 1.0;
 
     private static void Tile(StringBuilder html, string label, string value, string? note)
     {

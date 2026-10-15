@@ -29,7 +29,11 @@ namespace InternetMonitor.Core.History;
 /// When set, the chart marks every point whose key (derived from its <see cref="MetricPoint.Metadata"/>)
 /// differs from the one before - for the Wi-Fi signal series the access point, so a roam shows.
 /// </param>
-public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState, Func<string?, string?>? MetadataChangeKey = null);
+/// <param name="LatencyBands">
+/// Whether the chart shades the good/warning/bad latency bands under it. Only for round trips: a
+/// jitter of 150 ms is awful, while the same number as a latency is merely "warning".
+/// </param>
+public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState, Func<string?, string?>? MetadataChangeKey = null, bool LatencyBands = false);
 
 public static class SeriesNames
 {
@@ -75,6 +79,12 @@ public static class SeriesNames
 
     public const string TrafficUp = "traffic-up";
 
+    /// <summary>Share of a ten-echo burst lost, in percent - see <see cref="Monitors.LineQualitySampler"/>.</summary>
+    public const string PacketLoss = "packet-loss";
+
+    /// <summary>How much the round trip varied within the same burst, in ms.</summary>
+    public const string Jitter = "jitter";
+
     public const string SpeedTestDownload = "speedtest-download";
 
     public const string SpeedTestUpload = "speedtest-upload";
@@ -90,15 +100,17 @@ public static class SeriesNames
         new(For(StepId.Adapter)!, "step.adapter.name", UnitFor(StepId.Adapter), IsStateSeries(StepId.Adapter)),
         new(For(StepId.Link)!, "step.link.name", UnitFor(StepId.Link), IsStateSeries(StepId.Link)),
         new(WifiSignal, "series.wifiSignal", "%", false, WifiHistory.AccessPointOf),
-        new(For(StepId.Gateway)!, "step.gateway.name", UnitFor(StepId.Gateway), IsStateSeries(StepId.Gateway)),
-        new(For(StepId.PublicIp)!, "step.publicIp.name", UnitFor(StepId.PublicIp), IsStateSeries(StepId.PublicIp)),
-        new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns)),
-        new(For(StepId.Target)!, "step.target.name", UnitFor(StepId.Target), IsStateSeries(StepId.Target)),
+        new(For(StepId.Gateway)!, "step.gateway.name", UnitFor(StepId.Gateway), IsStateSeries(StepId.Gateway), LatencyBands: true),
+        new(For(StepId.PublicIp)!, "step.publicIp.name", UnitFor(StepId.PublicIp), IsStateSeries(StepId.PublicIp), LatencyBands: true),
+        new(PacketLoss, "series.packetLoss", "%", false),
+        new(Jitter, "series.jitter", "ms", false),
+        new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns), LatencyBands: true),
+        new(For(StepId.Target)!, "step.target.name", UnitFor(StepId.Target), IsStateSeries(StepId.Target), LatencyBands: true),
         new(TrafficDown, "series.trafficDown", "Mbps", false),
         new(TrafficUp, "series.trafficUp", "Mbps", false),
         new(SpeedTestDownload, "speedtest.download.name", "Mbps", false),
         new(SpeedTestUpload, "speedtest.upload.name", "Mbps", false),
-        new(SpeedTestPing, "series.speedTestPing", "ms", false),
+        new(SpeedTestPing, "series.speedTestPing", "ms", false, LatencyBands: true),
         new(SpeedTestBufferbloat, "series.speedTestBufferbloat", "ms", false),
     ];
 }

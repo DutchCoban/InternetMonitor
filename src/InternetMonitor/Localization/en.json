@@ -577,5 +577,15 @@
   "settings.historyRetention": "Keep history for",
   "settings.historyRetention.option": "{0} days",
   "history.range.30d": "30 days",
-  "reports.provider.periodDays.beyondRetention": "Last {0} days (measurements: last {1} days)"
+  "reports.provider.periodDays.beyondRetention": "Last {0} days (measurements: last {1} days)",
+  "series.packetLoss": "Packet loss",
+  "series.jitter": "Jitter",
+  "report.p.loss": "Packet loss",
+  "report.p.loss.note": "average over all measurements",
+  "report.p.quality": "Packet loss and jitter per day",
+  "report.p.quality.note": "Every minute, ten pings a tenth of a second apart go to a public internet address. Packet loss is the share that got no answer; jitter is how much the response time varied from one ping to the next. From around 1% loss or 30 ms jitter, video calls and online games start to stutter. Minutes in which nothing at all came back are outages and are listed above, not here.",
+  "report.p.col.day": "Day",
+  "report.p.col.loss": "Packet loss",
+  "report.p.col.lossMinutes": "Minutes with loss",
+  "report.p.col.jitter": "Jitter"
 }
