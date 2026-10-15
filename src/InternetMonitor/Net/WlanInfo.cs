@@ -9,8 +9,9 @@ namespace InternetMonitor.Net;
 /// <param name="SignalPercent">Windows' 0-100 signal quality - the number the taskbar's bars are drawn from.</param>
 /// <param name="Generation">"Wi-Fi 6", "Wi-Fi 5", ... or null for a PHY type without one.</param>
 /// <param name="AccessDenied">
-/// Windows refused the connection details because location access for desktop apps is off - since
-/// Windows 11 24H2 a network name and access point count as location data.
+/// Windows refused the connection details because location access is off - since Windows 11 24H2 a
+/// network name and access point count as location data. The signal is then derived from the RSSI
+/// and the band from the channel, both of which Windows still reports (see <see cref="WlanInfo"/>).
 /// </param>
 public sealed record WifiInfo(
     string? Ssid,
@@ -94,7 +95,7 @@ public static class WlanInfo
             uint result = WlanQueryInterface(client, ref interfaceId, OpcodeCurrentConnection, IntPtr.Zero, out _, out IntPtr connection, out _);
             if (result == ErrorAccessDenied)
             {
-                return WifiInfo.Denied;
+                return WithoutLocation(client, interfaceId);
             }
 
             if (result != ErrorSuccess)
@@ -157,6 +158,39 @@ public static class WlanInfo
             }
         }
     }
+
+    /// <summary>
+    /// What is left with location access off. Measured on Windows 11 (build 26300): the connection
+    /// details and both scan lists are refused, but the RSSI and the channel are not - and those are
+    /// the two that matter for "is the signal good enough". The percentage is derived from the RSSI
+    /// the way Windows itself scales it (-100 dBm is 0%, -50 dBm and above is 100%), and the band
+    /// from the channel number - which cannot tell a 6 GHz channel from a 2.4 or 5 GHz one with the
+    /// same number, a rare enough case to accept.
+    /// </summary>
+    private static WifiInfo WithoutLocation(IntPtr client, Guid interfaceId)
+    {
+        int? rssi = QueryInt(client, interfaceId, OpcodeRssi) is < 0 and > -120 and int r ? r : null;
+        int? channel = QueryInt(client, interfaceId, OpcodeChannelNumber) is > 0 and int c ? c : null;
+
+        return WifiInfo.Denied with
+        {
+            RssiDbm = rssi,
+            SignalPercent = rssi is { } dbm ? SignalFromRssi(dbm) : null,
+            Channel = channel,
+            FrequencyMHz = channel is { } ch ? FrequencyOfChannel(ch) : null,
+        };
+    }
+
+    public static int SignalFromRssi(int dbm) => Math.Clamp(2 * (dbm + 100), 0, 100);
+
+    /// <summary>The centre frequency of a 2.4 or 5 GHz channel; null for a number in neither range.</summary>
+    public static int? FrequencyOfChannel(int channel) => channel switch
+    {
+        14 => 2484,
+        >= 1 and <= 13 => 2407 + (5 * channel),
+        >= 32 and <= 177 => 5000 + (5 * channel),
+        _ => null,
+    };
 
     private static int? QueryInt(IntPtr client, Guid interfaceId, int opcode)
     {

@@ -485,7 +485,7 @@
   "measure.wifiStandard": "Wi-Fi standard",
   "measure.wifiRate": "Rate (receive / send)",
   "measure.wifiDetails": "Wi-Fi details",
-  "measure.wifiDetails.denied": "Network name and access point hidden: location access for desktop apps is off in Windows (Settings > Privacy & security > Location)",
+  "measure.wifiDetails.denied": "Network name and access point hidden: location access is off in Windows (Settings > Privacy & security > Location). The signal is derived from the signal strength, the band from the channel.",
   "series.wifiSignal": "Wi-Fi signal",
   "change.wifiNetwork": "Wi-Fi network changed from {0} to {1}",
   "change.wifiAccessPoint": "Switched to another Wi-Fi access point",
@@ -659,5 +659,6 @@
   "uptime.day.thursday": "Thu",
   "uptime.day.friday": "Fri",
   "uptime.day.saturday": "Sat",
-  "uptime.day.sunday": "Sun"
+  "uptime.day.sunday": "Sun",
+  "step.link.openLocationSettings": "Open location settings to show the network name and access point"
 }

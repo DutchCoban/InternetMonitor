@@ -485,7 +485,7 @@
   "measure.wifiStandard": "Wifi-standaard",
   "measure.wifiRate": "Snelheid (ontvangen / verzenden)",
   "measure.wifiDetails": "Wifi-details",
-  "measure.wifiDetails.denied": "Netwerknaam en access point verborgen: locatietoegang voor desktop-apps staat uit in Windows (Instellingen > Privacy en beveiliging > Locatie)",
+  "measure.wifiDetails.denied": "Netwerknaam en access point verborgen: locatietoegang staat uit in Windows (Instellingen > Privacy en beveiliging > Locatie). Het signaal is afgeleid uit de signaalsterkte, de band uit het kanaal.",
   "series.wifiSignal": "Wifi-signaal",
   "change.wifiNetwork": "Wifi-netwerk gewijzigd van {0} naar {1}",
   "change.wifiAccessPoint": "Overgeschakeld naar een ander wifi-access point",
@@ -659,5 +659,6 @@
   "uptime.day.thursday": "do",
   "uptime.day.friday": "vr",
   "uptime.day.saturday": "za",
-  "uptime.day.sunday": "zo"
+  "uptime.day.sunday": "zo",
+  "step.link.openLocationSettings": "Locatie-instellingen openen om netwerknaam en access point te tonen"
 }

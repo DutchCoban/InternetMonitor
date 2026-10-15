@@ -485,7 +485,7 @@
   "measure.wifiStandard": "Standard Wi-Fi",
   "measure.wifiRate": "Prędkość (odbiór / wysyłanie)",
   "measure.wifiDetails": "Szczegóły Wi-Fi",
-  "measure.wifiDetails.denied": "Nazwa sieci i punkt dostępowy ukryte: dostęp do lokalizacji dla aplikacji klasycznych jest wyłączony w Windows (Ustawienia > Prywatność i zabezpieczenia > Lokalizacja)",
+  "measure.wifiDetails.denied": "Nazwa sieci i punkt dostępowy ukryte: dostęp do lokalizacji jest wyłączony w Windows (Ustawienia > Prywatność i zabezpieczenia > Lokalizacja). Sygnał wyliczono z siły sygnału, pasmo z kanału.",
   "series.wifiSignal": "Sygnał Wi-Fi",
   "change.wifiNetwork": "Sieć Wi-Fi zmieniona z {0} na {1}",
   "change.wifiAccessPoint": "Przełączono na inny punkt dostępowy Wi-Fi",
@@ -659,5 +659,6 @@
   "uptime.day.thursday": "czw",
   "uptime.day.friday": "pt",
   "uptime.day.saturday": "sob",
-  "uptime.day.sunday": "nd"
+  "uptime.day.sunday": "nd",
+  "step.link.openLocationSettings": "Otwórz ustawienia lokalizacji, aby pokazać nazwę sieci i punkt dostępu"
 }

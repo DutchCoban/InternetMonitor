@@ -128,6 +128,12 @@ public sealed class LinkCheck : IStepCheck
             }
         }
 
+        // Windows only hides the network name and access point when location access is off, and the
+        // switch is easy to find once pointed at - the app never flips it itself.
+        (string, string)? action = wifi is { AccessDenied: true }
+            ? ("step.link.openLocationSettings", "ms-settings:privacy-location")
+            : null;
+
         return Task.FromResult(new StepResult(
             Id,
             state,
@@ -143,6 +149,7 @@ public sealed class LinkCheck : IStepCheck
             HeadlineArgs = headlineArgs,
             DetailKey = detailKey,
             DetailArgs = detailArgs,
+            Action = action,
         });
     }
 
@@ -160,9 +167,11 @@ public sealed class LinkCheck : IStepCheck
 
         if (wifi.SignalPercent is { } signal)
         {
+            // Derived from the RSSI when Windows withheld its own figure - close, but not identical.
+            string approx = wifi.AccessDenied ? "≈" : string.Empty;
             measurements.Add(new Measurement(
                 loc.Get("measure.wifiSignal"),
-                wifi.RssiDbm is { } rssi ? $"{signal}% ({rssi} dBm)" : $"{signal}%"));
+                wifi.RssiDbm is { } rssi ? $"{approx}{signal}% ({rssi} dBm)" : $"{approx}{signal}%"));
         }
 
         if (wifi.Band is { } band)

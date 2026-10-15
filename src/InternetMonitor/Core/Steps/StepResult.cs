@@ -43,6 +43,12 @@ public sealed record StepResult(
 
     public object[]? DetailArgs { get; init; }
 
+    /// <summary>
+    /// Something the user can do about this result, shown as a link under it: the localization key
+    /// of its text and what it opens (a URL or an ms-settings: page). Null when there is nothing.
+    /// </summary>
+    public (string TextKey, string Target)? Action { get; init; }
+
     /// <summary>The headline in English, reconstructed from <see cref="HeadlineKey"/> when a check provided one, else the live (possibly non-English) <see cref="Headline"/> as a graceful fallback.</summary>
     public string EnglishHeadline() => HeadlineKey is { } key ? LocalizationManager.FormatEnglish(key, HeadlineArgs ?? []) : Headline;
 

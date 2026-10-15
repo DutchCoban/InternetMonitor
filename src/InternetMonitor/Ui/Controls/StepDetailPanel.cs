@@ -16,6 +16,7 @@ public sealed class StepDetailPanel : ThemedControl
     private StepResult? _result;
     private int _scrollOffset;
     private int _contentHeight;
+    private Rectangle _actionBounds = Rectangle.Empty;
 
     protected override Color BehindColor => Theme.Current.Surface;
 
@@ -25,6 +26,21 @@ public sealed class StepDetailPanel : ThemedControl
         _result = result;
         _scrollOffset = 0;
         Invalidate();
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        Cursor = _actionBounds.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        base.OnMouseClick(e);
+        if (e.Button == MouseButtons.Left && _actionBounds.Contains(e.Location) && _result?.Action is { } action)
+        {
+            ShellOpen.Open(action.Target);
+        }
     }
 
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -93,6 +109,20 @@ public sealed class StepDetailPanel : ThemedControl
                 new Rectangle(Sp(2), y, width, detailSize.Height),
                 TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
             y += detailSize.Height + Sp(2);
+        }
+
+        _actionBounds = Rectangle.Empty;
+        if (result.Action is { } action)
+        {
+            Font linkFont = new(Theme.Font(FontRole.Body), FontStyle.Underline);
+            using (linkFont)
+            {
+                Size linkSize = GdiExtensions.MeasureCrisp(loc.Get(action.TextKey), linkFont);
+                _actionBounds = new Rectangle(Sp(2), y, linkSize.Width, linkSize.Height);
+                g.DrawTextCrisp(loc.Get(action.TextKey), linkFont, p.Accent, _actionBounds);
+            }
+
+            y += _actionBounds.Height + Sp(2);
         }
 
         if (result.Duration > TimeSpan.Zero && result.State.IsResolved())

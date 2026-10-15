@@ -485,7 +485,7 @@
   "measure.wifiStandard": "WLAN-Standard",
   "measure.wifiRate": "Rate (Empfang / Senden)",
   "measure.wifiDetails": "WLAN-Details",
-  "measure.wifiDetails.denied": "Netzwerkname und Access Point ausgeblendet: Der Standortzugriff für Desktop-Apps ist in Windows deaktiviert (Einstellungen > Datenschutz und Sicherheit > Standort)",
+  "measure.wifiDetails.denied": "Netzwerkname und Access Point ausgeblendet: Der Standortzugriff ist in Windows deaktiviert (Einstellungen > Datenschutz und Sicherheit > Standort). Das Signal ist aus der Signalstärke abgeleitet, das Band aus dem Kanal.",
   "series.wifiSignal": "WLAN-Signal",
   "change.wifiNetwork": "WLAN-Netzwerk geändert von {0} zu {1}",
   "change.wifiAccessPoint": "Zu einem anderen WLAN-Access-Point gewechselt",
@@ -659,5 +659,6 @@
   "uptime.day.thursday": "Do",
   "uptime.day.friday": "Fr",
   "uptime.day.saturday": "Sa",
-  "uptime.day.sunday": "So"
+  "uptime.day.sunday": "So",
+  "step.link.openLocationSettings": "Standorteinstellungen öffnen, um Netzwerkname und Access Point anzuzeigen"
 }

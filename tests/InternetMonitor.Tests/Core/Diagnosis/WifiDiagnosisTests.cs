@@ -60,6 +60,18 @@ public sealed class WifiDiagnosisTests
     }
 
     [Fact]
+    public void Details_appearing_after_a_start_without_them_are_not_a_change()
+    {
+        // Location access off at start-up, switched on later: the network did not change.
+        var detector = new ChangeDetector();
+        detector.Observe(Snapshot(Start, WifiInfo.Denied));
+
+        Assert.Empty(detector.Observe(Snapshot(Start.AddSeconds(15), Wifi("HeBo", "aa:00:00:00:00:01", 80))));
+        Assert.Empty(detector.Observe(Snapshot(Start.AddSeconds(30), WifiInfo.Denied)));
+        Assert.Empty(detector.Observe(Snapshot(Start.AddSeconds(45), Wifi("HeBo", "aa:00:00:00:00:01", 80))));
+    }
+
+    [Fact]
     public void A_gateway_failure_over_a_weak_signal_blames_the_signal()
     {
         StepSnapshot snapshot = Snapshot(Start, Wifi("HeBo", "aa:00:00:00:00:01", 22), gateway: StepState.Failed);
