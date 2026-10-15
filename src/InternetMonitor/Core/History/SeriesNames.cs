@@ -84,6 +84,14 @@ public static class SeriesNames
     /// <summary>1 when step 7's request over IPv6 worked, 0 when it failed; nothing when IPv6 was not on offer.</summary>
     public const string Ipv6 = "ipv6";
 
+    /// <summary>
+    /// 1 while the step pipeline had an incident open, else 0; the metadata is the incident's
+    /// cause key and id, "dns|INC-20261015-0002". This is what availability is computed from, so
+    /// clearing the incident list leaves the uptime strip and the provider report as they were.
+    /// Not charted.
+    /// </summary>
+    public const string Outage = "outage";
+
     /// <summary>1 while Windows treated the connection as metered (mobile data, a hotspot), else 0. Not charted.</summary>
     public const string Metered = "metered";
 

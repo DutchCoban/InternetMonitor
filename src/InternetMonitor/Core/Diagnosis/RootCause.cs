@@ -68,6 +68,10 @@ public static class RootCauseExtensions
         _ => "unknown",
     };
 
+    /// <summary>The cause with this <see cref="Key"/>, or <see cref="RootCause.Unknown"/> for one that does not exist (any more).</summary>
+    public static RootCause FromKey(string? key) =>
+        Enum.GetValues<RootCause>().FirstOrDefault(c => c.Key() == key, RootCause.Unknown);
+
     /// <summary>
     /// Maps a classification written by v1 into v2's enum. v1's "Network" covered adapter, link
     /// and address together, and there is no way to recover which it meant from the name alone -

@@ -219,6 +219,7 @@ public sealed class AppHost : ApplicationContext
 
         RootCauseResult diagnosis = RootCauseAnalyzer.Analyze(snapshot);
         _tracker.Observe(snapshot, diagnosis);
+        RecordOutageState(snapshot.TakenUtc);
         _diagnosticLog.LogCycle(snapshot, diagnosis, _tracker.ActiveIncident?.Id);
 
         UpdateTray(snapshot, diagnosis);
@@ -386,6 +387,27 @@ public sealed class AppHost : ApplicationContext
             _history.Sample(SeriesNames.TrafficUp, snapshot.TakenUtc, Math.Round(traffic.UpMbps, 2));
         }
     }
+
+    /// <summary>
+    /// Whether an incident is open, as a history series (see <see cref="SeriesNames.Outage"/>).
+    /// Sampled like every other series, but a change is recorded the moment it happens, so an
+    /// outage's start and end are exact rather than up to one sample interval late.
+    /// </summary>
+    private void RecordOutageState(DateTimeOffset at)
+    {
+        Incident? active = _tracker.ActiveIncident;
+        string? state = active is null ? null : $"{active.Cause.Key()}|{active.Id}";
+        if (state != _lastOutageState)
+        {
+            _history.Record(SeriesNames.Outage, at, active is null ? 0 : 1, state);
+            _lastOutageState = state;
+            return;
+        }
+
+        _history.Sample(SeriesNames.Outage, at, active is null ? 0 : 1, state);
+    }
+
+    private string? _lastOutageState = string.Empty;
 
     private bool IsMetered() => _pipeline.LatestSnapshot?.FactsFor<LinkFacts>(StepId.Link)?.Cost?.Metered == true;
 

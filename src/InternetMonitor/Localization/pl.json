@@ -180,7 +180,7 @@
   "incidents.timeline": "Oś czasu",
   "incidents.stepsAtStart": "Kontrole na starcie",
   "incidents.clear": "Wyczyść incydenty",
-  "incidents.clear.confirm": "Usunąć wszystkie zapisane incydenty? Tej operacji nie można cofnąć.",
+  "incidents.clear.confirm": "Usunąć wszystkie zapisane incydenty? Tej operacji nie można cofnąć. Oś czasu na stronie stanu i raport dla dostawcy nadal uwzględniają awarie: korzystają z własnej historii pomiarów aplikacji.",
   "explain.adapter.what": "Windows nie znajduje używalnej karty sieciowej albo znaleziona jest wyłączona.",
   "explain.adapter.cause": "Karta ({0}) jest wyłączona w systemie Windows albo jej sterownik przestał działać.",
   "explain.adapter.todo": "Otwórz Połączenia sieciowe i sprawdź, czy karta jest włączona. Jeśli jej nie ma, zainstaluj lub zaktualizuj sterownik.",

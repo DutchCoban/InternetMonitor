@@ -73,7 +73,7 @@ public static class UptimeTimeline
 
         IReadOnlyList<MetricPoint> adapter = history(SeriesNames.For(StepId.Adapter)!);
         IReadOnlyList<MetricPoint> latency = history(SeriesNames.For(StepId.PublicIp)!);
-        List<Incident> relevant = [.. incidents.Where(i => i.StartUtc < end && (i.EndUtc ?? nowUtc) > start)];
+        List<OutageSpan> relevant = [.. ProviderReportData.Spans(incidents, history, nowUtc).Where(s => s.StartUtc < end && s.EndUtc > start)];
 
         var blocks = new List<UptimeBlock>(BlockCount);
         for (int b = 0; b < BlockCount; b++)
@@ -88,17 +88,17 @@ public static class UptimeTimeline
                 continue;
             }
 
-            (Incident Incident, TimeSpan Overlap)? longest = relevant
-                .Select(i => (Incident: i, Overlap: Overlap(i, from, until, nowUtc)))
+            (OutageSpan Span, TimeSpan Overlap)? longest = relevant
+                .Select(s => (Span: s, Overlap: Overlap(s, from, until)))
                 .Where(x => x.Overlap > TimeSpan.Zero)
-                .OrderByDescending(x => StateOf(x.Incident) == UptimeState.Outage)
+                .OrderByDescending(x => StateOf(x.Span) == UptimeState.Outage)
                 .ThenByDescending(x => x.Overlap)
-                .Select(x => ((Incident, TimeSpan)?)x)
+                .Select(x => ((OutageSpan, TimeSpan)?)x)
                 .FirstOrDefault();
 
             if (longest is { } hit)
             {
-                blocks.Add(new UptimeBlock(from, to, StateOf(hit.Incident), hit.Incident.Id, hit.Incident.Cause));
+                blocks.Add(new UptimeBlock(from, to, StateOf(hit.Span), hit.Span.IncidentId, hit.Span.Cause));
                 continue;
             }
 
@@ -142,7 +142,7 @@ public static class UptimeTimeline
                 to = nowUtc;
             }
 
-            ProviderReportData data = ProviderReportData.Compute(incidents, history, from, to, timeZone);
+            ProviderReportData data = ProviderReportData.Compute(incidents, history, from, to, timeZone, nowUtc);
             UptimeState state = data.Availability is not { } availability || data.Coverage < 0.05
                 ? UptimeState.NotMeasured
                 : availability < GoodDay
@@ -159,15 +159,15 @@ public static class UptimeTimeline
     /// An outage colours a block red; a login page, a packet-level warning or a degraded cause
     /// colours it orange, the same split the status hero makes.
     /// </summary>
-    private static UptimeState StateOf(Incident incident) =>
-        incident.ConditionKey is null && ProviderReportData.IsOutage(incident.Cause) && incident.Cause != RootCause.CaptivePortal
+    private static UptimeState StateOf(OutageSpan span) =>
+        span.ConditionKey is null && ProviderReportData.IsOutage(span.Cause) && span.Cause != RootCause.CaptivePortal
             ? UptimeState.Outage
             : UptimeState.Warning;
 
-    private static TimeSpan Overlap(Incident incident, DateTimeOffset from, DateTimeOffset to, DateTimeOffset now)
+    private static TimeSpan Overlap(OutageSpan span, DateTimeOffset from, DateTimeOffset to)
     {
-        DateTimeOffset start = incident.StartUtc > from ? incident.StartUtc : from;
-        DateTimeOffset end = (incident.EndUtc ?? now) < to ? incident.EndUtc ?? now : to;
+        DateTimeOffset start = span.StartUtc > from ? span.StartUtc : from;
+        DateTimeOffset end = span.EndUtc < to ? span.EndUtc : to;
         return end - start;
     }
 

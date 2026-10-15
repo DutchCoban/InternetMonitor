@@ -180,7 +180,7 @@
   "incidents.timeline": "Timeline",
   "incidents.stepsAtStart": "Checks at the start",
   "incidents.clear": "Clear incidents",
-  "incidents.clear.confirm": "Delete all recorded incidents? This cannot be undone.",
+  "incidents.clear.confirm": "Delete all recorded incidents? This cannot be undone. The timeline on the Status page and the provider report keep counting the outages: they use the app's own measurement history.",
   "explain.adapter.what": "Windows cannot find a usable network adapter, or the one it found is switched off.",
   "explain.adapter.cause": "The adapter ({0}) is disabled in Windows, or its driver has stopped working.",
   "explain.adapter.todo": "Open Network connections in Windows and check that the adapter is enabled. If it is missing entirely, reinstall or update its driver.",

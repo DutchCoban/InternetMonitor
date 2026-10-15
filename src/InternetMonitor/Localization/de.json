@@ -180,7 +180,7 @@
   "incidents.timeline": "Zeitverlauf",
   "incidents.stepsAtStart": "Prüfungen zu Beginn",
   "incidents.clear": "Vorfälle löschen",
-  "incidents.clear.confirm": "Alle aufgezeichneten Vorfälle löschen? Das lässt sich nicht rückgängig machen.",
+  "incidents.clear.confirm": "Alle erfassten Störungen löschen? Dies kann nicht rückgängig gemacht werden. Die Zeitleiste auf der Statusseite und der Anbieterbericht zählen die Störungen weiterhin: Sie rechnen mit dem eigenen Messverlauf der App.",
   "explain.adapter.what": "Windows findet keinen nutzbaren Netzwerkadapter, oder der gefundene ist abgeschaltet.",
   "explain.adapter.cause": "Der Adapter ({0}) ist in Windows deaktiviert, oder sein Treiber arbeitet nicht mehr.",
   "explain.adapter.todo": "Öffnen Sie die Netzwerkverbindungen und prüfen Sie, ob der Adapter aktiviert ist. Fehlt er ganz, installieren oder aktualisieren Sie den Treiber.",

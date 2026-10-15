@@ -180,7 +180,7 @@
   "incidents.timeline": "Tijdlijn",
   "incidents.stepsAtStart": "Controles bij de start",
   "incidents.clear": "Incidenten wissen",
-  "incidents.clear.confirm": "Alle vastgelegde incidenten verwijderen? Dit kan niet ongedaan worden gemaakt.",
+  "incidents.clear.confirm": "Alle vastgelegde incidenten verwijderen? Dit kan niet ongedaan worden gemaakt. De tijdlijn op de statuspagina en het providerrapport blijven de storingen meetellen: die rekenen met de eigen meetgeschiedenis van de app.",
   "explain.adapter.what": "Windows vindt geen bruikbare netwerkadapter, of de gevonden adapter staat uit.",
   "explain.adapter.cause": "De adapter ({0}) staat uitgeschakeld in Windows, of het stuurprogramma werkt niet meer.",
   "explain.adapter.todo": "Open Netwerkverbindingen in Windows en controleer of de adapter is ingeschakeld. Ontbreekt hij helemaal, installeer of update dan het stuurprogramma.",

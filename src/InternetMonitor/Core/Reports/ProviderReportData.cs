@@ -26,6 +26,14 @@ public enum OutageSide
     Other,
 }
 
+/// <summary>
+/// A stretch during which an incident was open - from the outage series where it exists, from the
+/// incident list before that. See <see cref="ProviderReportData.Spans"/>.
+/// </summary>
+/// <param name="IncidentId">The incident behind it, for clicking through; it may since have been cleared from the list.</param>
+/// <param name="ConditionKey">Set for a network-health warning, which only the incident list knows about.</param>
+public sealed record OutageSpan(DateTimeOffset StartUtc, DateTimeOffset EndUtc, RootCause Cause, string? IncidentId, string? ConditionKey, bool Ongoing);
+
 public sealed record OutageEntry(DateTimeOffset StartUtc, TimeSpan Duration, RootCause Cause, OutageSide Side, bool Ongoing);
 
 public sealed record OutageGroup(RootCause Cause, OutageSide Side, int Count, TimeSpan Total, TimeSpan Longest);
@@ -98,12 +106,14 @@ public sealed record ProviderReportData(
     ///  - An outage is an incident with a connectivity cause. Packet-level warnings (network
     ///    health) and filtered pings are not outages: nothing stopped working.
     /// </summary>
+    /// <param name="nowUtc">What counts as now for an outage still going on; the current time when null.</param>
     public static ProviderReportData Compute(
         IReadOnlyList<Incident> incidents,
         Func<string, IReadOnlyList<MetricPoint>> history,
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
-        TimeZoneInfo timeZone)
+        TimeZoneInfo timeZone,
+        DateTimeOffset? nowUtc = null)
     {
         TimeSpan monitored = MonitoredTime(InPeriod(history(SeriesNames.For(Steps.StepId.Adapter)!), fromUtc, toUtc));
         List<(DateTimeOffset From, DateTimeOffset To)> metered = MeteredStretches(InPeriod(history(SeriesNames.Metered), fromUtc, toUtc));
@@ -112,15 +122,15 @@ public sealed record ProviderReportData(
 
         List<OutageEntry> outages =
         [
-            .. incidents
-                .Where(i => i.ConditionKey is null && IsOutage(i.Cause))
-                .Where(i => i.StartUtc < toUtc && (i.EndUtc ?? toUtc) > fromUtc)
-                .Select(i =>
+            .. Spans(incidents, history, nowUtc ?? DateTimeOffset.UtcNow)
+                .Where(s => s.ConditionKey is null && IsOutage(s.Cause))
+                .Where(s => s.StartUtc < toUtc && s.EndUtc > fromUtc)
+                .Select(s =>
                 {
-                    DateTimeOffset start = i.StartUtc < fromUtc ? fromUtc : i.StartUtc;
-                    DateTimeOffset end = i.EndUtc is { } e && e < toUtc ? e : toUtc;
-                    OutageSide side = OnMetered(i.StartUtc) ? OutageSide.MeteredConnection : SideOf(i.Cause);
-                    return new OutageEntry(i.StartUtc, end - start, i.Cause, side, i.EndUtc is null);
+                    DateTimeOffset start = s.StartUtc < fromUtc ? fromUtc : s.StartUtc;
+                    DateTimeOffset end = s.EndUtc < toUtc ? s.EndUtc : toUtc;
+                    OutageSide side = OnMetered(s.StartUtc) ? OutageSide.MeteredConnection : SideOf(s.Cause);
+                    return new OutageEntry(s.StartUtc, end - start, s.Cause, side, s.Ongoing);
                 })
                 .OrderBy(o => o.StartUtc),
         ];
@@ -164,6 +174,85 @@ public sealed record ProviderReportData(
                 InPeriod(history(SeriesNames.Jitter), fromUtc, toUtc),
                 timeZone),
         };
+    }
+
+    /// <summary>
+    /// Every stretch during which an incident was open, oldest first. Outages of the step pipeline
+    /// come from the outage series (<see cref="SeriesNames.Outage"/>), so clearing the incident list
+    /// does not make the record look clean; only for the time before that series began - history
+    /// recorded by an older version - are they taken from the incidents. Network-health warnings
+    /// always come from the incident list. Where the incident still exists its start is used, since
+    /// it is dated from the first failing cycle and the series changes a couple of cycles later.
+    /// </summary>
+    public static List<OutageSpan> Spans(IReadOnlyList<Incident> incidents, Func<string, IReadOnlyList<MetricPoint>> history, DateTimeOffset nowUtc)
+    {
+        IReadOnlyList<MetricPoint> series = history(SeriesNames.Outage);
+        DateTimeOffset? seriesStart = series.Count > 0 ? series[0].Timestamp : null;
+        Dictionary<string, Incident> byId = incidents.Where(i => i.ConditionKey is null).GroupBy(i => i.Id).ToDictionary(g => g.Key, g => g.First());
+
+        var spans = new List<OutageSpan>();
+        (DateTimeOffset Start, string? State)? open = null;
+        DateTimeOffset last = default;
+
+        void Close(DateTimeOffset end, bool ongoing)
+        {
+            if (open is not { } run)
+            {
+                return;
+            }
+
+            (RootCause cause, string? id) = ParseState(run.State);
+            DateTimeOffset start = id is not null && byId.TryGetValue(id, out Incident? incident) && incident.StartUtc < run.Start ? incident.StartUtc : run.Start;
+            spans.Add(new OutageSpan(start, end, cause, id, null, ongoing));
+            open = null;
+        }
+
+        foreach (MetricPoint point in series)
+        {
+            bool down = point.Value >= 0.5;
+            if (open is { } run && (point.Timestamp - last > MaxSampleGap || !down || point.Metadata != run.State))
+            {
+                // A gap means the app was not running: the outage is only known up to the last sample.
+                Close(point.Timestamp - last > MaxSampleGap ? last : point.Timestamp, ongoing: false);
+            }
+
+            if (down && open is null)
+            {
+                open = (point.Timestamp, point.Metadata);
+            }
+
+            last = point.Timestamp;
+        }
+
+        bool stillOpen = open is not null && nowUtc - last <= MaxSampleGap;
+        Close(stillOpen ? nowUtc : last, stillOpen);
+
+        // Before the series existed, the incident list is all there is - minus the incidents the
+        // series already covers (one that opened just before the series' first point, say).
+        HashSet<string?> inSeries = [.. spans.Select(s => s.IncidentId)];
+        spans.AddRange(incidents
+            .Where(i => i.ConditionKey is null && (seriesStart is null || i.StartUtc < seriesStart) && !inSeries.Contains(i.Id))
+            .Select(i => new OutageSpan(i.StartUtc, i.EndUtc ?? nowUtc, i.Cause, i.Id, null, i.EndUtc is null)));
+
+        spans.AddRange(incidents
+            .Where(i => i.ConditionKey is not null)
+            .Select(i => new OutageSpan(i.StartUtc, i.EndUtc ?? nowUtc, i.Cause, i.Id, i.ConditionKey, i.EndUtc is null)));
+
+        return [.. spans.OrderBy(s => s.StartUtc)];
+    }
+
+    /// <summary>"dns|INC-20261015-0002" back into the cause and the incident id.</summary>
+    private static (RootCause Cause, string? Id) ParseState(string? state)
+    {
+        if (state is null)
+        {
+            return (RootCause.Unknown, null);
+        }
+
+        int bar = state.IndexOf('|');
+        return bar < 0
+            ? (RootCauseExtensions.FromKey(state), null)
+            : (RootCauseExtensions.FromKey(state[..bar]), state[(bar + 1)..]);
     }
 
     /// <summary>

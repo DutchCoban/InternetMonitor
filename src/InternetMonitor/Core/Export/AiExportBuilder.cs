@@ -649,6 +649,7 @@ public static class AiExportBuilder
             : seriesId switch
             {
                 SeriesNames.Metered => "Metered connection (mobile data / hotspot)",
+                SeriesNames.Outage => "Incident open (step pipeline)",
                 "ip" => "IP address (v1)",
                 "time" => "Time sync (v1)",
                 _ when seriesId.StartsWith("internet:", StringComparison.Ordinal) => $"Ping to {seriesId["internet:".Length..]} (v1)",
@@ -661,6 +662,7 @@ public static class AiExportBuilder
         _ when seriesId.StartsWith("internet:", StringComparison.Ordinal) || seriesId.StartsWith("endpoint:", StringComparison.Ordinal) => "ms",
         "time" => "s (clock offset)",
         SeriesNames.Metered => "1 = metered, 0 = not",
+        SeriesNames.Outage => "1 = incident open, 0 = not",
         _ => "-",
     };
 
