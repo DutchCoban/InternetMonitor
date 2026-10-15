@@ -12,7 +12,12 @@ public sealed class SingleInstanceManager : IDisposable
 {
     private const string MutexName = "InternetMonitor.SingleInstance.Mutex";
 
+    /// <summary>Set by a second launch to ask the running instance to show its window.</summary>
+    private const string ShowEventName = "InternetMonitor.SingleInstance.Show";
+
     private readonly Mutex? _mutex;
+    private EventWaitHandle? _showEvent;
+    private RegisteredWaitHandle? _showWait;
 
     private SingleInstanceManager(Mutex? mutex) => _mutex = mutex;
 
@@ -40,8 +45,35 @@ public sealed class SingleInstanceManager : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// From a second launch: asks the instance already running to bring its window up. Does
+    /// nothing when that instance is not listening (yet), which only leaves it in the tray.
+    /// </summary>
+    public static void RequestShow()
+    {
+        try
+        {
+            using EventWaitHandle show = EventWaitHandle.OpenExisting(ShowEventName);
+            show.Set();
+        }
+        catch (Exception ex) when (ex is WaitHandleCannotBeOpenedException or UnauthorizedAccessException or IOException)
+        {
+            // Nothing is listening; the running instance stays as it is.
+        }
+    }
+
+    /// <summary>Calls <paramref name="onShow"/>, on a thread-pool thread, whenever a second launch asks for the window.</summary>
+    public void ListenForShow(Action onShow)
+    {
+        _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
+        _showWait = ThreadPool.RegisterWaitForSingleObject(_showEvent, (_, _) => onShow(), null, Timeout.Infinite, executeOnlyOnce: false);
+    }
+
     public void Dispose()
     {
+        _showWait?.Unregister(null);
+        _showEvent?.Dispose();
+
         if (_mutex is null)
         {
             return;

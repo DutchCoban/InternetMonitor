@@ -472,6 +472,9 @@ public sealed class AppHost : ApplicationContext
     /// Brings the window up from the tray: shown, restored to how it was left (maximised or not) when
     /// minimised, and in front.
     /// </summary>
+    /// <summary>A second launch asked for the window (see <see cref="SingleInstanceManager.ListenForShow"/>); arrives off the UI thread.</summary>
+    public void ShowFromAnotherLaunch() => _ui.Post(_ => ShowWindow(), null);
+
     private void ShowWindow()
     {
         if (_window.IsDisposed)

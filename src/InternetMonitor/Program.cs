@@ -12,10 +12,9 @@ namespace InternetMonitor;
 internal static class Program
 {
     /// <summary>
-    /// Opens the main window immediately instead of starting silently in the tray. Normal
-    /// launches stay quiet - a monitor that throws a window at you on every boot is a nuisance -
-    /// but a shortcut the user clicks to look at the app wants the window, and so does any
-    /// scripted check of the UI.
+    /// Kept for shortcuts made for older versions, which only opened the window with it. Every
+    /// launch now opens the window except one with <see cref="AutoStart.TrayArgument"/> - the
+    /// sign-in start, where a window on every boot would be a nuisance.
     /// </summary>
     private const string ShowWindowArgument = "--show";
 
@@ -63,24 +62,33 @@ internal static class Program
             return;
         }
 
+        bool trayOnly = args.Any(a => string.Equals(a, AutoStart.TrayArgument, StringComparison.OrdinalIgnoreCase))
+            && !args.Any(a => string.Equals(a, ShowWindowArgument, StringComparison.OrdinalIgnoreCase));
+
         using SingleInstanceManager? instance = SingleInstanceManager.TryAcquire();
         if (instance is null)
         {
-            // Another copy is already running and already has a tray icon. Saying nothing is the
-            // right behaviour for a tray app: the user double-clicked a shortcut for something
-            // that is, as far as they are concerned, already open.
+            // Another copy is already running in the tray. Someone who opens the app again wants
+            // to see it, so that copy is asked to bring its window up; this one just exits.
+            if (!trayOnly)
+            {
+                SingleInstanceManager.RequestShow();
+            }
+
             return;
         }
 
         Application.ThreadException += (_, e) => ReportFatal(e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => ReportFatal(e.ExceptionObject as Exception);
 
-        bool showWindow = args.Any(a => string.Equals(a, ShowWindowArgument, StringComparison.OrdinalIgnoreCase));
         string? page = TryGetArgumentValue(args, PageArgument);
         string? trace = TryGetArgumentValue(args, TraceArgument);
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new AppHost(showWindow || page is not null || trace is not null, page, trace));
+        AutoStart.UpgradeLegacyEntry();
+        var host = new AppHost(!trayOnly || page is not null || trace is not null, page, trace);
+        instance.ListenForShow(host.ShowFromAnotherLaunch);
+        Application.Run(host);
     }
 
     /// <summary>

@@ -56,8 +56,10 @@ one `.exe`, nothing to install, free and open source.
    from the latest release.
 2. **Run it.** There is no installer; put the file wherever you like. The app isn't code-signed,
    so Windows SmartScreen may warn the first time - choose *More info* → *Run anyway*.
-3. **Click the icon in the system tray** to open the Status screen. That's it - monitoring has
-   started. Turn on *Settings → Start automatically with Windows* to keep it running.
+3. **That's it** - the Status screen opens and monitoring has started. Closing the window keeps
+   the app running in the system tray; open it again from the tray icon or by starting the app
+   once more. Turn on *Settings → Start automatically with Windows* to keep it running - it then
+   starts quietly in the tray when you sign in.
 
 Requires Windows 10 or 11 (64-bit). Nothing else to install - the .NET runtime is built in.
 

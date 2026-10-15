@@ -16,12 +16,19 @@ internal static class AutoStart
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "InternetMonitor";
 
+    /// <summary>
+    /// What Windows passes at sign-in: start in the tray without opening the window. A launch the
+    /// user makes themselves opens it - see <see cref="Program"/>.
+    /// </summary>
+    public const string TrayArgument = "--tray";
+
     public static bool IsEnabled()
     {
         try
         {
             using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
-            return key?.GetValue(ValueName) is string existing && existing.Equals(QuotedExePath(), StringComparison.OrdinalIgnoreCase);
+            return key?.GetValue(ValueName) is string existing
+                && (existing.Equals(Command(), StringComparison.OrdinalIgnoreCase) || existing.Equals(QuotedExePath(), StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or ObjectDisposedException)
         {
@@ -38,7 +45,7 @@ internal static class AutoStart
 
             if (enabled)
             {
-                key.SetValue(ValueName, QuotedExePath());
+                key.SetValue(ValueName, Command());
             }
             else
             {
@@ -54,6 +61,29 @@ internal static class AutoStart
             return false;
         }
     }
+
+    /// <summary>
+    /// Rewrites an entry made by an older version - the bare path, from when every launch started
+    /// in the tray - to include <see cref="TrayArgument"/>, so signing in keeps starting quietly now
+    /// that an ordinary launch opens the window. Leaves anything else alone.
+    /// </summary>
+    public static void UpgradeLegacyEntry()
+    {
+        try
+        {
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+            if (key?.GetValue(ValueName) is string existing && existing.Equals(QuotedExePath(), StringComparison.OrdinalIgnoreCase))
+            {
+                key.SetValue(ValueName, Command());
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException or ObjectDisposedException)
+        {
+            // Left as it was: the app then opens its window at sign-in, which is harmless.
+        }
+    }
+
+    private static string Command() => $"{QuotedExePath()} {TrayArgument}";
 
     /// <summary>
     /// The running executable's own path, quoted so a path containing spaces - the common case

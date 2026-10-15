@@ -93,7 +93,7 @@ public sealed class UpdateInstaller
             $"Wait-Process -Id {Environment.ProcessId} -ErrorAction SilentlyContinue; " +
             "Start-Sleep -Milliseconds 750; " +
             $"Move-Item -Force -LiteralPath '{EscapeSingleQuotes(downloadedExePath)}' -Destination '{EscapeSingleQuotes(currentExePath)}'; " +
-            $"Start-Process -FilePath '{EscapeSingleQuotes(currentExePath)}'";
+            $"Start-Process -FilePath '{EscapeSingleQuotes(currentExePath)}' -ArgumentList '{App.AutoStart.TrayArgument}'";
 
         string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
 
