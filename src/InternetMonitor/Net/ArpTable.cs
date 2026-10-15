@@ -19,7 +19,6 @@ namespace InternetMonitor.Net;
 public static class ArpTable
 {
     private const int NoError = 0;
-    private const int ErrorInsufficientBuffer = 122;
     private const int MaxlenPhysaddr = 8;
 
     /// <summary>Entries with this type are stale/pending removal, not a real neighbor - see MIB_IPNETROW.dwType.</summary>

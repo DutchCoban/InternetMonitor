@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Net;
-using System.Net.NetworkInformation;
 using InternetMonitor.Localization;
 using InternetMonitor.Net;
 
@@ -62,7 +61,7 @@ public sealed class GatewayCheck : IStepCheck
             gateway, context.Targets.GatewayProbePorts, timeout, race.Token, context.LocalAddress);
 
         (PingOutcome ping, (int Port, TcpOutcome Outcome)? tcpAnswer) =
-            await AwaitAnswersAsync(icmp, tcp, race, cancellationToken).ConfigureAwait(false);
+            await AwaitAnswersAsync(icmp, tcp, race).ConfigureAwait(false);
 
         bool reachable = ping.Success || tcpAnswer is not null;
         string? via = ping.Success
@@ -133,14 +132,12 @@ public sealed class GatewayCheck : IStepCheck
     /// ping cancels <paramref name="race"/>, which stops the TCP connects still open; their
     /// cancellation is observed here so it never surfaces as an unobserved task exception. The TCP
     /// answer is then null - the ping already proved the router is there. A cancelled cycle
-    /// (<paramref name="cancellationToken"/>) surfaces from the awaited task as usual. Public for
-    /// the tests.
+    /// surfaces from the awaited task as usual. Public for the tests.
     /// </summary>
     public static async Task<(PingOutcome Ping, (int Port, TcpOutcome Outcome)? Tcp)> AwaitAnswersAsync(
         Task<PingOutcome> icmp,
         Task<(int Port, TcpOutcome Outcome)?> tcp,
-        CancellationTokenSource race,
-        CancellationToken cancellationToken)
+        CancellationTokenSource race)
     {
         try
         {

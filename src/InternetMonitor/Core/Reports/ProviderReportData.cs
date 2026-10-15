@@ -84,8 +84,6 @@ public sealed record ProviderReportData(
 
     public double Coverage => Period > TimeSpan.Zero ? Math.Clamp(Monitored / Period, 0, 1) : 0;
 
-    public TimeSpan TotalDowntime => Outages.Aggregate(TimeSpan.Zero, (sum, o) => sum + o.Duration);
-
     public IEnumerable<OutageEntry> ProviderOutages => Outages.Where(o => o.Side == OutageSide.Provider);
 
     /// <summary>

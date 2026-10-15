@@ -1,4 +1,3 @@
-using InternetMonitor.Localization;
 using InternetMonitor.Ui.Theming;
 
 namespace InternetMonitor.Ui.Windows;

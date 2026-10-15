@@ -71,9 +71,6 @@ public sealed record Incident
     /// <summary>What moved in the half hour before this opened. Often the actual cause.</summary>
     public IReadOnlyList<string> RecentChanges { get; set; } = [];
 
-    /// <summary>A traceroute captured when the incident opened, when the cause made one worth having.</summary>
-    public string? TraceroutePath { get; set; }
-
     /// <summary>
     /// Which network-health condition opened this, e.g. "tcpRetransmissions" - null for every
     /// pipeline-driven incident. Lets the AI export group these by condition without parsing

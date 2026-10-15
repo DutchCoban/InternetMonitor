@@ -47,11 +47,7 @@ public sealed record HttpOutcome(
     IPAddress? RemoteAddress,
     int Port,
     string? TlsProtocol,
-    HttpTimings Timings)
-{
-    /// <summary>A 5xx means the stack works but the service behind it does not - degraded, not down.</summary>
-    public bool ServerError => StatusCode >= 500;
-}
+    HttpTimings Timings);
 
 /// <summary>
 /// A full DNS -> TCP -> TLS -> HTTP request with every stage timed separately and every failure

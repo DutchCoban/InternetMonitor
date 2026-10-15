@@ -7,7 +7,7 @@ namespace InternetMonitor.Core.Steps;
 /// This is the highest-value testing affordance in the whole project for the least code. The
 /// behaviour that most needs checking - the focus arrow moving, downstream steps reporting as
 /// skipped rather than as six separate problems, an incident opening with a timeline and a
-/// plain-language explanation, the automatic traceroute - only happens when something breaks, and
+/// plain-language explanation - only happens when something breaks, and
 /// the alternative is physically unplugging a cable and racing to watch the screen. Here it is a
 /// checkbox.
 ///
@@ -21,32 +21,6 @@ public static class FaultSimulation
 
     /// <summary>Raised when the simulated set changes, so the UI can run a fresh cycle at once.</summary>
     public static event Action? Changed;
-
-    public static bool IsActive
-    {
-        get
-        {
-#if DEBUG
-            lock (Gate)
-            {
-                return Forced.Count > 0;
-            }
-#else
-            return false;
-#endif
-        }
-    }
-
-    public static IReadOnlyCollection<StepId> ForcedFailures
-    {
-        get
-        {
-            lock (Gate)
-            {
-                return [.. Forced];
-            }
-        }
-    }
 
     public static void Set(IEnumerable<StepId> steps)
     {

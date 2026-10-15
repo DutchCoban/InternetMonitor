@@ -47,9 +47,6 @@ public static class AppPaths
     /// <summary>Cached IP-to-owner lookups, so a repeated traceroute does not re-query Cymru/RDAP.</summary>
     public static string CacheDir => Path.Combine(Root, "cache");
 
-    /// <summary>Saved traceroute runs, including the ones captured automatically when an incident opens.</summary>
-    public static string TraceroutesDir => Path.Combine(Root, "traceroutes");
-
     /// <summary>
     /// Creates a directory if it is missing, swallowing failure. Callers are all best-effort
     /// persistence paths: losing a cache write must never interrupt monitoring.

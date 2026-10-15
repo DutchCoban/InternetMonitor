@@ -421,7 +421,6 @@ cold start is an easy trade for a tray app that starts once and runs for days.
 - Incident history: `%AppData%\InternetMonitor\incidents.json`
 - Per-check history (the History screen's charts): `%AppData%\InternetMonitor\history\`
 - Cached lookups (traceroute hop ownership, MAC vendors): `%AppData%\InternetMonitor\cache\`
-- Saved traceroute runs: `%AppData%\InternetMonitor\traceroutes\`
 
 None of these live inside the application directory, so the app itself can be replaced/updated
 (by hand, or via the self-update feature above) without touching configuration or history.

@@ -1,5 +1,4 @@
 using System.Drawing.Drawing2D;
-using System.Linq;
 using InternetMonitor.Core.Tools.LanScan;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Theming;

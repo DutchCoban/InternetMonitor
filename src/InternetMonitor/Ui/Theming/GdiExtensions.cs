@@ -130,9 +130,8 @@ internal static class GdiExtensions
 
     /// <summary>
     /// Text via GDI (<see cref="TextRenderer"/>) rather than GDI+ <see cref="Graphics.DrawString"/>:
-    /// it hints and grid-fits properly, so small UI text stays crisp instead of going soft. Use
-    /// <see cref="DrawTextSmooth"/> instead for anything rotated, scaled or very large, which GDI
-    /// cannot do.
+    /// it hints and grid-fits properly, so small UI text stays crisp instead of going soft. GDI
+    /// cannot draw rotated or scaled text; nothing in this app needs that.
     /// </summary>
     public static void DrawTextCrisp(
         this Graphics g,
@@ -150,34 +149,6 @@ internal static class GdiExtensions
         // NoPadding matters for layout: without it GDI adds a few pixels of its own on each side,
         // and measured-then-drawn text no longer lines up with anything measured next to it.
         TextRenderer.DrawText(g, text, font, bounds, color, flags | TextFormatFlags.NoPadding);
-    }
-
-    /// <summary>
-    /// Text via GDI+ <see cref="Graphics.DrawString"/>, which follows the Graphics transform - the
-    /// counterpart of <see cref="DrawTextCrisp"/> for rotated or scaled text. Currently unused.
-    /// </summary>
-    public static void DrawTextSmooth(
-        this Graphics g,
-        string text,
-        Font font,
-        Color color,
-        RectangleF bounds,
-        StringAlignment horizontal = StringAlignment.Near,
-        StringAlignment vertical = StringAlignment.Center)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            return;
-        }
-
-        using var format = new StringFormat(StringFormatFlags.NoClip)
-        {
-            Alignment = horizontal,
-            LineAlignment = vertical,
-            Trimming = StringTrimming.EllipsisCharacter,
-        };
-        using var brush = new SolidBrush(color);
-        g.DrawString(text, font, brush, bounds, format);
     }
 
     public static Size MeasureCrisp(string text, Font font, int maxWidth = 0)
@@ -207,12 +178,4 @@ internal static class GdiExtensions
             (int)(from.G + ((to.G - from.G) * k)),
             (int)(from.B + ((to.B - from.B) * k)));
     }
-
-    /// <summary>
-    /// Nudges a colour toward white or black depending on the active theme, so one call lightens
-    /// in dark mode and darkens in light mode - which is what "slightly more prominent" means in
-    /// both.
-    /// </summary>
-    public static Color Emphasize(this Color color, float amount) =>
-        Mix(color, Theme.IsDark ? Color.White : Color.Black, amount);
 }

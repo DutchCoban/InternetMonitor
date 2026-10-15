@@ -1,5 +1,3 @@
-using InternetMonitor.Core.Steps;
-
 namespace InternetMonitor.Core.Diagnosis;
 
 /// <summary>
@@ -50,7 +48,7 @@ public enum RootCause
     Unknown,
 }
 
-/// <summary>Localization keys, v1 name mapping and the step each cause points at.</summary>
+/// <summary>Localization keys and the mapping of v1's classification names.</summary>
 public static class RootCauseExtensions
 {
     public static string Key(this RootCause cause) => cause switch
@@ -91,17 +89,5 @@ public static class RootCauseExtensions
         // TimeSync was a v1 classification with no v2 step behind it yet; it is not a connectivity
         // fault, so it degrades to Unknown rather than being mapped onto something it is not.
         _ => RootCause.Unknown,
-    };
-
-    public static StepId? PrimaryStep(this RootCause cause) => cause switch
-    {
-        RootCause.Adapter => StepId.Adapter,
-        RootCause.Link => StepId.Link,
-        RootCause.IpConfiguration => StepId.IpAddress,
-        RootCause.Gateway => StepId.Gateway,
-        RootCause.Internet or RootCause.FirewallSuspected => StepId.PublicIp,
-        RootCause.Dns => StepId.Dns,
-        RootCause.Target or RootCause.CaptivePortal or RootCause.Ipv6Broken => StepId.Target,
-        _ => null,
     };
 }

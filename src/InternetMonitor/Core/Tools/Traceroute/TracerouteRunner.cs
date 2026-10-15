@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.NetworkInformation;
 using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Tools.Traceroute;

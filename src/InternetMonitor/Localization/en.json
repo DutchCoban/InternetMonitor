@@ -27,7 +27,6 @@
   "page.settings.subtitle": "Checks, appearance and notifications",
   "page.reports.title": "Reports",
   "page.reports.subtitle": "A report for your provider, and exports of everything the monitor recorded",
-  "page.underConstruction": "This screen is not built yet.",
   "step.adapter.name": "Network adapter",
   "step.link.name": "Cable / link",
   "step.ip.name": "IP address",

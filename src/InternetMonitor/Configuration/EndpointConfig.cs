@@ -44,10 +44,4 @@ public sealed record EndpointConfig(
     // auto-generated one, since it shares the parameter's name) is what turns a null argument into
     // a real empty list everywhere else in the app reads Headers.
     public IReadOnlyList<EndpointHeader> Headers { get; init; } = Headers ?? [];
-
-    public static EndpointConfig CreateUrl(string name, string url, int? expectedStatusCode = null) =>
-        new(Guid.NewGuid().ToString("N"), name, EndpointKind.Url, Url: url, ExpectedStatusCode: expectedStatusCode);
-
-    public static EndpointConfig CreateTcpPort(string name, string host, int port) =>
-        new(Guid.NewGuid().ToString("N"), name, EndpointKind.TcpPort, Host: host, Port: port);
 }

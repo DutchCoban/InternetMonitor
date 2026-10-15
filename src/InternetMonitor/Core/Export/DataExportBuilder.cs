@@ -12,9 +12,8 @@ namespace InternetMonitor.Core.Export;
 
 /// <summary>
 /// Builds the "export all data" .zip: a redacted copy of settings, every incident, one CSV per
-/// history series, and the diagnostics log when there is one. Traceroute results are not
-/// included - <see cref="Incident.TraceroutePath"/> and <see cref="AppPaths.TraceroutesDir"/>
-/// exist as scaffolding nothing writes to yet, and this export does not change that.
+/// history series, and the diagnostics log when there is one. Traceroutes are not kept, so
+/// there are none to include.
 ///
 /// A pure function over data the caller already has (from <see cref="App.AppServices"/>, via
 /// Settings) - no file-system reads here beyond what is handed in, same reasoning as

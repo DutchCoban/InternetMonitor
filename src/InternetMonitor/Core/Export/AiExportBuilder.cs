@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using InternetMonitor.Configuration;
-using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Reports;

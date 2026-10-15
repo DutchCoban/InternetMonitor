@@ -336,7 +336,7 @@ public sealed class StepList : ThemedControl
 
             if (expanded > 0)
             {
-                DrawExpanded(g, p, result, nameColumn, y, expanded);
+                DrawExpanded(g, p, result, nameColumn, y);
                 y += expanded;
             }
         }
@@ -431,7 +431,7 @@ public sealed class StepList : ThemedControl
     }
 
     /// <summary>An expanded row: the detail sentence, then every measurement as a label/value line.</summary>
-    private void DrawExpanded(Graphics g, Palette p, StepResult result, int x, int y, int height)
+    private void DrawExpanded(Graphics g, Palette p, StepResult result, int x, int y)
     {
         int lineHeight = Dp(18);
         int cursor = y + Sp(1);

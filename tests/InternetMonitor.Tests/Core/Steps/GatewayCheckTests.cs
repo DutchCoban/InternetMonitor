@@ -18,7 +18,7 @@ public sealed class GatewayCheckTests
         var tcp = new TaskCompletionSource<(int Port, TcpOutcome Outcome)?>();
         race.Token.Register(() => tcp.TrySetCanceled(race.Token));
 
-        var result = await GatewayCheck.AwaitAnswersAsync(Task.FromResult(PingOk), tcp.Task, race, CancellationToken.None)
+        var result = await GatewayCheck.AwaitAnswersAsync(Task.FromResult(PingOk), tcp.Task, race)
             .WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.True(result.Ping.Success);
@@ -33,7 +33,7 @@ public sealed class GatewayCheckTests
         var tcp = new TaskCompletionSource<(int Port, TcpOutcome Outcome)?>();
 
         Task<(PingOutcome Ping, (int Port, TcpOutcome Outcome)? Tcp)> pending =
-            GatewayCheck.AwaitAnswersAsync(Task.FromResult(PingTimedOut), tcp.Task, race, CancellationToken.None);
+            GatewayCheck.AwaitAnswersAsync(Task.FromResult(PingTimedOut), tcp.Task, race);
         Assert.False(pending.IsCompleted);
 
         tcp.SetResult(Port80);
@@ -50,7 +50,7 @@ public sealed class GatewayCheckTests
         var ping = new TaskCompletionSource<PingOutcome>();
 
         Task<(PingOutcome Ping, (int Port, TcpOutcome Outcome)? Tcp)> pending =
-            GatewayCheck.AwaitAnswersAsync(ping.Task, Task.FromResult(Port80), race, CancellationToken.None);
+            GatewayCheck.AwaitAnswersAsync(ping.Task, Task.FromResult(Port80), race);
         Assert.False(pending.IsCompleted);
 
         ping.SetResult(PingTimedOut);
@@ -68,6 +68,6 @@ public sealed class GatewayCheckTests
         cycle.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            GatewayCheck.AwaitAnswersAsync(Task.FromCanceled<PingOutcome>(cycle.Token), Task.FromResult(Port80), race, cycle.Token));
+            GatewayCheck.AwaitAnswersAsync(Task.FromCanceled<PingOutcome>(cycle.Token), Task.FromResult(Port80), race));
     }
 }

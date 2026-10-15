@@ -2,7 +2,6 @@ using InternetMonitor.App;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.Monitors;
-using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;

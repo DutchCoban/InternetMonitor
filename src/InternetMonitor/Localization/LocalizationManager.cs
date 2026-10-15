@@ -51,10 +51,6 @@ public sealed class LocalizationManager
 
     private LocalizationManager(string language) => SetLanguage(language);
 
-    /// <summary>This language's own display name, for showing in the UI without the caller having to look it up.</summary>
-    public string CurrentLanguageDisplayName =>
-        SupportedLanguages.FirstOrDefault(l => l.Code == CurrentLanguage).DisplayName ?? CurrentLanguage;
-
     public void SetLanguage(string languageCode)
     {
         CurrentLanguage = SupportedLanguages.Any(l => l.Code == languageCode) ? languageCode : DefaultLanguageCode;

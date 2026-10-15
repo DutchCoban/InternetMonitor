@@ -43,15 +43,4 @@ public static class LatencyClassifier
         { Cost.Metered: true } => ("step.latency.metered", []),
         _ => ("step.latency.high", []),
     };
-
-    /// <summary>Combines two states, keeping the worse one. Ok &lt; Warning &lt; Failed.</summary>
-    public static StepState Worse(StepState a, StepState b)
-    {
-        if (a == StepState.Failed || b == StepState.Failed)
-        {
-            return StepState.Failed;
-        }
-
-        return a == StepState.Warning || b == StepState.Warning ? StepState.Warning : StepState.Ok;
-    }
 }
