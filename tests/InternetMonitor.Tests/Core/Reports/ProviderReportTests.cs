@@ -59,6 +59,48 @@ public sealed class ProviderReportTests
     }
 
     [Fact]
+    public void Time_on_a_metered_connection_and_outages_in_it_do_not_count_against_the_line()
+    {
+        // Ten hours measured; hours 4-6 on a phone's hotspot, with an outage in them.
+        List<MetricPoint> metered =
+        [
+            .. Samples(From, TimeSpan.FromHours(4), value: 0).SkipLast(1),
+            .. Samples(From.AddHours(4), TimeSpan.FromHours(2), value: 1).SkipLast(1),
+            .. Samples(From.AddHours(6), TimeSpan.FromHours(4), value: 0),
+        ];
+
+        ProviderReportData data = Compute(
+            Samples(From, TimeSpan.FromHours(10)),
+            metered,
+            Incident(RootCause.Internet, From.AddHours(1), TimeSpan.FromMinutes(30)),
+            Incident(RootCause.Internet, From.AddHours(5), TimeSpan.FromMinutes(30)));
+
+        Assert.Equal(2, data.MeteredTime.TotalHours, 2);
+        Assert.Equal(OutageSide.MeteredConnection, data.Outages[1].Side);
+        Assert.Equal(OutageSide.Provider, data.Outages[0].Side);
+        Assert.Equal(2, data.OutagesByCause.Count);
+
+        // Half an hour down out of the eight hours on the line itself.
+        Assert.Equal(1 - (0.5 / 8), data.Availability!.Value, 3);
+    }
+
+    [Fact]
+    public void A_metered_stretch_ends_where_the_app_stopped_running()
+    {
+        List<MetricPoint> points =
+        [
+            new(From, 1, null),
+            new(From.AddMinutes(1), 1, null),
+            new(From.AddHours(3), 1, null),
+            new(From.AddHours(3).AddMinutes(2), 0, null),
+        ];
+
+        List<(DateTimeOffset From, DateTimeOffset To)> stretches = ProviderReportData.MeteredStretches(points);
+
+        Assert.Equal([(From, From.AddMinutes(1)), (From.AddHours(3), From.AddHours(3).AddMinutes(2))], stretches);
+    }
+
+    [Fact]
     public void Chart_numbers_use_a_dot_whatever_the_culture()
     {
         CultureInfo previous = CultureInfo.CurrentCulture;
@@ -79,12 +121,15 @@ public sealed class ProviderReportTests
         }
     }
 
-    private static ProviderReportData Compute(IReadOnlyList<MetricPoint> adapterAndLatency, params Incident[] incidents)
+    private static ProviderReportData Compute(IReadOnlyList<MetricPoint> adapterAndLatency, params Incident[] incidents) =>
+        Compute(adapterAndLatency, [], incidents);
+
+    private static ProviderReportData Compute(IReadOnlyList<MetricPoint> adapterAndLatency, IReadOnlyList<MetricPoint> metered, params Incident[] incidents)
     {
         IReadOnlyList<MetricPoint> History(string series) =>
             series == SeriesNames.For(InternetMonitor.Core.Steps.StepId.Adapter) || series == SeriesNames.For(InternetMonitor.Core.Steps.StepId.PublicIp)
                 ? adapterAndLatency
-                : [];
+                : series == SeriesNames.Metered ? metered : [];
 
         return ProviderReportData.Compute(incidents, History, From, To, TimeZoneInfo.Utc);
     }

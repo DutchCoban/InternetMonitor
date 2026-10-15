@@ -523,7 +523,7 @@
   "report.p.belowPlan": "Snelheidstests onder 80% van het abonnement",
   "report.p.belowPlan.note": "downloadsnelheid",
   "report.p.xOfY": "{0} van {1}",
-  "report.p.otherOutages": "{0} andere storing(en) hadden hun oorzaak in deze computer, het thuisnetwerk of een inlogpagina. Ze staan hieronder, maar tellen niet mee voor de beschikbaarheid van de verbinding.",
+  "report.p.otherOutages": "{0} andere storing(en) hadden hun oorzaak in deze computer, het thuisnetwerk, een inlogpagina of een mobiele verbinding. Ze staan hieronder, maar tellen niet mee voor de beschikbaarheid van de verbinding.",
   "report.p.outages": "Storingen",
   "report.p.noOutages": "In deze periode zijn geen storingen vastgelegd.",
   "report.p.byCause": "Per oorzaak",
@@ -587,5 +587,16 @@
   "report.p.col.day": "Dag",
   "report.p.col.loss": "Pakketverlies",
   "report.p.col.lossMinutes": "Minuten met verlies",
-  "report.p.col.jitter": "Jitter"
+  "report.p.col.jitter": "Jitter",
+  "measure.connectionCost": "Datakosten",
+  "measure.connectionCost.metered": "Gemeten verbinding",
+  "measure.connectionCost.mobile": "Gemeten (mobiel internet)",
+  "measure.connectionCost.roaming": "roaming",
+  "measure.connectionCost.overLimit": "datalimiet (bijna) bereikt",
+  "step.latency.metered": "Je zit op een gemeten verbinding. Als dat mobiel internet of de hotspot van een telefoon is, is een hogere reactietijd daar normaal.",
+  "settings.speedTestOnMetered": "Ook automatisch testen op een gemeten verbinding",
+  "speedtest.metered": "Gemeten verbinding: een test kan veel data verbruiken.",
+  "speedtest.metered.estimate": "Gemeten verbinding: een test verbruikt ongeveer {0} MB.",
+  "report.p.side.metered": "Mobiele verbinding / hotspot",
+  "report.p.metered": "Gedurende {0} van de gemeten tijd zat deze computer op een gemeten verbinding (mobiel internet of de hotspot van een telefoon). Die tijd, en storingen die daarin begonnen, tellen niet mee voor de beschikbaarheid van de lijn."
 }

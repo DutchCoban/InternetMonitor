@@ -129,6 +129,7 @@ public sealed class AppHost : ApplicationContext
 
         _speedTestScheduler = new SpeedTestScheduler();
         _speedTestScheduler.RunCompleted += OnSpeedTestRunCompleted;
+        _speedTestScheduler.SkipRun = () => !_settings.SpeedTestOnMetered && IsMetered();
         _speedTestScheduler.Reconfigure(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
 
         var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler);
@@ -367,12 +368,21 @@ public sealed class AppHost : ApplicationContext
             _history.Sample(SeriesNames.WifiSignal, link.TimestampUtc, signal, facts.Wifi.Bssid);
         }
 
+        // Whether the line was metered, so the provider report can tell time spent on a phone's
+        // hotspot from time on the line it is about.
+        if (snapshot[StepId.Link]?.Facts is LinkFacts { Cost.Metered: { } metered })
+        {
+            _history.Sample(SeriesNames.Metered, snapshot.TakenUtc, metered ? 1 : 0);
+        }
+
         if (snapshot.Throughput is { } traffic)
         {
             _history.Sample(SeriesNames.TrafficDown, snapshot.TakenUtc, Math.Round(traffic.DownMbps, 2));
             _history.Sample(SeriesNames.TrafficUp, snapshot.TakenUtc, Math.Round(traffic.UpMbps, 2));
         }
     }
+
+    private bool IsMetered() => _pipeline.LatestSnapshot?.FactsFor<LinkFacts>(StepId.Link)?.Cost?.Metered == true;
 
     /// <summary>Runs on the sampler's own loop; <see cref="MetricStore.Record"/> is safe off the UI thread.</summary>
     private void RecordLineQuality(LineQualitySample sample)

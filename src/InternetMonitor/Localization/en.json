@@ -523,7 +523,7 @@
   "report.p.belowPlan": "Speed tests below 80% of the subscription",
   "report.p.belowPlan.note": "download speed",
   "report.p.xOfY": "{0} of {1}",
-  "report.p.otherOutages": "{0} other outage(s) had their cause in this computer, the home network or a login page. They are listed below, but do not count against the availability of the connection.",
+  "report.p.otherOutages": "{0} other outage(s) had their cause in this computer, the home network, a login page or a mobile connection. They are listed below, but do not count against the availability of the connection.",
   "report.p.outages": "Outages",
   "report.p.noOutages": "No outages were recorded in this period.",
   "report.p.byCause": "By cause",
@@ -587,5 +587,16 @@
   "report.p.col.day": "Day",
   "report.p.col.loss": "Packet loss",
   "report.p.col.lossMinutes": "Minutes with loss",
-  "report.p.col.jitter": "Jitter"
+  "report.p.col.jitter": "Jitter",
+  "measure.connectionCost": "Data costs",
+  "measure.connectionCost.metered": "Metered connection",
+  "measure.connectionCost.mobile": "Metered (mobile data)",
+  "measure.connectionCost.roaming": "roaming",
+  "measure.connectionCost.overLimit": "data limit (nearly) reached",
+  "step.latency.metered": "You are on a metered connection. If that is mobile data or a phone's hotspot, a higher response time is normal for it.",
+  "settings.speedTestOnMetered": "Also run automatically on a metered connection",
+  "speedtest.metered": "Metered connection: a test can use a lot of data.",
+  "speedtest.metered.estimate": "Metered connection: a test uses about {0} MB.",
+  "report.p.side.metered": "Mobile connection / hotspot",
+  "report.p.metered": "For {0} of the measured time this computer was on a metered connection (mobile data or a phone's hotspot). That time, and outages that started in it, do not count towards the availability of the line."
 }

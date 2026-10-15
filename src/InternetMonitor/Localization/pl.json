@@ -523,7 +523,7 @@
   "report.p.belowPlan": "Testy prędkości poniżej 80% abonamentu",
   "report.p.belowPlan.note": "prędkość pobierania",
   "report.p.xOfY": "{0} z {1}",
-  "report.p.otherOutages": "Pozostałe awarie ({0}) miały przyczynę w tym komputerze, sieci domowej lub stronie logowania. Są wymienione poniżej, ale nie wpływają na dostępność połączenia.",
+  "report.p.otherOutages": "Pozostałe awarie ({0}) miały przyczynę w tym komputerze, sieci domowej, stronie logowania lub połączeniu komórkowym. Są wymienione poniżej, ale nie wpływają na dostępność połączenia.",
   "report.p.outages": "Awarie",
   "report.p.noOutages": "W tym okresie nie zarejestrowano żadnych awarii.",
   "report.p.byCause": "Według przyczyny",
@@ -587,5 +587,16 @@
   "report.p.col.day": "Dzień",
   "report.p.col.loss": "Utrata pakietów",
   "report.p.col.lossMinutes": "Minuty z utratą",
-  "report.p.col.jitter": "Jitter"
+  "report.p.col.jitter": "Jitter",
+  "measure.connectionCost": "Koszt danych",
+  "measure.connectionCost.metered": "Połączenie taryfowe",
+  "measure.connectionCost.mobile": "Taryfowe (dane komórkowe)",
+  "measure.connectionCost.roaming": "roaming",
+  "measure.connectionCost.overLimit": "limit danych (prawie) osiągnięty",
+  "step.latency.metered": "Korzystasz z połączenia taryfowego. Jeśli to dane komórkowe lub hotspot telefonu, wyższy czas odpowiedzi jest tam normalny.",
+  "settings.speedTestOnMetered": "Testuj automatycznie także na połączeniu taryfowym",
+  "speedtest.metered": "Połączenie taryfowe: test może zużyć dużo danych.",
+  "speedtest.metered.estimate": "Połączenie taryfowe: test zużywa około {0} MB.",
+  "report.p.side.metered": "Połączenie komórkowe / hotspot",
+  "report.p.metered": "Przez {0} mierzonego czasu ten komputer korzystał z połączenia taryfowego (dane komórkowe lub hotspot telefonu). Ten czas oraz awarie, które się w nim zaczęły, nie są wliczane do dostępności łącza."
 }

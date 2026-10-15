@@ -16,6 +16,12 @@ public enum OutageSide
     /// <summary>Beyond the router: the internet connection itself, the provider's DNS, the wider internet.</summary>
     Provider,
 
+    /// <summary>
+    /// Started while the computer was on a metered connection - mobile data or a phone's hotspot -
+    /// so whatever went wrong, it was not on the line this report is about.
+    /// </summary>
+    MeteredConnection,
+
     /// <summary>A login page, or a cause that could not be determined.</summary>
     Other,
 }
@@ -49,6 +55,12 @@ public sealed record ProviderReportData(
     IReadOnlyList<DayLatency> LatencyByDay,
     IReadOnlyList<SpeedTestEntry> SpeedTests)
 {
+    /// <summary>
+    /// Monitored time spent on a metered connection (mobile data, a phone's hotspot). It is left out
+    /// of the availability figure, like outages that started in it: the report is about the line.
+    /// </summary>
+    public TimeSpan MeteredTime { get; init; }
+
     /// <summary>Packet loss and jitter per day; empty when the period predates the series.</summary>
     public IReadOnlyList<DayQuality> QualityByDay { get; init; } = [];
 
@@ -90,6 +102,9 @@ public sealed record ProviderReportData(
         TimeZoneInfo timeZone)
     {
         TimeSpan monitored = MonitoredTime(InPeriod(history(SeriesNames.For(Steps.StepId.Adapter)!), fromUtc, toUtc));
+        List<(DateTimeOffset From, DateTimeOffset To)> metered = MeteredStretches(InPeriod(history(SeriesNames.Metered), fromUtc, toUtc));
+        TimeSpan meteredTime = metered.Aggregate(TimeSpan.Zero, (sum, s) => sum + (s.To - s.From));
+        bool OnMetered(DateTimeOffset at) => metered.Any(s => at >= s.From && at <= s.To);
 
         List<OutageEntry> outages =
         [
@@ -100,7 +115,8 @@ public sealed record ProviderReportData(
                 {
                     DateTimeOffset start = i.StartUtc < fromUtc ? fromUtc : i.StartUtc;
                     DateTimeOffset end = i.EndUtc is { } e && e < toUtc ? e : toUtc;
-                    return new OutageEntry(i.StartUtc, end - start, i.Cause, SideOf(i.Cause), i.EndUtc is null);
+                    OutageSide side = OnMetered(i.StartUtc) ? OutageSide.MeteredConnection : SideOf(i.Cause);
+                    return new OutageEntry(i.StartUtc, end - start, i.Cause, side, i.EndUtc is null);
                 })
                 .OrderBy(o => o.StartUtc),
         ];
@@ -108,10 +124,10 @@ public sealed record ProviderReportData(
         List<OutageGroup> groups =
         [
             .. outages
-                .GroupBy(o => o.Cause)
+                .GroupBy(o => (o.Cause, o.Side))
                 .Select(g => new OutageGroup(
-                    g.Key,
-                    SideOf(g.Key),
+                    g.Key.Cause,
+                    g.Key.Side,
                     g.Count(),
                     g.Aggregate(TimeSpan.Zero, (sum, o) => sum + o.Duration),
                     g.Max(o => o.Duration)))
@@ -120,8 +136,9 @@ public sealed record ProviderReportData(
         ];
 
         TimeSpan downtime = outages.Where(o => o.Side == OutageSide.Provider).Aggregate(TimeSpan.Zero, (sum, o) => sum + o.Duration);
-        double? availability = monitored > TimeSpan.Zero
-            ? Math.Clamp(1 - (downtime / monitored), 0, 1)
+        TimeSpan onLine = monitored - meteredTime;
+        double? availability = onLine > TimeSpan.Zero
+            ? Math.Clamp(1 - (downtime / onLine), 0, 1)
             : null;
 
         return new ProviderReportData(
@@ -134,12 +151,50 @@ public sealed record ProviderReportData(
             ComputeLatencyByDay(InPeriod(history(SeriesNames.For(Steps.StepId.PublicIp)!), fromUtc, toUtc), timeZone),
             CollectSpeedTests(history, fromUtc, toUtc))
         {
+            MeteredTime = meteredTime,
             QualityByDay = ComputeQualityByDay(
                 InPeriod(history(SeriesNames.PacketLoss), fromUtc, toUtc),
                 InPeriod(history(SeriesNames.Jitter), fromUtc, toUtc),
                 timeZone),
         };
     }
+
+    /// <summary>
+    /// The stretches during which the metered series said 1. A stretch ends at the first 0 or at a
+    /// gap the app was not running for, the same way <see cref="MonitoredTime"/> treats gaps.
+    /// </summary>
+    public static List<(DateTimeOffset From, DateTimeOffset To)> MeteredStretches(IReadOnlyList<MetricPoint> points)
+    {
+        var stretches = new List<(DateTimeOffset From, DateTimeOffset To)>();
+        DateTimeOffset? start = null;
+        DateTimeOffset last = default;
+        foreach (MetricPoint point in points)
+        {
+            bool gap = start is not null && point.Timestamp - last > MaxSampleGap;
+            if (start is { } open && (point.Value < 0.5 || gap))
+            {
+                stretches.Add((open, gap ? last : point.Timestamp));
+                start = null;
+            }
+
+            if (point.Value >= 0.5 && start is null)
+            {
+                start = point.Timestamp;
+            }
+
+            last = point.Timestamp;
+        }
+
+        if (start is { } stillOpen && last > stillOpen)
+        {
+            stretches.Add((stillOpen, last));
+        }
+
+        return stretches;
+    }
+
+    /// <summary>Longer than this between two samples means the app was not running in between.</summary>
+    private static readonly TimeSpan MaxSampleGap = TimeSpan.FromMinutes(5);
 
     private static List<DayQuality> ComputeQualityByDay(IReadOnlyList<MetricPoint> loss, IReadOnlyList<MetricPoint> jitter, TimeZoneInfo timeZone)
     {

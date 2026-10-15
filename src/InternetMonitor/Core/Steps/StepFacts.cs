@@ -37,7 +37,11 @@ public sealed record LinkFacts(
 
     // The radio side of a connected Wi-Fi adapter: signal, band, access point. Null for a cable,
     // or when Windows could not report it.
-    WifiInfo? Wifi = null) : StepFacts
+    WifiInfo? Wifi = null,
+
+    // Whether Windows treats the connection as metered (data plan, phone hotspot). Null when not
+    // connected.
+    ConnectionCostInfo? Cost = null) : StepFacts
 {
     /// <summary>Connected over Wi-Fi with a signal below the given Windows signal quality.</summary>
     public bool WeakSignal(int thresholdPercent) => Wifi?.SignalPercent is { } signal && signal < thresholdPercent;

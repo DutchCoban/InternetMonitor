@@ -74,6 +74,13 @@ public sealed class SpeedTestClient : IDisposable
     private const string PingPath = "empty.php";
 
     private static readonly TimeSpan PhaseDuration = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Roughly how much data one test moves at the given speeds: each direction runs flat out for
+    /// one phase. Used to warn before a manual test on a metered connection.
+    /// </summary>
+    public static double EstimatedMegabytes(double downloadMbps, double uploadMbps) =>
+        (downloadMbps + uploadMbps) * PhaseDuration.TotalSeconds / 8;
     private const int ConcurrentStreams = 2;
     private const int PingSampleCount = 5;
     private const int UploadChunkBytes = 1_000_000;

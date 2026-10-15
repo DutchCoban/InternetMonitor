@@ -523,7 +523,7 @@
   "report.p.belowPlan": "Geschwindigkeitstests unter 80 % des Tarifs",
   "report.p.belowPlan.note": "Download-Geschwindigkeit",
   "report.p.xOfY": "{0} von {1}",
-  "report.p.otherOutages": "{0} weitere Störung(en) lagen an diesem Computer, dem Heimnetz oder einer Anmeldeseite. Sie sind unten aufgeführt, zählen aber nicht gegen die Verfügbarkeit der Verbindung.",
+  "report.p.otherOutages": "{0} weitere Störung(en) lagen an diesem Computer, dem Heimnetz, einer Anmeldeseite oder einer mobilen Verbindung. Sie sind unten aufgeführt, zählen aber nicht gegen die Verfügbarkeit der Verbindung.",
   "report.p.outages": "Störungen",
   "report.p.noOutages": "In diesem Zeitraum wurden keine Störungen erfasst.",
   "report.p.byCause": "Nach Ursache",
@@ -587,5 +587,16 @@
   "report.p.col.day": "Tag",
   "report.p.col.loss": "Paketverlust",
   "report.p.col.lossMinutes": "Minuten mit Verlust",
-  "report.p.col.jitter": "Jitter"
+  "report.p.col.jitter": "Jitter",
+  "measure.connectionCost": "Datenkosten",
+  "measure.connectionCost.metered": "Getaktete Verbindung",
+  "measure.connectionCost.mobile": "Getaktet (mobile Daten)",
+  "measure.connectionCost.roaming": "Roaming",
+  "measure.connectionCost.overLimit": "Datenlimit (fast) erreicht",
+  "step.latency.metered": "Du bist über eine getaktete Verbindung online. Wenn das mobile Daten oder der Hotspot eines Handys sind, ist eine höhere Antwortzeit dort normal.",
+  "settings.speedTestOnMetered": "Auch über getaktete Verbindungen automatisch testen",
+  "speedtest.metered": "Getaktete Verbindung: ein Test kann viele Daten verbrauchen.",
+  "speedtest.metered.estimate": "Getaktete Verbindung: ein Test verbraucht etwa {0} MB.",
+  "report.p.side.metered": "Mobile Verbindung / Hotspot",
+  "report.p.metered": "Während {0} der gemessenen Zeit war dieser Computer über eine getaktete Verbindung online (mobile Daten oder der Hotspot eines Handys). Diese Zeit und darin begonnene Störungen zählen nicht zur Verfügbarkeit des Anschlusses."
 }

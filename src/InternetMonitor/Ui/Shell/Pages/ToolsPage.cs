@@ -1,4 +1,5 @@
 using InternetMonitor.App;
+using InternetMonitor.Core.History;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Core.Tools.LanScan;
 using InternetMonitor.Core.Tools.SpeedTest;
@@ -45,6 +46,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     private SpeedTestResultView _speedTestView = null!;
     private AppButton _runSpeedTest = null!;
     private Panel _speedTestBar = null!;
+    private Label _meteredNote = null!;
 
     private CancellationTokenSource? _speedTestRunning;
 
@@ -83,6 +85,10 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _tracerouteCard.Visible = id == TracerouteChipId;
         _lanScanCard.Visible = id == LanScanChipId;
         _speedTestCard.Visible = id == SpeedTestChipId;
+        if (id == SpeedTestChipId)
+        {
+            RefreshMeteredNote();
+        }
     }
 
     // ---- Traceroute -----------------------------------------------------------------------------
@@ -382,8 +388,11 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _runSpeedTest = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Pulse };
         _runSpeedTest.Click += (_, _) => StartOrCancelSpeedTest();
 
+        _meteredNote = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Small), Visible = false };
+
         _speedTestBar = new Panel { Dock = DockStyle.Top, Height = Dp(40) };
         _speedTestBar.Controls.Add(_runSpeedTest);
+        _speedTestBar.Controls.Add(_meteredNote);
         _speedTestBar.Resize += (_, _) => LayoutSpeedTestBar();
 
         _speedTestCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Pulse, Visible = false };
@@ -400,6 +409,31 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
         _runSpeedTest.Top = (_speedTestBar.Height - _runSpeedTest.Height) / 2;
         _runSpeedTest.Left = 0;
+
+        int noteLeft = _runSpeedTest.Right + Sp(3);
+        _meteredNote.Bounds = new Rectangle(noteLeft, 0, Math.Max(0, _speedTestBar.Width - noteLeft), _speedTestBar.Height);
+    }
+
+    /// <summary>
+    /// On a metered connection a manual test still runs - the user asked for it - but the bar says
+    /// what it will cost first, estimated from the last result (or said in general terms without one).
+    /// </summary>
+    private void RefreshMeteredNote()
+    {
+        bool metered = Services.Pipeline.LatestSnapshot?.FactsFor<LinkFacts>(StepId.Link)?.Cost?.Metered == true;
+        _meteredNote.Visible = metered;
+        if (!metered)
+        {
+            return;
+        }
+
+        MetricPoint? down = Services.History.Get(SeriesNames.SpeedTestDownload).LastOrDefault() is { Timestamp.Ticks: > 0 } d ? d : null;
+        MetricPoint? up = Services.History.Get(SeriesNames.SpeedTestUpload).LastOrDefault() is { Timestamp.Ticks: > 0 } u ? u : null;
+        _meteredNote.Text = down is { } lastDown
+            ? Loc.Format("speedtest.metered.estimate", Math.Max(1, Math.Round(SpeedTestClient.EstimatedMegabytes(lastDown.Value, up?.Value ?? 0) / 10) * 10).ToString("F0"))
+            : Loc.Get("speedtest.metered");
+        _meteredNote.ForeColor = Theme.Current.Warn;
+        _meteredNote.BackColor = Theme.Current.Surface;
     }
 
     private void StartOrCancelSpeedTest()
@@ -499,7 +533,19 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _speedTestView.Status = Loc.Get("speedtest.idle");
     }
 
-    protected override void OnThemeChanged() => ApplyBarColors();
+    protected override void OnActivated()
+    {
+        if (_speedTestCard.Visible)
+        {
+            RefreshMeteredNote();
+        }
+    }
+
+    protected override void OnThemeChanged()
+    {
+        ApplyBarColors();
+        RefreshMeteredNote();
+    }
 
     private void ApplyBarColors()
     {

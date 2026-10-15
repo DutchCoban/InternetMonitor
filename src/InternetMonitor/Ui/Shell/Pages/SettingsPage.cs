@@ -54,6 +54,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Toggle _speedTestAutoRun = null!;
     private ComboBox _speedTestInterval = null!;
     private ComboBox _historyRetention = null!;
+    private Toggle _speedTestOnMetered = null!;
     private ComboBox _logLevel = null!;
     private Toggle _logSuccessfulChecks = null!;
     private Toggle _logDetailedMeasurements = null!;
@@ -294,12 +295,21 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             Services.Settings.Save();
             Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
             _speedTestInterval.Enabled = _speedTestAutoRun.Checked;
+            _speedTestOnMetered.Enabled = _speedTestAutoRun.Checked;
         };
         AddRow(_toolsCard, "settings.speedTestAutoRun", _speedTestAutoRun);
 
         _speedTestInterval = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
         _speedTestInterval.SelectedIndexChanged += OnSpeedTestIntervalChanged;
         AddRow(_toolsCard, "settings.speedTestInterval", _speedTestInterval);
+
+        _speedTestOnMetered = new Toggle();
+        _speedTestOnMetered.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.SpeedTestOnMetered = _speedTestOnMetered.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_toolsCard, "settings.speedTestOnMetered", _speedTestOnMetered);
     }
 
     private void OnSpeedTestIntervalChanged(object? sender, EventArgs e)
@@ -1010,6 +1020,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
         _speedTestAutoRun.SetWithoutNotify(settings.SpeedTestAutoRunEnabled);
         _speedTestInterval.Enabled = settings.SpeedTestAutoRunEnabled;
+        _speedTestOnMetered.SetWithoutNotify(settings.SpeedTestOnMetered);
+        _speedTestOnMetered.Enabled = settings.SpeedTestAutoRunEnabled;
         _speedTestInterval.SelectedIndexChanged -= OnSpeedTestIntervalChanged;
         PopulateSpeedTestIntervalItems();
         SelectComboItem(_speedTestInterval, settings.SpeedTestIntervalHours.ToString());

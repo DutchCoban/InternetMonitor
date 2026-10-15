@@ -148,6 +148,13 @@ public sealed class AppSettings
         set => _speedTestIntervalHours = Array.IndexOf(AllowedSpeedTestIntervalHours, value) >= 0 ? value : _speedTestIntervalHours;
     }
 
+    /// <summary>
+    /// Whether the automatic speed test also runs on a metered connection (mobile data, a phone's
+    /// hotspot). Off by default: a test moves a lot of data, and Windows itself holds back large
+    /// downloads on such a connection.
+    /// </summary>
+    public bool SpeedTestOnMetered { get; set; }
+
     // ---- Provider report -----------------------------------------------------------------------
 
     /// <summary>The subscription's advertised download speed in Mbit/s, for the provider report; 0 = not entered.</summary>

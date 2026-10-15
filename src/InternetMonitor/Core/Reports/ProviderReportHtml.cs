@@ -77,6 +77,11 @@ public static class ProviderReportHtml
             html.Append("<p class=\"note\">").Append(E(loc.Format("report.p.otherOutages", otherCount))).Append("</p>");
         }
 
+        if (data.MeteredTime >= TimeSpan.FromMinutes(1))
+        {
+            html.Append("<p class=\"note\">").Append(E(loc.Format("report.p.metered", Duration(data.MeteredTime, loc)))).Append("</p>");
+        }
+
         html.Append("</section>");
 
         // ---- Outages ----
@@ -227,6 +232,7 @@ public static class ProviderReportHtml
         OutageSide.ThisComputer => loc.Get("report.p.side.computer"),
         OutageSide.HomeNetwork => loc.Get("report.p.side.home"),
         OutageSide.Provider => loc.Get("report.p.side.provider"),
+        OutageSide.MeteredConnection => loc.Get("report.p.side.metered"),
         _ => loc.Get("report.p.side.other"),
     };
 

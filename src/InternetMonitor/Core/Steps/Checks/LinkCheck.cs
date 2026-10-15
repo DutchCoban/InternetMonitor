@@ -66,7 +66,10 @@ public sealed class LinkCheck : IStepCheck
             ? WlanInfo.Query(interfaceId)
             : null;
 
-        var facts = new LinkFacts(info.Link, managed, wireless, adapter.Name, wifi);
+        ConnectionCostInfo? cost = connected ? ConnectionCost.Query(adapter) : null;
+        context.Cost = cost;
+
+        var facts = new LinkFacts(info.Link, managed, wireless, adapter.Name, wifi, cost);
         var measurements = new List<Measurement>
         {
             new(loc.Get("measure.linkState"), loc.Get($"linkState.{info.Link.ToString().ToLowerInvariant()}")),
@@ -81,6 +84,23 @@ public sealed class LinkCheck : IStepCheck
         if (wifi is not null)
         {
             AddWifiMeasurements(measurements, wifi, loc);
+        }
+
+        // Only said when it is so: "not metered" is the normal case and not worth a row.
+        if (cost is { Metered: true })
+        {
+            string kind = loc.Get(cost.Mobile ? "measure.connectionCost.mobile" : "measure.connectionCost.metered");
+            if (cost.Roaming)
+            {
+                kind += ", " + loc.Get("measure.connectionCost.roaming");
+            }
+
+            if (cost.OverLimit)
+            {
+                kind += ", " + loc.Get("measure.connectionCost.overLimit");
+            }
+
+            measurements.Add(new Measurement(loc.Get("measure.connectionCost"), kind));
         }
 
         (StepState state, string headlineKey, string? detailKey) = (connected, connecting, wireless) switch

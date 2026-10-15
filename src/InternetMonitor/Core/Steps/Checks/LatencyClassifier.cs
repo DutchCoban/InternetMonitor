@@ -31,12 +31,16 @@ public static class LatencyClassifier
     /// <summary>
     /// The detail line for a latency warning. When this computer was filling the line at the time,
     /// that is said outright - it turns "the internet is slow" into "your own downloads are
-    /// queueing in the router", which is a different fix and not the provider's.
+    /// queueing in the router", which is a different fix and not the provider's. On a metered
+    /// connection - nearly always mobile data or a phone's hotspot - a higher round trip is simply
+    /// what that kind of connection does, and saying so saves a pointless hunt for a fault.
     /// </summary>
-    public static (string Key, object[] Args) WarningDetail(StepContext context) =>
-        context.Throughput is { Busy: true } busy
-            ? ("step.latency.busy", [busy.DownMbps.ToString("F0"), busy.UpMbps.ToString("F0")])
-            : ("step.latency.high", []);
+    public static (string Key, object[] Args) WarningDetail(StepContext context) => context switch
+    {
+        { Throughput: { Busy: true } busy } => ("step.latency.busy", [busy.DownMbps.ToString("F0"), busy.UpMbps.ToString("F0")]),
+        { Cost.Metered: true } => ("step.latency.metered", []),
+        _ => ("step.latency.high", []),
+    };
 
     /// <summary>Combines two states, keeping the worse one. Ok &lt; Warning &lt; Failed.</summary>
     public static StepState Worse(StepState a, StepState b)

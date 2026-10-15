@@ -599,6 +599,7 @@ public static class AiExportBuilder
         OutageSide.ThisComputer => "this computer",
         OutageSide.HomeNetwork => "home network / router",
         OutageSide.Provider => "provider",
+        OutageSide.MeteredConnection => "metered connection (mobile data or hotspot) - not the line",
         _ => "other",
     };
 
@@ -608,6 +609,7 @@ public static class AiExportBuilder
             ? LocalizationManager.GetEnglish(series.NameKey)
             : seriesId switch
             {
+                SeriesNames.Metered => "Metered connection (mobile data / hotspot)",
                 "ip" => "IP address (v1)",
                 "time" => "Time sync (v1)",
                 _ when seriesId.StartsWith("internet:", StringComparison.Ordinal) => $"Ping to {seriesId["internet:".Length..]} (v1)",
@@ -619,6 +621,7 @@ public static class AiExportBuilder
     {
         _ when seriesId.StartsWith("internet:", StringComparison.Ordinal) || seriesId.StartsWith("endpoint:", StringComparison.Ordinal) => "ms",
         "time" => "s (clock offset)",
+        SeriesNames.Metered => "1 = metered, 0 = not",
         _ => "-",
     };
 

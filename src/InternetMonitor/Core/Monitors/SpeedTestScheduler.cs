@@ -26,6 +26,13 @@ public sealed class SpeedTestScheduler : IAsyncDisposable
     public event EventHandler<SpeedTestResult>? RunCompleted;
 
     /// <summary>
+    /// Asked just before each scheduled run; true skips that one run (the schedule carries on).
+    /// Used to keep automatic tests off a metered connection: a test moves tens to hundreds of
+    /// megabytes, which on a data plan is a cost the user did not ask for.
+    /// </summary>
+    public Func<bool>? SkipRun { get; set; }
+
+    /// <summary>
     /// Applies settings and starts/stops/restarts the loop as needed. Idempotent: calling this
     /// again with the same enabled/interval while already running is a no-op.
     /// </summary>
@@ -82,6 +89,11 @@ public sealed class SpeedTestScheduler : IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
+                if (SkipRun?.Invoke() == true)
+                {
+                    continue;
+                }
+
                 try
                 {
                     SpeedTestResult result = await _client.RunAsync(null, cancellationToken).ConfigureAwait(false);

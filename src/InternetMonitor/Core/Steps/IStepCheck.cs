@@ -27,6 +27,9 @@ public sealed class StepContext(CheckTargets targets)
 
     /// <summary>How busy this computer's connection was since the previous cycle; null when unknown.</summary>
     public ThroughputSample? Throughput { get; set; }
+
+    /// <summary>Whether the connection is metered or mobile, as step 2 found it; null when unknown.</summary>
+    public Net.ConnectionCostInfo? Cost { get; set; }
 }
 
 /// <summary>

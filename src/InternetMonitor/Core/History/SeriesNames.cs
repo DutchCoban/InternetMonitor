@@ -85,6 +85,9 @@ public static class SeriesNames
     /// <summary>How much the round trip varied within the same burst, in ms.</summary>
     public const string Jitter = "jitter";
 
+    /// <summary>1 while Windows treated the connection as metered (mobile data, a hotspot), else 0. Not charted.</summary>
+    public const string Metered = "metered";
+
     public const string SpeedTestDownload = "speedtest-download";
 
     public const string SpeedTestUpload = "speedtest-upload";
