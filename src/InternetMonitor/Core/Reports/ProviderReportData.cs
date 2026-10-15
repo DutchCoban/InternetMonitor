@@ -232,7 +232,7 @@ public sealed record ProviderReportData(
         _ => OutageSide.Other,
     };
 
-    private static bool IsOutage(RootCause cause) =>
+    public static bool IsOutage(RootCause cause) =>
         cause is not (RootCause.Healthy or RootCause.FirewallSuspected or RootCause.NetworkHealth or RootCause.Ipv6Broken);
 
     private static List<MetricPoint> InPeriod(IReadOnlyList<MetricPoint> points, DateTimeOffset from, DateTimeOffset to) =>

@@ -1,6 +1,7 @@
 using InternetMonitor.App;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Monitors;
+using InternetMonitor.Core.Reports;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
@@ -20,6 +21,9 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         ?? throw new InvalidOperationException("StatusPage must be constructed on the UI thread.");
 
     private StatusHero _hero = null!;
+    private Card _uptimeCard = null!;
+    private UptimeStrip _uptime = null!;
+    private DateTimeOffset _uptimeRefreshedAt = DateTimeOffset.MinValue;
     private Card _stepsCard = null!;
     private StepList _steps = null!;
     private Card _latencyCard = null!;
@@ -37,6 +41,9 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
     /// </summary>
     public event Action? ContentHeightChanged;
 
+    /// <summary>A block on the uptime strip was clicked: the incident behind it should open.</summary>
+    public event Action<string>? IncidentRequested;
+
     protected override void Build()
     {
         _steps = new StepList { Dock = DockStyle.Fill };
@@ -50,6 +57,11 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _latencyCard.Height = Dp(150);
         _latencyCard.Controls.Add(_latencyChart);
 
+        _uptime = new UptimeStrip { Dock = DockStyle.Fill };
+        _uptime.IncidentClicked += id => IncidentRequested?.Invoke(id);
+        _uptimeCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.History };
+        _uptimeCard.Controls.Add(_uptime);
+
         _hero = new StatusHero { Dock = DockStyle.Top };
         _hero.Height = _hero.PreferredHeight;
 
@@ -61,8 +73,10 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         // and PageBase adds its header after this runs.
         Controls.Add(_latencyCard);
         Controls.Add(_stepsCard);
+        Controls.Add(_uptimeCard);
         Controls.Add(_hero);
 
+        ResizeUptimeCard();
         ResizeStepsCard();
     }
 
@@ -81,6 +95,10 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _stepsCard.Subtitle = Loc.Get("status.steps.subtitle");
         _latencyCard.Title = Loc.Get("status.latency.title");
         _latencyCard.Subtitle = Loc.Get("status.latency.subtitle");
+        _uptimeCard.Title = Loc.Get("uptime.title");
+        _uptimeCard.Subtitle = Loc.Get("uptime.subtitle");
+        ResizeUptimeCard();
+        _uptime.Invalidate();
         ResizeStepsCard();
         Header.RefreshActions();
 
@@ -101,6 +119,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         Services.Pipeline.StepChanged += OnStepChanged;
         Services.Pipeline.CycleCompleted += OnCycleCompleted;
         Services.NetworkHealth.StatusChanged += OnNetworkHealthStatusChanged;
+        Services.Incidents.Changed += OnIncidentsChanged;
         Services.Cadence.Foreground = true;
 
         // Paint whatever the last cycle concluded straight away, so switching to this page never
@@ -117,6 +136,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
 
         RefreshNetworkHealth(Services.NetworkHealth.CurrentStatus);
         RefreshLatencyChart();
+        _ = RefreshUptimeAsync(force: true);
     }
 
     protected override void OnDeactivated()
@@ -130,6 +150,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         Services.Pipeline.StepChanged -= OnStepChanged;
         Services.Pipeline.CycleCompleted -= OnCycleCompleted;
         Services.NetworkHealth.StatusChanged -= OnNetworkHealthStatusChanged;
+        Services.Incidents.Changed -= OnIncidentsChanged;
     }
 
     private void OnStepChanged(StepResult result) => Post(() =>
@@ -148,7 +169,45 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
     {
         _hero.Apply(snapshot, checking: false);
         RefreshLatencyChart();
+        _ = RefreshUptimeAsync(force: false);
     });
+
+    private void OnIncidentsChanged() => Post(() => _ = RefreshUptimeAsync(force: true));
+
+    /// <summary>
+    /// Recomputes the strip off the UI thread - a week of history is a few hundred thousand points
+    /// to walk - and at most once a minute from the cycle, since a quarter-hour block cannot change
+    /// colour faster than that. An incident opening or closing refreshes it straight away.
+    /// </summary>
+    private async Task RefreshUptimeAsync(bool force)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (!force && now - _uptimeRefreshedAt < TimeSpan.FromMinutes(1))
+        {
+            return;
+        }
+
+        _uptimeRefreshedAt = now;
+        await Services.History.Loaded.ConfigureAwait(true);
+
+        IReadOnlyList<Core.Incidents.Incident> incidents = Services.Incidents.All;
+        DateTimeOffset since = now - TimeSpan.FromDays(UptimeTimeline.DayCount + 1);
+        double warningMs = Services.Targets.LatencyWarningMs;
+        UptimeOverview overview = await Task.Run(() => UptimeTimeline.Compute(
+            incidents,
+            id => Services.History.Get(id, since),
+            now,
+            TimeZoneInfo.Local,
+            warningMs)).ConfigureAwait(true);
+
+        if (!IsDisposed)
+        {
+            _uptime.SetOverview(overview);
+        }
+    }
+
+    private void ResizeUptimeCard() =>
+        _uptimeCard.Height = _uptime.PreferredHeight + (_uptimeCard.Height - _uptimeCard.DisplayRectangle.Height) + _uptimeCard.Inset;
 
     private void OnNetworkHealthStatusChanged(NetworkHealthStatus status) => Post(() => RefreshNetworkHealth(status));
 
@@ -209,7 +268,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
     /// here to go stale.
     /// </summary>
     internal int MeasureRequiredHeight() =>
-        Header.Height + _hero.Height + _stepsCard.Height + _latencyCard.Height + Padding.Top + Padding.Bottom;
+        Header.Height + _hero.Height + _uptimeCard.Height + _stepsCard.Height + _latencyCard.Height + Padding.Top + Padding.Bottom;
 
     private void ResizeStepsCard()
     {

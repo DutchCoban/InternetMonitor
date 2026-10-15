@@ -96,6 +96,7 @@ public sealed class MainWindow : Form
         if (_pages["status"] is StatusPage statusPage)
         {
             statusPage.ContentHeightChanged += EnsureStatusPageFits;
+            statusPage.IncidentRequested += ShowIncident;
         }
 
         // Covers both a true first run (the 1000x700 fallback above is smaller than the Status
@@ -161,6 +162,16 @@ public sealed class MainWindow : Form
 
     /// <summary>Shows the number of open incidents on the nav rail, or clears it at zero.</summary>
     public void SetIncidentBadge(int count) => _rail.SetBadge("incidents", count);
+
+    /// <summary>Opens the Incidents page on one incident - from a block on the Status page's uptime strip.</summary>
+    public void ShowIncident(string id)
+    {
+        ShowPage("incidents");
+        if (_pages["incidents"] is IncidentsPage incidents)
+        {
+            incidents.ShowIncident(id);
+        }
+    }
 
     /// <summary>Opens the Tools page and traces a route, as the --trace command line asks for.</summary>
     public void StartTraceroute(string target)
@@ -285,6 +296,7 @@ public sealed class MainWindow : Form
             if (_pages["status"] is StatusPage statusPage)
             {
                 statusPage.ContentHeightChanged -= EnsureStatusPageFits;
+                statusPage.IncidentRequested -= ShowIncident;
             }
         }
 
