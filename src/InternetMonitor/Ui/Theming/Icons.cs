@@ -125,10 +125,7 @@ internal static class Icons
                 break;
 
             case Glyph.Tools:
-                // A wrench at 45 degrees: open jaw plus shaft.
-                g.DrawArc(pen, 2.5f, 2.5f, 9.5f, 9.5f, 40f, 265f);
-                g.DrawLine(pen, 10.2f, 10.2f, 20f, 20f);
-                g.DrawLine(pen, 17.4f, 19f, 19f, 17.4f);
+                DrawNetworkTools(g, pen);
                 break;
 
             case Glyph.Settings:
@@ -320,6 +317,46 @@ internal static class Icons
         path.AddPolygon(points.ToArray());
         g.DrawPath(pen, path);
         g.DrawEllipse(pen, cx - 2.9f, cy - 2.9f, 5.8f, 5.8f);
+    }
+
+    /// <summary>
+    /// Network tools: a disc that is half gear (left) and half globe (right), with an open-ended
+    /// wrench lying across its foot - tools for the network rather than a generic spanner.
+    /// </summary>
+    private static void DrawNetworkTools(Graphics g, Pen pen)
+    {
+        const float cx = 12f;
+        const float cy = 9f;
+        const float rim = 6.6f;
+        const float tip = 8.7f;
+        const float halfTooth = 14f;
+        float[] teeth = [225f, 180f, 135f];
+
+        // Left half: walk the rim from top to bottom, stepping out to the tip inside each tooth.
+        var gear = new List<PointF>();
+        for (float degrees = 270f; degrees >= 90f; degrees -= 1f)
+        {
+            float radius = teeth.Any(t => Math.Abs(degrees - t) <= halfTooth) ? tip : rim;
+            gear.Add(Polar(cx, cy, radius, degrees * Math.PI / 180));
+        }
+
+        g.DrawLines(pen, gear.ToArray());
+        g.DrawArc(pen, cx - 2.6f, cy - 2.6f, 5.2f, 5.2f, 90f, 180f);
+
+        // Right half: globe outline, equator and one meridian; the shared vertical splits the two.
+        g.DrawArc(pen, cx - rim, cy - rim, rim * 2, rim * 2, 270f, 180f);
+        g.DrawLine(pen, cx, cy - rim, cx, cy + rim);
+        g.DrawLine(pen, cx, cy, cx + rim, cy);
+        g.DrawArc(pen, cx - 3.3f, cy - rim, 6.6f, rim * 2, 270f, 180f);
+
+        // The wrench: a shaft with an open jaw at each end, opening outwards.
+        const float wy = 19.6f;
+        const float jaw = 2.5f;
+        const float left = 4f;
+        const float right = 20f;
+        g.DrawLine(pen, left + jaw, wy, right - jaw, wy);
+        g.DrawArc(pen, left - jaw, wy - jaw, jaw * 2, jaw * 2, 220f, 280f);
+        g.DrawArc(pen, right - jaw, wy - jaw, jaw * 2, jaw * 2, 40f, 280f);
     }
 
     private static PointF Polar(float cx, float cy, float radius, double angle) =>
