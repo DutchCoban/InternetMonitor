@@ -268,9 +268,9 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
             RecordSample(_packetLoss, now, lostPercent);
         }
 
-        EvaluateCondition(_tcpRetransmissions, now);
-        EvaluateCondition(_ttlExceeded, now);
-        EvaluateCondition(_packetLoss, now);
+        EvaluateCondition(_tcpRetransmissions, now, closeOnCalmSamples: true);
+        EvaluateCondition(_ttlExceeded, now, closeOnCalmSamples: true);
+        EvaluateCondition(_packetLoss, now, closeOnCalmSamples: true);
         PublishStatus();
     }
 
@@ -339,7 +339,13 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     /// Opens an incident when a condition crosses its threshold within its window, and closes it
     /// once it no longer does. Counts are summed over the window; packet loss, already a rate, is averaged.
     /// </summary>
-    private void EvaluateCondition(ConditionTracker tracker, DateTimeOffset now)
+    /// <param name="closeOnCalmSamples">
+    /// For the counter conditions, polled every <see cref="CounterPollIntervalSeconds"/>: an open
+    /// incident also closes once the latest samples are back to a normal pace, without waiting for
+    /// the burst to leave the window - see <see cref="BackToNormal"/>. The rogue-DHCP condition has
+    /// one probe per window, so for it the window is the measurement.
+    /// </param>
+    private void EvaluateCondition(ConditionTracker tracker, DateTimeOffset now, bool closeOnCalmSamples = false)
     {
         if (!tracker.Threshold.Enabled)
         {
@@ -347,14 +353,23 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
             return;
         }
 
+        // After an early close (see below) the burst that caused it is still in the window; it
+        // has had its incident, so only what came after counts towards opening a new one.
+        List<(DateTimeOffset At, int Count)> counted = [.. tracker.Samples.Where(s => tracker.CountedFrom is not { } from || s.At > from)];
         int countInWindow = tracker.Mode == AggregationMode.Sum
-            ? tracker.Samples.Sum(s => s.Count)
-            : tracker.Samples.Count > 0 ? (int)Math.Round(tracker.Samples.Average(s => s.Count)) : 0;
+            ? counted.Sum(s => s.Count)
+            : counted.Count > 0 ? (int)Math.Round(counted.Average(s => s.Count)) : 0;
 
         tracker.CountInWindow = countInWindow;
         bool breaching = countInWindow > tracker.Threshold.MaxOccurrences;
 
-        if (breaching && tracker.ActiveIncident is null)
+        if (breaching && tracker.ActiveIncident is { } open && closeOnCalmSamples
+            && BackToNormal(tracker.Samples, tracker.Mode == AggregationMode.Average, tracker.Threshold, open.StartUtc, TimeSpan.FromSeconds(CounterPollIntervalSeconds)))
+        {
+            CloseIncidentIfOpen(tracker, now);
+            tracker.CountedFrom = now;
+        }
+        else if (breaching && tracker.ActiveIncident is null)
         {
             Incident incident = BuildIncident(tracker, countInWindow, now);
             _incidents.Add(incident);
@@ -388,6 +403,35 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         tracker.ResumedAt = null;
         IncidentClosed?.Invoke(active);
     }
+
+    /// <summary>
+    /// Whether the last <see cref="CalmSamplesToClose"/> samples taken since the incident opened
+    /// were all at a normal pace. A healthy line still retransmits a little, so "normal" is not
+    /// zero but the threshold spread evenly over the window: 380 per 5 minutes is 38 per
+    /// 30-second sample. A rate (packet loss) is compared with the threshold as it is. The window
+    /// total keeps deciding when an incident opens; this only lets a burst that has clearly ended
+    /// close it within a minute instead of after the whole window. Public for the tests.
+    /// </summary>
+    public static bool BackToNormal(
+        IReadOnlyList<(DateTimeOffset At, int Count)> samples,
+        bool isRate,
+        NetworkHealthThreshold threshold,
+        DateTimeOffset openedAt,
+        TimeSpan pollInterval)
+    {
+        List<int> since = [.. samples.Where(s => s.At > openedAt).Select(s => s.Count)];
+        if (since.Count < CalmSamplesToClose)
+        {
+            return false;
+        }
+
+        double window = TimeSpan.FromMinutes(Math.Max(1, threshold.WindowMinutes)).TotalSeconds;
+        double perSample = isRate ? threshold.MaxOccurrences : threshold.MaxOccurrences * pollInterval.TotalSeconds / window;
+        return since.TakeLast(CalmSamplesToClose).All(count => count <= perSample);
+    }
+
+    /// <summary>Two calm samples - a minute at the 30-second poll - before an incident closes early.</summary>
+    private const int CalmSamplesToClose = 2;
 
     /// <summary>
     /// A network-health incident, worded from the <c>networkHealth.{key}.*</c> texts with the count
@@ -505,5 +549,8 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
 
         /// <summary>When an incident left open by the previous run was picked up; null otherwise.</summary>
         public DateTimeOffset? ResumedAt { get; set; }
+
+        /// <summary>Set when an incident closed early: samples up to here no longer count towards opening one.</summary>
+        public DateTimeOffset? CountedFrom { get; set; }
     }
 }
