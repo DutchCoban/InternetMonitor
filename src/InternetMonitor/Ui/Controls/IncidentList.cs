@@ -28,6 +28,9 @@ public sealed class IncidentList : ThemedControl
 
     protected override Color BehindColor => Theme.Current.Surface;
 
+    /// <summary>What the empty list says - "nothing recorded" normally, "nothing matches" while a filter is on.</summary>
+    public string EmptyTextKey { get; set; } = "incidents.empty";
+
     public Incident? Selected =>
         _selectedIndex >= 0 && _selectedIndex < _incidents.Count ? _incidents[_selectedIndex] : null;
 
@@ -43,6 +46,28 @@ public sealed class IncidentList : ThemedControl
         _selectedIndex = previousId is null ? 0 : Math.Max(0, _incidents.ToList().FindIndex(i => i.Id == previousId));
         ClampScroll();
         Invalidate();
+    }
+
+    /// <summary>Selects the incident with this id and scrolls it into view; false when it is not in the list.</summary>
+    public bool SelectById(string id)
+    {
+        int index = _incidents.ToList().FindIndex(i => i.Id == id);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        _selectedIndex = index;
+        int top = index * RowHeight;
+        if (top < _scrollOffset || top + RowHeight > _scrollOffset + Height)
+        {
+            _scrollOffset = top - ((Height - RowHeight) / 2);
+            ClampScroll();
+        }
+
+        Invalidate();
+        SelectionChanged?.Invoke(_incidents[index]);
+        return true;
     }
 
     public void SelectFirst()
@@ -123,7 +148,7 @@ public sealed class IncidentList : ThemedControl
         if (_incidents.Count == 0)
         {
             g.DrawTextCrisp(
-                loc.Get("incidents.empty"),
+                loc.Get(EmptyTextKey),
                 Theme.Font(FontRole.Body),
                 p.TextMuted,
                 ClientRectangle,

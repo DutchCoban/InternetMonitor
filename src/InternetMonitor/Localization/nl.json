@@ -625,5 +625,18 @@
   "explain.ipv6.cause": "Een verzoek via IPv6 mislukte, terwijl hetzelfde soort verzoek via IPv4 lukte. Browsers en apps proberen eerst IPv6 en vallen pas na een vertraging terug op IPv4, dus sites kunnen traag of af en toe niet laden. Meestal ligt het aan de IPv6-instellingen van de router of aan de provider.",
   "explain.ipv6.todo": "Herstart de router. Werkt IPv6 daarna nog niet, meld het dan bij je provider - of zet als noodoplossing IPv6 uit in de router, zodat apparaten het niet meer proberen.",
   "series.ipv6": "IPv6",
-  "report.p.ipv6": "Dit netwerk geeft IPv6-adressen, maar {0} van de IPv6-controles mislukte terwijl IPv4 werkte. Daardoor laden sites traag, omdat browsers eerst IPv6 proberen. Dit telt niet als storing."
+  "report.p.ipv6": "Dit netwerk geeft IPv6-adressen, maar {0} van de IPv6-controles mislukte terwijl IPv4 werkte. Daardoor laden sites traag, omdat browsers eerst IPv6 proberen. Dit telt niet als storing.",
+  "incidents.filter.search": "Zoek in incidenten",
+  "incidents.filter.side.all": "Alle",
+  "incidents.filter.side.provider": "Provider",
+  "incidents.filter.side.homenetwork": "Thuisnetwerk",
+  "incidents.filter.side.thiscomputer": "Deze computer",
+  "incidents.filter.side.other": "Overig",
+  "incidents.filter.period.all": "Altijd",
+  "incidents.filter.period.active": "Nu actief",
+  "incidents.filter.period.day": "24 uur",
+  "incidents.filter.period.week": "7 dagen",
+  "incidents.filter.period.month": "30 dagen",
+  "incidents.filter.none": "Geen incidenten die aan dit filter voldoen.",
+  "incidents.filter.count": "{0} van {1}"
 }

@@ -625,5 +625,18 @@
   "explain.ipv6.cause": "Eine Anfrage über IPv6 schlug fehl, während dieselbe Art von Anfrage über IPv4 gelang. Browser und Apps versuchen zuerst IPv6 und weichen erst nach einer Verzögerung auf IPv4 aus, daher können Seiten langsam oder nur manchmal laden. Meist liegt es an der IPv6-Einrichtung des Routers oder am Anbieter.",
   "explain.ipv6.todo": "Starte den Router neu. Funktioniert IPv6 danach immer noch nicht, melde es deinem Anbieter - oder schalte als Notlösung IPv6 im Router ab, damit Geräte es nicht mehr versuchen.",
   "series.ipv6": "IPv6",
-  "report.p.ipv6": "Dieses Netzwerk vergibt IPv6-Adressen, aber {0} der IPv6-Prüfungen schlugen fehl, während IPv4 funktionierte. Dadurch laden Seiten langsam, weil Browser zuerst IPv6 versuchen. Es zählt nicht als Störung."
+  "report.p.ipv6": "Dieses Netzwerk vergibt IPv6-Adressen, aber {0} der IPv6-Prüfungen schlugen fehl, während IPv4 funktionierte. Dadurch laden Seiten langsam, weil Browser zuerst IPv6 versuchen. Es zählt nicht als Störung.",
+  "incidents.filter.search": "Störungen durchsuchen",
+  "incidents.filter.side.all": "Alle",
+  "incidents.filter.side.provider": "Anbieter",
+  "incidents.filter.side.homenetwork": "Heimnetz",
+  "incidents.filter.side.thiscomputer": "Dieser Computer",
+  "incidents.filter.side.other": "Sonstige",
+  "incidents.filter.period.all": "Gesamter Zeitraum",
+  "incidents.filter.period.active": "Laufend",
+  "incidents.filter.period.day": "24 Stunden",
+  "incidents.filter.period.week": "7 Tage",
+  "incidents.filter.period.month": "30 Tage",
+  "incidents.filter.none": "Keine Störungen entsprechen diesem Filter.",
+  "incidents.filter.count": "{0} von {1}"
 }

@@ -625,5 +625,18 @@
   "explain.ipv6.cause": "A request over IPv6 failed while the same kind of request over IPv4 succeeded. Browsers and apps try IPv6 first and only fall back to IPv4 after a delay, so sites can load slowly or only sometimes. This is usually the router's IPv6 setup or the provider's.",
   "explain.ipv6.todo": "Restart the router. If IPv6 still does not work, report it to your provider - or, as a workaround, turn IPv6 off in the router so devices stop trying it.",
   "series.ipv6": "IPv6",
-  "report.p.ipv6": "This network hands out IPv6, but {0} of the IPv6 checks failed while IPv4 was working. That makes sites load slowly, because browsers try IPv6 first. It does not count as an outage."
+  "report.p.ipv6": "This network hands out IPv6, but {0} of the IPv6 checks failed while IPv4 was working. That makes sites load slowly, because browsers try IPv6 first. It does not count as an outage.",
+  "incidents.filter.search": "Search incidents",
+  "incidents.filter.side.all": "All",
+  "incidents.filter.side.provider": "Provider",
+  "incidents.filter.side.homenetwork": "Home network",
+  "incidents.filter.side.thiscomputer": "This computer",
+  "incidents.filter.side.other": "Other",
+  "incidents.filter.period.all": "Any time",
+  "incidents.filter.period.active": "Ongoing",
+  "incidents.filter.period.day": "24 hours",
+  "incidents.filter.period.week": "7 days",
+  "incidents.filter.period.month": "30 days",
+  "incidents.filter.none": "No incidents match this filter.",
+  "incidents.filter.count": "{0} of {1}"
 }

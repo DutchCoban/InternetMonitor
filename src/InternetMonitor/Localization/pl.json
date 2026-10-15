@@ -625,5 +625,18 @@
   "explain.ipv6.cause": "Żądanie przez IPv6 nie powiodło się, a takie samo żądanie przez IPv4 tak. Przeglądarki i aplikacje najpierw próbują IPv6 i dopiero po opóźnieniu przechodzą na IPv4, więc strony mogą ładować się wolno lub tylko czasami. Zwykle przyczyną jest konfiguracja IPv6 w routerze lub dostawca.",
   "explain.ipv6.todo": "Uruchom ponownie router. Jeśli IPv6 nadal nie działa, zgłoś to dostawcy - albo tymczasowo wyłącz IPv6 w routerze, aby urządzenia przestały go używać.",
   "series.ipv6": "IPv6",
-  "report.p.ipv6": "Ta sieć przydziela adresy IPv6, ale {0} kontroli IPv6 nie powiodło się, gdy IPv4 działało. Przez to strony ładują się wolno, bo przeglądarki najpierw próbują IPv6. Nie jest to liczone jako awaria."
+  "report.p.ipv6": "Ta sieć przydziela adresy IPv6, ale {0} kontroli IPv6 nie powiodło się, gdy IPv4 działało. Przez to strony ładują się wolno, bo przeglądarki najpierw próbują IPv6. Nie jest to liczone jako awaria.",
+  "incidents.filter.search": "Szukaj incydentów",
+  "incidents.filter.side.all": "Wszystkie",
+  "incidents.filter.side.provider": "Dostawca",
+  "incidents.filter.side.homenetwork": "Sieć domowa",
+  "incidents.filter.side.thiscomputer": "Ten komputer",
+  "incidents.filter.side.other": "Inne",
+  "incidents.filter.period.all": "Cały okres",
+  "incidents.filter.period.active": "Trwające",
+  "incidents.filter.period.day": "24 godziny",
+  "incidents.filter.period.week": "7 dni",
+  "incidents.filter.period.month": "30 dni",
+  "incidents.filter.none": "Żaden incydent nie pasuje do tego filtra.",
+  "incidents.filter.count": "{0} z {1}"
 }
