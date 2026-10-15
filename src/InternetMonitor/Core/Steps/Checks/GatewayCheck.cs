@@ -9,12 +9,16 @@ namespace InternetMonitor.Core.Steps.Checks;
 /// <summary>
 /// Step 4: can I reach my own router?
 ///
-/// ICMP and a TCP connect to a few common router ports are raced against each other, all started
-/// at once, first answer wins. This is carried straight over from v1 (Network/GatewayReachability)
-/// and it matters: plenty of routers do not answer pings, and plenty of networks filter ICMP, so a
-/// ping-only check reports a perfectly healthy gateway as unreachable. Racing rather than
-/// sequencing means the common case (ICMP works) stays as fast as a single ping instead of waiting
-/// through a chain of timeouts.
+/// ICMP and a TCP connect to a few common router ports start at the same moment. This is carried
+/// straight over from v1 (Network/GatewayReachability) and it matters: plenty of routers do not
+/// answer pings, and plenty of networks filter ICMP, so a ping-only check reports a perfectly
+/// healthy gateway as unreachable.
+///
+/// A successful ping settles it and the TCP attempt is cancelled, so the common case stays as fast
+/// as a single ping - even on a router with none of the ports open, which would otherwise hold the
+/// step for the full timeout. When TCP answers first the ping is still awaited: ICMP is the
+/// preferred source of the latency, and "the router ignores ping" is worth showing. See
+/// <see cref="AwaitAnswersAsync"/>.
 ///
 /// Deliberately no retry. A settings change - even just switching DNS server - can genuinely make
 /// the gateway unreachable at the OS level for a second or two, and that is real, momentary state
@@ -57,21 +61,8 @@ public sealed class GatewayCheck : IStepCheck
         Task<(int Port, TcpOutcome Outcome)?> tcp = TcpConnect.FirstAnsweringPortAsync(
             gateway, context.Targets.GatewayProbePorts, timeout, race.Token, context.LocalAddress);
 
-        PingOutcome ping;
-        (int Port, TcpOutcome Outcome)? tcpAnswer;
-        // Both are awaited, each within the same timeout, so ICMP's outcome is known even when a
-        // TCP port answered: ICMP is preferred as the answer (see "via" below), and its status is
-        // shown either way - "the router ignores ping" is worth seeing.
-        try
-        {
-            await Task.WhenAll(icmp, tcp).ConfigureAwait(false);
-            ping = await icmp.ConfigureAwait(false);
-            tcpAnswer = await tcp.ConfigureAwait(false);
-        }
-        finally
-        {
-            race.Cancel();
-        }
+        (PingOutcome ping, (int Port, TcpOutcome Outcome)? tcpAnswer) =
+            await AwaitAnswersAsync(icmp, tcp, race, cancellationToken).ConfigureAwait(false);
 
         bool reachable = ping.Success || tcpAnswer is not null;
         string? via = ping.Success
@@ -135,5 +126,37 @@ public sealed class GatewayCheck : IStepCheck
             DetailKey = detailKey,
             DetailArgs = detailArgs,
         };
+    }
+
+    /// <summary>
+    /// Waits for the ping, and for the TCP attempt only when the ping did not succeed. A successful
+    /// ping cancels <paramref name="race"/>, which stops the TCP connects still open; their
+    /// cancellation is observed here so it never surfaces as an unobserved task exception. The TCP
+    /// answer is then null - the ping already proved the router is there. A cancelled cycle
+    /// (<paramref name="cancellationToken"/>) surfaces from the awaited task as usual. Public for
+    /// the tests.
+    /// </summary>
+    public static async Task<(PingOutcome Ping, (int Port, TcpOutcome Outcome)? Tcp)> AwaitAnswersAsync(
+        Task<PingOutcome> icmp,
+        Task<(int Port, TcpOutcome Outcome)?> tcp,
+        CancellationTokenSource race,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            PingOutcome ping = await icmp.ConfigureAwait(false);
+            if (ping.Success)
+            {
+                race.Cancel();
+                _ = tcp.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                return (ping, null);
+            }
+
+            return (ping, await tcp.ConfigureAwait(false));
+        }
+        finally
+        {
+            race.Cancel();
+        }
     }
 }
