@@ -2,6 +2,7 @@ using System.Net;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.Incidents;
+using InternetMonitor.Core.Tools.SpeedTest;
 using InternetMonitor.Localization;
 using InternetMonitor.Net;
 
@@ -80,6 +81,19 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         _incidents = incidents;
         _pingTargets = pingTargets;
         _gatewayProvider = gatewayProvider;
+
+        // Pick up what the previous run left open, so it is closed here - by the condition it
+        // belongs to - rather than lingering as "active" for good.
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        foreach (ConditionTracker tracker in new[] { _tcpRetransmissions, _packetLoss, _ttlExceeded, _rogueDhcp })
+        {
+            if (incidents.ActiveFor(tracker.Key) is { } open)
+            {
+                tracker.ActiveIncident = open;
+                tracker.ResumedAt = now;
+            }
+        }
+
         PublishStatus();
     }
 
@@ -116,6 +130,13 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
 
         if (!enabled)
         {
+            // Nothing will measure these any more, so nothing would ever close them.
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            foreach (ConditionTracker tracker in new[] { _tcpRetransmissions, _packetLoss, _ttlExceeded, _rogueDhcp })
+            {
+                CloseIncidentIfOpen(tracker, now);
+            }
+
             StopCounterLoop();
             StopDhcpLoop();
             PublishStatus();
@@ -342,6 +363,13 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         }
         else if (!breaching)
         {
+            // An incident resumed after a restart is judged on a full window of fresh samples:
+            // right after start-up the window is empty, which says nothing about the condition.
+            if (tracker.ResumedAt is { } resumed && now - resumed < TimeSpan.FromMinutes(Math.Max(1, tracker.Threshold.WindowMinutes)))
+            {
+                return;
+            }
+
             CloseIncidentIfOpen(tracker, now);
         }
     }
@@ -357,14 +385,20 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         active.EndUtc = now;
         _incidents.Update(active);
         tracker.ActiveIncident = null;
+        tracker.ResumedAt = null;
         IncidentClosed?.Invoke(active);
     }
 
-    /// <summary>A network-health incident, worded from the <c>networkHealth.{key}.*</c> texts with the count and window.</summary>
+    /// <summary>
+    /// A network-health incident, worded from the <c>networkHealth.{key}.*</c> texts with the count
+    /// and window. When a speed test ran within the window, the cause and advice say so.
+    /// </summary>
     private Incident BuildIncident(ConditionTracker tracker, int countInWindow, DateTimeOffset now)
     {
         LocalizationManager loc = LocalizationManager.Instance;
         string prefix = $"networkHealth.{tracker.Key}";
+        bool speedTest = SpeedTestActivity.During(now - TimeSpan.FromMinutes(Math.Max(1, tracker.Threshold.WindowMinutes)), now);
+        (string causeKey, string todoKey) = ExplanationKeys(tracker.Key, speedTest);
 
         return new Incident
         {
@@ -376,9 +410,22 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
             Headline = loc.Format($"{prefix}.headline", countInWindow, tracker.Threshold.WindowMinutes),
             Explanation = new Explanation(
                 loc.Get($"{prefix}.what"),
-                loc.Format($"{prefix}.cause", countInWindow, tracker.Threshold.WindowMinutes),
-                loc.Get($"{prefix}.todo")),
+                loc.Format(causeKey, countInWindow, tracker.Threshold.WindowMinutes),
+                loc.Get(todoKey)),
         };
+    }
+
+    /// <summary>
+    /// The cause and advice texts for a condition. Retransmissions and packet loss have a variant
+    /// for a window in which a speed test ran: filling the line on purpose makes both go up, which
+    /// is then expected rather than a fault. Public for the tests.
+    /// </summary>
+    public static (string CauseKey, string TodoKey) ExplanationKeys(string conditionKey, bool speedTestDuring)
+    {
+        string prefix = $"networkHealth.{conditionKey}";
+        return speedTestDuring && conditionKey is "tcpRetransmissions" or "packetLoss"
+            ? ($"{prefix}.speedTest.cause", $"{prefix}.speedTest.todo")
+            : ($"{prefix}.cause", $"{prefix}.todo");
     }
 
     /// <summary>Snapshots every condition for the Diagnostics page and raises <see cref="StatusChanged"/>.</summary>
@@ -455,5 +502,8 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         public int CountInWindow { get; set; }
 
         public Incident? ActiveIncident { get; set; }
+
+        /// <summary>When an incident left open by the previous run was picked up; null otherwise.</summary>
+        public DateTimeOffset? ResumedAt { get; set; }
     }
 }

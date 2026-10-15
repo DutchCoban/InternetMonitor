@@ -8,17 +8,22 @@ namespace InternetMonitor.Core.Incidents;
 /// Turns a run of failing cycles into one incident, and keeps a timeline of what happened while it
 /// was open.
 ///
-/// Debounced in both directions: two consecutive bad cycles before an incident opens, two good
-/// ones before it closes. v1 used exactly these thresholds and the reasoning holds - a single
-/// failed cycle during a Wi-Fi roam or a DHCP renewal is not an outage, and recording it as one
-/// fills the list with noise that hides the real events.
+/// Debounced in both directions: three consecutive bad cycles before an incident opens (dated
+/// from the first of them), two good ones before it closes. v1 opened after two; the reasoning is
+/// the same - a failed cycle or two during a Wi-Fi roam, a DHCP renewal or a few lost DNS packets
+/// is not an outage, and recording it as one fills the list with noise that hides the real events.
 ///
 /// Keyed on the overall root cause rather than on individual steps, so "gateway and internet and
 /// DNS all failed" is one incident with one cause rather than three competing records.
 /// </summary>
 public sealed class IncidentTracker
 {
-    private const int OpenThreshold = 2;
+    /// <summary>
+    /// Three failing cycles in a row open an incident. With a window open a cycle is three seconds,
+    /// and two was short enough for a few seconds of lost DNS packets on an otherwise working line
+    /// to become an incident and a pop-up; three still catches anything a person would notice.
+    /// </summary>
+    public const int OpenThreshold = 3;
     private const int ResolveThreshold = 2;
 
     /// <summary>
@@ -33,6 +38,7 @@ public sealed class IncidentTracker
 
     private Incident? _active;
     private int _consecutiveBad;
+    private DateTimeOffset? _firstBadAt;
     private int _consecutiveGood;
 
     public IncidentTracker(IncidentStore store, ChangeDetector changes)
@@ -61,6 +67,7 @@ public sealed class IncidentTracker
         {
             _consecutiveGood = 0;
             _consecutiveBad++;
+            _firstBadAt ??= snapshot.TakenUtc;
 
             if (_active is null && _consecutiveBad >= OpenThreshold)
             {
@@ -88,6 +95,7 @@ public sealed class IncidentTracker
         }
 
         _consecutiveBad = 0;
+        _firstBadAt = null;
         if (_active is null)
         {
             return;
@@ -116,7 +124,7 @@ public sealed class IncidentTracker
             // Dated from the first bad cycle, not from the one that crossed the threshold:
             // the outage started when it started, and reporting it as starting later would
             // understate every duration by one interval.
-            StartUtc = snapshot.TakenUtc,
+            StartUtc = _firstBadAt ?? snapshot.TakenUtc,
             Status = IncidentStatus.Active,
             Headline = failure?.EnglishHeadline() ?? LocalizationManager.GetEnglish($"cause.{diagnosis.Cause.Key()}"),
             Explanation = PlainLanguage.DescribeEnglish(diagnosis.Cause, snapshot),
@@ -126,7 +134,7 @@ public sealed class IncidentTracker
         };
 
         incident.Timeline.Add(new TimelineEntry(
-            snapshot.TakenUtc,
+            incident.StartUtc,
             LocalizationManager.FormatEnglish("incident.timeline.opened", incident.Headline)));
 
         _active = incident;

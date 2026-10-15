@@ -556,7 +556,7 @@
   "report.p.legend.plan": "Tarif",
   "report.p.legend.plan80": "80 % des Tarifs",
   "report.p.method": "Wie wurde gemessen?",
-  "report.p.method.text": "Alle paar Sekunden prüft die App nacheinander: den Netzwerkadapter, die Kabel- oder WLAN-Verbindung, die IP-Adresse, den Router, öffentliche Internetadressen, die Namensauflösung per DNS und eine HTTPS-Anfrage an eine öffentliche Testadresse. Eine Störung wird erfasst, wenn eine Prüfung in zwei aufeinanderfolgenden Runden fehlschlägt, und beendet, wenn sie in zwei aufeinanderfolgenden Runden gelingt. Zeit, in der der Computer aus war oder die App nicht lief, wird nicht gemessen und nicht gezählt.",
+  "report.p.method.text": "Alle paar Sekunden prüft die App nacheinander: den Netzwerkadapter, die Kabel- oder WLAN-Verbindung, die IP-Adresse, den Router, öffentliche Internetadressen, die Namensauflösung per DNS und eine HTTPS-Anfrage an eine öffentliche Testadresse. Eine Störung wird erfasst, wenn eine Prüfung in drei aufeinanderfolgenden Runden fehlschlägt, und beendet, wenn sie in zwei aufeinanderfolgenden Runden gelingt. Zeit, in der der Computer aus war oder die App nicht lief, wird nicht gemessen und nicht gezählt.",
   "report.p.method.sides": "\"Anbieter\" bedeutet, dass der Router erreichbar war, das Internet dahinter aber nicht - oder dass der DNS des Anbieters nicht antwortete. \"Heimnetz / Router\" bedeutet, dass der Router selbst nicht reagierte. \"Dieser Computer\" bedeutet, dass der Adapter, die Kabel- oder WLAN-Verbindung oder die IP-Adresse das Problem war.",
   "report.p.footer": "Internet Monitor {0} - github.com/DutchCoban/InternetMonitor",
   "report.p.dur.dh": "{0} T. {1} Std.",
@@ -657,5 +657,9 @@
   "uptime.day.friday": "Fr",
   "uptime.day.saturday": "Sa",
   "uptime.day.sunday": "So",
-  "step.link.openLocationSettings": "Standorteinstellungen öffnen, um Netzwerkname und Access Point anzuzeigen"
+  "step.link.openLocationSettings": "Standorteinstellungen öffnen, um Netzwerkname und Access Point anzuzeigen",
+  "networkHealth.tcpRetransmissions.speedTest.cause": "{0} Neuübertragungen in den letzten {1} Minuten, während ein Geschwindigkeitstest lief. Ein Geschwindigkeitstest lastet die Leitung bewusst aus, und TCP muss dann Pakete erneut senden - das ist normal und keine Störung.",
+  "networkHealth.tcpRetransmissions.speedTest.todo": "Nichts, wenn es nur während des Tests auftrat. Kommt es auch ohne Geschwindigkeitstest wieder, prüfe das WLAN-Signal und die Kabel.",
+  "networkHealth.packetLoss.speedTest.cause": "Durchschnittlich {0} % Paketverlust in den letzten {1} Minuten, während ein Geschwindigkeitstest lief. Bei bewusst ausgelasteter Leitung stehen Pings hinter dem Testverkehr an und einige gehen verloren - das ist normal und keine Störung.",
+  "networkHealth.packetLoss.speedTest.todo": "Nichts, wenn es nur während des Tests auftrat. Kommt es auch ohne Geschwindigkeitstest wieder, prüfe das WLAN-Signal und die Kabel."
 }

@@ -55,14 +55,28 @@ public sealed class IncidentStore
         }
     }
 
+    /// <summary>
+    /// The open incident of the step pipeline, if any - what <see cref="IncidentTracker"/> resumes
+    /// after a restart. Network-health incidents are left out: they belong to
+    /// <see cref="Monitors.NetworkHealthMonitor"/>, which resumes its own through <see cref="ActiveFor"/>.
+    /// </summary>
     public Incident? Active
     {
         get
         {
             lock (_lock)
             {
-                return _incidents.FirstOrDefault(i => i.Status == IncidentStatus.Active);
+                return _incidents.FirstOrDefault(i => i.Status == IncidentStatus.Active && i.ConditionKey is null);
             }
+        }
+    }
+
+    /// <summary>The open network-health incident for one condition, if any.</summary>
+    public Incident? ActiveFor(string conditionKey)
+    {
+        lock (_lock)
+        {
+            return _incidents.FirstOrDefault(i => i.Status == IncidentStatus.Active && i.ConditionKey == conditionKey);
         }
     }
 

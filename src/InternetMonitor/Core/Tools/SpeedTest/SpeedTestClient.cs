@@ -104,11 +104,21 @@ public sealed class SpeedTestClient : IDisposable
 
     public async Task<SpeedTestResult> RunAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
     {
-        (double pingMs, double jitterMs) = await MeasurePingJitterAsync(progress, cancellationToken).ConfigureAwait(false);
-        double? idlePing = Median(await PingRepeatedlyAsync(IdlePingSamples, cancellationToken).ConfigureAwait(false));
-        (double downloadMbps, double? loadedDown) = await MeasureDownloadAsync(progress, cancellationToken).ConfigureAwait(false);
-        (double uploadMbps, double? loadedUp) = await MeasureUploadAsync(progress, cancellationToken).ConfigureAwait(false);
-        return new SpeedTestResult(pingMs, jitterMs, downloadMbps, uploadMbps, idlePing, loadedDown, loadedUp);
+        // Recorded for the network-health monitor: a full line makes TCP retransmit, and an
+        // incident raised over it should say a speed test was running (see SpeedTestActivity).
+        SpeedTestActivity.Begin();
+        try
+        {
+            (double pingMs, double jitterMs) = await MeasurePingJitterAsync(progress, cancellationToken).ConfigureAwait(false);
+            double? idlePing = Median(await PingRepeatedlyAsync(IdlePingSamples, cancellationToken).ConfigureAwait(false));
+            (double downloadMbps, double? loadedDown) = await MeasureDownloadAsync(progress, cancellationToken).ConfigureAwait(false);
+            (double uploadMbps, double? loadedUp) = await MeasureUploadAsync(progress, cancellationToken).ConfigureAwait(false);
+            return new SpeedTestResult(pingMs, jitterMs, downloadMbps, uploadMbps, idlePing, loadedDown, loadedUp);
+        }
+        finally
+        {
+            SpeedTestActivity.End();
+        }
     }
 
     /// <summary>ICMP pings at <see cref="LoadedPingInterval"/> until <paramref name="count"/> are sent or the token fires.</summary>

@@ -78,7 +78,7 @@ public static class AiExportBuilder
         reachability check plus any endpoints the user configured, with per-stage timing.
         All steps use the same adapter. History is sampled at most every 15 seconds.
 
-        **Incidents.** An incident opens after two consecutive failing cycles and closes after two
+        **Incidents.** An incident opens after three consecutive failing cycles and closes after two
         consecutive good ones, so very short blips do not appear. Each records its most likely
         cause, a timeline, every step's result at the start and at resolution, and what changed in
         the environment in the 30 minutes before it opened.

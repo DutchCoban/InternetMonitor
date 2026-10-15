@@ -556,7 +556,7 @@
   "report.p.legend.plan": "Abonnement",
   "report.p.legend.plan80": "80% van het abonnement",
   "report.p.method": "Hoe is dit gemeten?",
-  "report.p.method.text": "Elke paar seconden controleert de app achtereenvolgens: de netwerkadapter, de kabel- of wifiverbinding, het IP-adres, de router, publieke internetadressen, het opzoeken van namen via DNS en een HTTPS-verzoek naar een openbaar testadres. Een storing wordt vastgelegd als een controle twee rondes achter elkaar faalt, en afgesloten als hij twee rondes achter elkaar slaagt. Tijd waarin de computer uit stond of de app niet draaide, is niet gemeten en telt niet mee.",
+  "report.p.method.text": "Elke paar seconden controleert de app achtereenvolgens: de netwerkadapter, de kabel- of wifiverbinding, het IP-adres, de router, publieke internetadressen, het opzoeken van namen via DNS en een HTTPS-verzoek naar een openbaar testadres. Een storing wordt vastgelegd als een controle drie rondes achter elkaar faalt, en afgesloten als hij twee rondes achter elkaar slaagt. Tijd waarin de computer uit stond of de app niet draaide, is niet gemeten en telt niet mee.",
   "report.p.method.sides": "\"Provider\" betekent dat de router bereikbaar was, maar het internet daarachter niet - of dat de DNS van de provider niet antwoordde. \"Thuisnetwerk / router\" betekent dat de router zelf niet reageerde. \"Deze computer\" betekent dat de adapter, de kabel- of wifiverbinding of het IP-adres het probleem was.",
   "report.p.footer": "Internet Monitor {0} - github.com/DutchCoban/InternetMonitor",
   "report.p.dur.dh": "{0} d {1} u",
@@ -657,5 +657,9 @@
   "uptime.day.friday": "vr",
   "uptime.day.saturday": "za",
   "uptime.day.sunday": "zo",
-  "step.link.openLocationSettings": "Locatie-instellingen openen om netwerknaam en access point te tonen"
+  "step.link.openLocationSettings": "Locatie-instellingen openen om netwerknaam en access point te tonen",
+  "networkHealth.tcpRetransmissions.speedTest.cause": "{0} retransmissies in de laatste {1} minuten, terwijl er een snelheidstest liep. Een snelheidstest trekt de lijn bewust vol, en dan moet TCP pakketten opnieuw versturen - dat is normaal en geen storing.",
+  "networkHealth.tcpRetransmissions.speedTest.todo": "Niets, als het alleen tijdens de test gebeurde. Komt het ook zonder snelheidstest terug, controleer dan het wifi-signaal en de kabels.",
+  "networkHealth.packetLoss.speedTest.cause": "Gemiddeld {0}% pakketverlies in de laatste {1} minuten, terwijl er een snelheidstest liep. Met de lijn bewust vol staan pings in de rij achter het verkeer van de test en vallen er een paar weg - dat is normaal en geen storing.",
+  "networkHealth.packetLoss.speedTest.todo": "Niets, als het alleen tijdens de test gebeurde. Komt het ook zonder snelheidstest terug, controleer dan het wifi-signaal en de kabels."
 }

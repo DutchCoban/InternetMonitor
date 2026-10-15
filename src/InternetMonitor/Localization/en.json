@@ -556,7 +556,7 @@
   "report.p.legend.plan": "Subscription",
   "report.p.legend.plan80": "80% of subscription",
   "report.p.method": "How was this measured?",
-  "report.p.method.text": "Every few seconds the app checks, in order: the network adapter, the cable or Wi-Fi link, the IP address, the router, public internet addresses, DNS name resolution and an HTTPS request to a public test address. An outage is recorded when a check fails in two consecutive rounds, and closed when it succeeds in two consecutive rounds. Time when the computer was off or the app was not running is not measured and is not counted.",
+  "report.p.method.text": "Every few seconds the app checks, in order: the network adapter, the cable or Wi-Fi link, the IP address, the router, public internet addresses, DNS name resolution and an HTTPS request to a public test address. An outage is recorded when a check fails in three consecutive rounds, and closed when it succeeds in two consecutive rounds. Time when the computer was off or the app was not running is not measured and is not counted.",
   "report.p.method.sides": "\"Provider\" means the router was reachable, but the internet beyond it was not - or the provider's DNS did not answer. \"Home network / router\" means the router itself did not respond. \"This computer\" means the adapter, the cable or Wi-Fi link, or the IP address was the problem.",
   "report.p.footer": "Internet Monitor {0} - github.com/DutchCoban/InternetMonitor",
   "report.p.dur.dh": "{0} d {1} h",
@@ -657,5 +657,9 @@
   "uptime.day.friday": "Fri",
   "uptime.day.saturday": "Sat",
   "uptime.day.sunday": "Sun",
-  "step.link.openLocationSettings": "Open location settings to show the network name and access point"
+  "step.link.openLocationSettings": "Open location settings to show the network name and access point",
+  "networkHealth.tcpRetransmissions.speedTest.cause": "{0} retransmissions in the last {1} minutes, while a speed test was running. A speed test fills the line on purpose, and TCP then has to resend packets - this is expected and not a fault.",
+  "networkHealth.tcpRetransmissions.speedTest.todo": "Nothing, if it only happened during the test. If it also comes back without a speed test, check the Wi-Fi signal and cables.",
+  "networkHealth.packetLoss.speedTest.cause": "{0}% packet loss on average over the last {1} minutes, while a speed test was running. With the line filled on purpose, pings queue behind the test's traffic and some are dropped - this is expected and not a fault.",
+  "networkHealth.packetLoss.speedTest.todo": "Nothing, if it only happened during the test. If it also comes back without a speed test, check the Wi-Fi signal and cables."
 }
