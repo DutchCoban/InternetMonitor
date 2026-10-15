@@ -2,6 +2,10 @@ using InternetMonitor.Core.Steps;
 
 namespace InternetMonitor.Core.Diagnosis;
 
+/// <summary>
+/// The analyser's verdict: the single most likely cause, how serious it is, and which steps it
+/// involves. Only <see cref="Severity.Error"/> opens an incident; see <see cref="IsProblem"/>.
+/// </summary>
 public sealed record RootCauseResult(
     RootCause Cause,
     Severity Severity,

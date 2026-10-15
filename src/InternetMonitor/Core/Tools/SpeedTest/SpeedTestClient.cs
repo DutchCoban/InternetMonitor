@@ -3,6 +3,7 @@ using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Tools.SpeedTest;
 
+/// <summary>The stages of a speed test, in the order they run.</summary>
 public enum SpeedTestPhase
 {
     Ping,
@@ -11,6 +12,10 @@ public enum SpeedTestPhase
     Upload,
 }
 
+/// <summary>
+/// A live reading for the result tiles: milliseconds for Ping and Jitter, Mbit/s for Download and
+/// Upload.
+/// </summary>
 public sealed record SpeedTestProgress(SpeedTestPhase Phase, double Value);
 
 /// <param name="IdlePingMs">ICMP round trip with the line quiet - the baseline for the two loaded readings.</param>

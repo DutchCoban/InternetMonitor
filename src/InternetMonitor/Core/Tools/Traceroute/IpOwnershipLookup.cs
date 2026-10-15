@@ -69,12 +69,16 @@ public sealed class IpOwnershipLookup : IDisposable
             return null;
         }
 
+        // Cached per prefix rather than per address: every hop in one provider's block has the
+        // same owner, so one lookup serves them all.
         string key = PrefixKey(address);
         if (_cache.TryGetValue(key, out CacheEntry? cached) && DateTimeOffset.UtcNow - cached.StoredUtc < CacheLifetime)
         {
             return cached.Owner;
         }
 
+        // Team Cymru (one DNS query) gives the AS number and usually its name. RDAP is slower, so
+        // it is only asked when Cymru left the network name open, and only fills in the gaps.
         IpOwner? owner = await QueryCymruAsync(address, cancellationToken).ConfigureAwait(false);
 
         if (_useRdap && (owner is null || owner.NetworkName is null))
@@ -92,6 +96,8 @@ public sealed class IpOwnershipLookup : IDisposable
             }
         }
 
+        // An empty answer is not cached, so a lookup that failed for a network reason is retried
+        // on the next trace instead of being remembered for a month.
         if (owner is { HasAnything: true })
         {
             _cache[key] = new CacheEntry(owner, DateTimeOffset.UtcNow);

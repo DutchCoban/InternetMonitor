@@ -15,6 +15,10 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class NavRail : ThemedControl
 {
+    /// <summary>
+    /// One entry in the rail: the page id it switches to and its icon; the label comes from
+    /// <c>nav.{Id}</c>.
+    /// </summary>
     public sealed record Item(string Id, Glyph Glyph)
     {
         public string Label { get; set; } = string.Empty;

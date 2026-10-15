@@ -3,21 +3,6 @@ using InternetMonitor.Core.Steps;
 namespace InternetMonitor.Core.History;
 
 /// <summary>
-/// Maps a step onto the history series it records into.
-///
-/// Four of these names are v1's probe ids rather than v2's step keys, and that is deliberate: the
-/// files on disk are v1's files, so an upgrading user opens the History page and sees the weeks of
-/// latency they already had instead of an empty chart. The measurement behind each of those four
-/// is the same quantity measured the same way, so the continuity is real and not just a filename
-/// trick.
-///
-/// Steps 1 and 2 are the exception. v1 recorded one combined "network" series for adapter, link
-/// and address together; v2 splits that into two separate questions, so only the adapter inherits
-/// the old series and the link starts fresh. Pretending v1's combined 0/1 was a link measurement
-/// would put a line on the chart that means something different before and after the upgrade,
-/// which is worse than a short history.
-/// </summary>
-/// <summary>
 /// One entry in the History page's series picker: a series key (as stored in
 /// <see cref="MetricStore"/> and used by <see cref="SeriesNames.For"/>), the localization key for
 /// its chip label, its unit, and whether it's a state series (see <see cref="SeriesNames.IsStateSeries"/>).
@@ -35,6 +20,21 @@ namespace InternetMonitor.Core.History;
 /// </param>
 public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState, Func<string?, string?>? MetadataChangeKey = null, bool LatencyBands = false);
 
+/// <summary>
+/// Maps a step onto the history series it records into.
+///
+/// Four of these names are v1's probe ids rather than v2's step keys, and that is deliberate: the
+/// files on disk are v1's files, so an upgrading user opens the History page and sees the weeks of
+/// latency they already had instead of an empty chart. The measurement behind each of those four
+/// is the same quantity measured the same way, so the continuity is real and not just a filename
+/// trick.
+///
+/// Steps 1 and 2 are the exception. v1 recorded one combined "network" series for adapter, link
+/// and address together; v2 splits that into two separate questions, so only the adapter inherits
+/// the old series and the link starts fresh. Pretending v1's combined 0/1 was a link measurement
+/// would put a line on the chart that means something different before and after the upgrade,
+/// which is worse than a short history.
+/// </summary>
 public static class SeriesNames
 {
     public static string? For(StepId step) => step switch
@@ -66,17 +66,13 @@ public static class SeriesNames
     /// </summary>
     public static bool IsStateSeries(StepId step) => step is StepId.Adapter or StepId.Link;
 
-    /// <summary>
-    /// Every series the History page can show, in display order. The six pipeline steps are built
-    /// from the step-keyed members above (so they stay in sync automatically); the two Speed Test
-    /// series are listed directly, since they have no <see cref="StepId"/> to derive from.
-    /// </summary>
     /// <summary>Wi-Fi signal quality in percent, with the access point's BSSID as each point's metadata.</summary>
     public const string WifiSignal = "wifi-signal";
 
     /// <summary>This computer's own traffic per cycle, in Mbit/s - see <see cref="ThroughputMeter"/>.</summary>
     public const string TrafficDown = "traffic-down";
 
+    /// <summary>This computer's own upload traffic per cycle, in Mbit/s.</summary>
     public const string TrafficUp = "traffic-up";
 
     /// <summary>Share of a ten-echo burst lost, in percent - see <see cref="Monitors.LineQualitySampler"/>.</summary>
@@ -91,8 +87,10 @@ public static class SeriesNames
     /// <summary>1 while Windows treated the connection as metered (mobile data, a hotspot), else 0. Not charted.</summary>
     public const string Metered = "metered";
 
+    /// <summary>A speed test's download result in Mbit/s, one point per run.</summary>
     public const string SpeedTestDownload = "speedtest-download";
 
+    /// <summary>A speed test's upload result in Mbit/s, one point per run.</summary>
     public const string SpeedTestUpload = "speedtest-upload";
 
     /// <summary>The speed test's idle round trip, as shown on its Ping tile.</summary>
@@ -101,6 +99,12 @@ public static class SeriesNames
     /// <summary>How many milliseconds the round trip grew while the speed test filled the line.</summary>
     public const string SpeedTestBufferbloat = "speedtest-bufferbloat";
 
+    /// <summary>
+    /// Every series the History page can show, in display order. The pipeline steps are built from
+    /// the step-keyed members above (so they stay in sync automatically); the series that have no
+    /// <see cref="StepId"/> of their own - Wi-Fi signal, line quality, IPv6, traffic, speed tests -
+    /// are listed directly. <see cref="Metered"/> is recorded but deliberately not charted.
+    /// </summary>
     public static IReadOnlyList<ChartableSeries> Chartable { get; } =
     [
         new(For(StepId.Adapter)!, "step.adapter.name", UnitFor(StepId.Adapter), IsStateSeries(StepId.Adapter)),

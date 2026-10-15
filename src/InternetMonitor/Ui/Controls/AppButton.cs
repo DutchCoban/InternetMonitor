@@ -3,6 +3,7 @@ using InternetMonitor.Ui.Theming;
 
 namespace InternetMonitor.Ui.Controls;
 
+/// <summary>How prominent a button is: Primary for the page's main action, Danger for a destructive one.</summary>
 public enum ButtonVariant
 {
     /// <summary>The one call to action on a page - filled with the accent colour.</summary>

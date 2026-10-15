@@ -96,7 +96,6 @@ public class Card : ThemedControl
         }
     }
 
-    /// <summary>The inset between the card edge and its content, in device pixels.</summary>
     /// <summary>
     /// The gap between the card's edge and its content, in device pixels. Public rather than
     /// protected: code outside Card that manually positions children inside one (rather than

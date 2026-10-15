@@ -288,6 +288,9 @@ public static class AiExportBuilder
             return;
         }
 
+        // Every free-text field goes through doc.Names, which swaps network names and hardware
+        // addresses for their stand-ins; measurement labels and fixed values are translated back
+        // to English, since they were recorded in whatever language the app showed at the time.
         foreach (Incident incident in incidents.OrderByDescending(i => i.StartUtc))
         {
             string side = incident.ConditionKey is null ? SideName(ProviderReportData.SideOf(incident.Cause)) : "packet-level warning";

@@ -3,6 +3,7 @@ using InternetMonitor.Core.Steps;
 
 namespace InternetMonitor.Core.Incidents;
 
+/// <summary>Whether an incident is still going on or has been closed by two good cycles in a row.</summary>
 public enum IncidentStatus
 {
     Active,

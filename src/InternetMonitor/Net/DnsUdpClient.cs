@@ -5,6 +5,7 @@ using System.Text;
 
 namespace InternetMonitor.Net;
 
+/// <summary>The DNS record types this client asks for, with their wire values.</summary>
 public enum DnsRecordType : ushort
 {
     A = 1,
@@ -12,6 +13,10 @@ public enum DnsRecordType : ushort
     Aaaa = 28,
 }
 
+/// <summary>
+/// One query's answer. <see cref="Answered"/> means a reply arrived at all; <see cref="Success"/>
+/// means it was also NOERROR. An answer with no records is a success with empty lists.
+/// </summary>
 public sealed record DnsQueryResult(
     bool Answered,
     int ResponseCode,

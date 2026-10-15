@@ -50,6 +50,7 @@ public enum RootCause
     Unknown,
 }
 
+/// <summary>Localization keys, v1 name mapping and the step each cause points at.</summary>
 public static class RootCauseExtensions
 {
     public static string Key(this RootCause cause) => cause switch

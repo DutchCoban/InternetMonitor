@@ -4,6 +4,7 @@ using System.Net.Sockets;
 
 namespace InternetMonitor.Net;
 
+/// <summary>Whether the probe could run at all - Unavailable when UDP port 68 could not be bound.</summary>
 public enum DhcpProbeStatus
 {
     Ok,
@@ -121,11 +122,13 @@ public static class DhcpDiscoverProbe
     {
         offer = default;
 
+        // The fixed BOOTP header is 236 bytes plus the 4-byte magic cookie; options follow at 240.
         if (packet.Length < 240 || packet[0] != OpBootReply)
         {
             return false;
         }
 
+        // xid: only replies to this probe's own DISCOVER count, not the DHCP traffic of other clients.
         if (BinaryPrimitives.ReadUInt32BigEndian(packet.Slice(4, 4)) != expectedTransactionId)
         {
             return false;
@@ -139,6 +142,8 @@ public static class DhcpDiscoverProbe
         IPAddress? serverIdentifier = null;
         bool isOffer = false;
 
+        // Options are code/length/value triplets until the End option. A truncated or malformed
+        // option ends the walk rather than reading past the packet.
         int pos = 240;
         while (pos < packet.Length)
         {
@@ -177,6 +182,9 @@ public static class DhcpDiscoverProbe
             return false;
         }
 
+        // yiaddr (offset 16) is the address being offered; siaddr (offset 20) is a boot server,
+        // which servers often leave empty. The Server Identifier option is the reliable name of the
+        // offering server, so it wins; the sender's address is the last resort.
         IPAddress yiaddr = new(packet.Slice(16, 4));
         IPAddress siaddr = new(packet.Slice(20, 4));
 

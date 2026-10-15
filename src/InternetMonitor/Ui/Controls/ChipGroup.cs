@@ -3,16 +3,8 @@ using InternetMonitor.Ui.Theming;
 namespace InternetMonitor.Ui.Controls;
 
 /// <summary>
-/// A row of selectable pills - the range picker on a chart, the step picker on the History page.
-///
-/// One owner-drawn control rather than a row of radio buttons or toggle buttons: the chips need to
-/// size themselves to translated text, wrap when the window is narrow, and look like the rest of
-/// the app rather than like Win32. Hit-testing a list of rectangles is less code than keeping a
-/// dozen child controls aligned.
-/// </summary>
-/// <summary>
-/// <see cref="ChipGroup.Filter"/> is the compact look used for picking a chart range or series -
-/// many of these can sit in a row, so each stays small. <see cref="ChipGroup.Menu"/> is for when
+/// <see cref="ChipGroupVariant.Filter"/> is the compact look used for picking a chart range or series -
+/// many of these can sit in a row, so each stays small. <see cref="ChipGroupVariant.Menu"/> is for when
 /// the chips themselves ARE the navigation (switching between whole tools, say) rather than a
 /// filter alongside other content, and reads more like a pair of tab/menu buttons: bigger, bolder
 /// text, and a visible border at rest so each option is recognisable as clickable even before
@@ -24,6 +16,14 @@ public enum ChipGroupVariant
     Menu,
 }
 
+/// <summary>
+/// A row of selectable pills - the range picker on a chart, the step picker on the History page.
+///
+/// One owner-drawn control rather than a row of radio buttons or toggle buttons: the chips need to
+/// size themselves to translated text, wrap when the window is narrow, and look like the rest of
+/// the app rather than like Win32. Hit-testing a list of rectangles is less code than keeping a
+/// dozen child controls aligned.
+/// </summary>
 public sealed class ChipGroup : ThemedControl
 {
     public sealed record Chip(string Id, string Label);

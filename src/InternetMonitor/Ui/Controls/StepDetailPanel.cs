@@ -111,6 +111,8 @@ public sealed class StepDetailPanel : ThemedControl
             y += detailSize.Height + Sp(2);
         }
 
+        // The action link's rectangle is kept for OnMouseMove/OnMouseClick, since it is painted
+        // rather than a child control; it moves with the scroll offset like everything else here.
         _actionBounds = Rectangle.Empty;
         if (result.Action is { } action)
         {

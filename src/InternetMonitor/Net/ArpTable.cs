@@ -39,6 +39,7 @@ public static class ArpTable
 
     private static IReadOnlyDictionary<IPAddress, string> Read()
     {
+        // First call with no buffer only fills in the size needed (it returns "insufficient buffer").
         int size = 0;
         _ = GetIpNetTable(IntPtr.Zero, ref size, false);
 
@@ -50,6 +51,7 @@ public static class ArpTable
                 return new Dictionary<IPAddress, string>();
             }
 
+            // MIB_IPNETTABLE: a DWORD entry count, then the rows back to back.
             int numEntries = Marshal.ReadInt32(buffer);
             int rowSize = Marshal.SizeOf<MibIpNetRow>();
             IntPtr rowsStart = buffer + 4;

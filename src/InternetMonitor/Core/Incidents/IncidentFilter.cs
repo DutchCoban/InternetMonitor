@@ -16,6 +16,7 @@ public enum IncidentSideFilter
     Other,
 }
 
+/// <summary>The Incidents page's time filter.</summary>
 public enum IncidentPeriodFilter
 {
     All,
@@ -27,6 +28,7 @@ public enum IncidentPeriodFilter
     Month,
 }
 
+/// <summary>Everything the Incidents page filters on; the defaults filter nothing.</summary>
 public sealed record IncidentFilterCriteria(
     string Search = "",
     IncidentSideFilter Side = IncidentSideFilter.All,

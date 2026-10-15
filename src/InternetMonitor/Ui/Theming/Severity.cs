@@ -14,6 +14,7 @@ public enum Severity
     Error,
 }
 
+/// <summary>The palette tokens and the shape that go with each <see cref="Severity"/>.</summary>
 public static class SeverityColors
 {
     /// <summary>The strong colour: text, icon strokes, chart series.</summary>

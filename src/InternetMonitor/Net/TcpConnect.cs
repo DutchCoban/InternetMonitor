@@ -17,6 +17,7 @@ public readonly record struct TcpOutcome(bool Connected, bool Refused, double? E
     public bool Answered => Connected || Refused;
 }
 
+/// <summary>TCP connects that never throw, optionally bound to one adapter's address.</summary>
 public static class TcpConnect
 {
     /// <summary>

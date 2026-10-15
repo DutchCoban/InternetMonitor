@@ -5,6 +5,10 @@ using InternetMonitor.Localization;
 
 namespace InternetMonitor;
 
+/// <summary>
+/// Entry point: command-line modes (self-test, trace), crash handling and the single-instance
+/// guard, then <see cref="App.AppHost"/>.
+/// </summary>
 internal static class Program
 {
     /// <summary>

@@ -39,10 +39,13 @@ public sealed class UpdateInstaller
     /// </summary>
     public async Task<bool> DownloadAndApplyAsync(string assetUrl, string currentExePath, CancellationToken cancellationToken)
     {
+        // A unique name per attempt, so a half-written file from an earlier failed download can
+        // never be mistaken for this one.
         string downloadPath = Path.Combine(Path.GetTempPath(), $"InternetMonitor-update-{Guid.NewGuid():N}.exe");
 
         try
         {
+            // ResponseHeadersRead streams the ~50 MB body to disk instead of buffering it in memory.
             using HttpResponseMessage response = await _httpClient.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {

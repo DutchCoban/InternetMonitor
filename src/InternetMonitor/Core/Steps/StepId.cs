@@ -20,6 +20,7 @@ public enum StepId
     Target = 7,
 }
 
+/// <summary>The life cycle of one step within one cycle, and its verdict once resolved.</summary>
 public enum StepState
 {
     /// <summary>Not started. Drawn dimmed.</summary>
@@ -40,6 +41,7 @@ public enum StepState
     Skipped,
 }
 
+/// <summary>The short key of a <see cref="StepId"/>, used in localization keys and logs.</summary>
 public static class StepIdExtensions
 {
     /// <summary>
@@ -60,6 +62,7 @@ public static class StepIdExtensions
     };
 }
 
+/// <summary>Whether a <see cref="StepState"/> is final yet, and whether it is a failure.</summary>
 public static class StepStateExtensions
 {
     public static bool IsResolved(this StepState state) =>

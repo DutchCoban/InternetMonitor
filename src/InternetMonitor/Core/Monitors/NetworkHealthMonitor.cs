@@ -10,6 +10,7 @@ namespace InternetMonitor.Core.Monitors;
 /// <summary>One condition's current reading, for the Diagnostics page summary card.</summary>
 public sealed record NetworkHealthConditionStatus(bool Enabled, int CountInWindow, int Threshold, int WindowMinutes, bool IncidentOpen);
 
+/// <summary>Everything the Diagnostics page's network-health card shows, as of the last poll.</summary>
 public sealed record NetworkHealthStatus(
     bool MonitoringEnabled,
     NetworkHealthConditionStatus TcpRetransmissions,

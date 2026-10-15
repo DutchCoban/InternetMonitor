@@ -65,6 +65,8 @@ public static class CaptivePortalProbe
             await tcp.ConnectAsync(remote, url.Port, budget.Token).ConfigureAwait(false);
             NetworkStream stream = tcp.GetStream();
 
+            // Unlike TlsTimedRequest this does send "Connection: close": the body is read to the end
+            // here, and a server that closes when done is the simplest way to know where that is.
             string request =
                 $"GET {url.PathAndQuery} HTTP/1.1\r\n" +
                 $"Host: {url.Host}\r\n" +

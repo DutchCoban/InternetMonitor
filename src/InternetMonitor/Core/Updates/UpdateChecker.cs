@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace InternetMonitor.Core.Updates;
 
+/// <summary>What one check against GitHub found. The URLs are null when no newer release exists.</summary>
 public sealed record UpdateCheckResult(bool IsUpdateAvailable, string? LatestVersion, string? ReleaseUrl, string? AssetDownloadUrl);
 
 /// <summary>

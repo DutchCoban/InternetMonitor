@@ -557,6 +557,7 @@ public sealed class MetricChart : ThemedControl
 
         foreach (List<PointF> segment in segments)
         {
+            // A lone sample between two gaps has no line to draw; a dot keeps it visible.
             if (segment.Count == 1)
             {
                 using var dot = new SolidBrush(p.Accent);

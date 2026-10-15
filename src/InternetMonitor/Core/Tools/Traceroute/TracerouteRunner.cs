@@ -4,6 +4,10 @@ using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Tools.Traceroute;
 
+/// <summary>
+/// One finished trace. <see cref="TcpReachability"/> is only set when ICMP did not reach the
+/// destination, and says which port answered a plain TCP connect, if any.
+/// </summary>
 public sealed record TracerouteResult(
     string Target,
     IPAddress? TargetAddress,

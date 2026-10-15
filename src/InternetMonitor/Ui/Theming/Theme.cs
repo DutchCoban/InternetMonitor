@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace InternetMonitor.Ui.Theming;
 
+/// <summary>The user's theme choice: follow Windows, or force light or dark.</summary>
 public enum ThemeMode
 {
     System,
@@ -10,6 +11,7 @@ public enum ThemeMode
     Dark,
 }
 
+/// <summary>The type scale: every text in the app uses one of these roles rather than a font of its own.</summary>
 public enum FontRole
 {
     /// <summary>The one big word on a page - the status hero headline.</summary>

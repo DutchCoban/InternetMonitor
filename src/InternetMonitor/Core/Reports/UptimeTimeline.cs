@@ -5,6 +5,7 @@ using InternetMonitor.Core.Steps;
 
 namespace InternetMonitor.Core.Reports;
 
+/// <summary>The colour of one block or day on the uptime strip.</summary>
 public enum UptimeState
 {
     /// <summary>The app was not running for most of the block - no verdict either way.</summary>
@@ -24,6 +25,10 @@ public sealed record UptimeBlock(DateTimeOffset StartUtc, DateTimeOffset EndUtc,
 /// <param name="Availability">The provider report's figure for that day; null when nothing was measured.</param>
 public sealed record UptimeDay(DateOnly Day, UptimeState State, double? Availability, double Coverage, int Outages);
 
+/// <summary>
+/// The whole strip: <see cref="UptimeTimeline.BlockCount"/> quarter-hour blocks and
+/// <see cref="UptimeTimeline.DayCount"/> days, oldest first.
+/// </summary>
 public sealed record UptimeOverview(IReadOnlyList<UptimeBlock> Blocks, IReadOnlyList<UptimeDay> Days);
 
 /// <summary>

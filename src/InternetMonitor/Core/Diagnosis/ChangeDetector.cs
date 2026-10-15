@@ -4,6 +4,7 @@ using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Diagnosis;
 
+/// <summary>What moved in the environment between two cycles; each kind has a <c>change.*</c> text.</summary>
 public enum ChangeKind
 {
     IpAddress,
@@ -18,6 +19,10 @@ public enum ChangeKind
     VpnDisconnected,
 }
 
+/// <summary>
+/// One change, with the values before and after where they are worth showing (never a hardware
+/// address or a VPN's name).
+/// </summary>
 public sealed record EnvironmentChange(ChangeKind Kind, string? From, string? To, DateTimeOffset AtUtc)
 {
     private string Key => $"change.{char.ToLowerInvariant(Kind.ToString()[0])}{Kind.ToString()[1..]}";

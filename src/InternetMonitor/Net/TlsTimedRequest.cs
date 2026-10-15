@@ -28,12 +28,17 @@ public enum HttpStage
 /// <summary>Asks <see cref="TlsTimedRequest"/> to look up AAAA and connect over IPv6, from <paramref name="Source"/>.</summary>
 public sealed record IPv6Path(IPAddress? Source);
 
+/// <summary>How long each stage of a request took. A stage that was never reached is null.</summary>
 public sealed record HttpTimings(TimeSpan? Dns, TimeSpan? Tcp, TimeSpan? Tls, TimeSpan? Http, TimeSpan Total)
 {
     /// <summary>The address came from <see cref="DnsAnswerCache"/>, so <see cref="Dns"/> measured no lookup.</summary>
     public bool DnsFromCache { get; init; }
 }
 
+/// <summary>
+/// The result of one <see cref="TlsTimedRequest"/>: whether any HTTP response came back, which
+/// stage failed when none did, and the per-stage timings either way.
+/// </summary>
 public sealed record HttpOutcome(
     bool Succeeded,
     int? StatusCode,

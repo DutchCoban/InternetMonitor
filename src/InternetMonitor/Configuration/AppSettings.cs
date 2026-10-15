@@ -7,6 +7,14 @@ using InternetMonitor.Ui.Theming;
 namespace InternetMonitor.Configuration;
 
 /// <summary>
+/// One network-health condition's threshold: fires when more than <see cref="MaxOccurrences"/>
+/// occurrences are seen within <see cref="WindowMinutes"/> minutes. <see cref="Enabled"/> is
+/// per-condition because a user may want TTL errors flagged without caring about
+/// retransmissions, say.
+/// </summary>
+public sealed record NetworkHealthThreshold(bool Enabled, int MaxOccurrences, int WindowMinutes);
+
+/// <summary>
 /// The on-disk settings model, read from and written to the same
 /// %AppData%\InternetMonitor\settings.json that v1 used. Unknown properties in an existing v1
 /// file are ignored by the deserialiser and new v2 properties simply take their defaults, so an
@@ -16,14 +24,6 @@ namespace InternetMonitor.Configuration;
 /// that refuses to start because of a bad settings file is worse than one that starts with
 /// defaults and lets the user fix it.
 /// </summary>
-/// <summary>
-/// One network-health condition's threshold: fires when more than <see cref="MaxOccurrences"/>
-/// occurrences are seen within <see cref="WindowMinutes"/> minutes. <see cref="Enabled"/> is
-/// per-condition because a user may want TTL errors flagged without caring about
-/// retransmissions, say.
-/// </summary>
-public sealed record NetworkHealthThreshold(bool Enabled, int MaxOccurrences, int WindowMinutes);
-
 public sealed class AppSettings
 {
     private static readonly JsonSerializerOptions Json = new()

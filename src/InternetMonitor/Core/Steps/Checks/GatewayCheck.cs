@@ -59,6 +59,9 @@ public sealed class GatewayCheck : IStepCheck
 
         PingOutcome ping;
         (int Port, TcpOutcome Outcome)? tcpAnswer;
+        // Both are awaited, each within the same timeout, so ICMP's outcome is known even when a
+        // TCP port answered: ICMP is preferred as the answer (see "via" below), and its status is
+        // shown either way - "the router ignores ping" is worth seeing.
         try
         {
             await Task.WhenAll(icmp, tcp).ConfigureAwait(false);

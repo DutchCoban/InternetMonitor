@@ -3,6 +3,7 @@ using InternetMonitor.Ui.Theming;
 
 namespace InternetMonitor.Ui.Windows;
 
+/// <summary>Which of the three update messages the toast shows.</summary>
 public enum UpdateToastKind
 {
     /// <summary>A newer release exists and auto-install is off - informational, links to the release page.</summary>

@@ -4,6 +4,7 @@ using System.Net.Sockets;
 
 namespace InternetMonitor.Net;
 
+/// <summary>A name lookup's result: the addresses found (none on failure), how long it took, and why it failed.</summary>
 public readonly record struct DnsOutcome(
     IReadOnlyList<IPAddress> Addresses,
     double ElapsedMs,
@@ -14,6 +15,7 @@ public readonly record struct DnsOutcome(
     public bool Success => Addresses.Count > 0;
 }
 
+/// <summary>Name lookups with a hard time budget - through Windows' resolver or through given servers.</summary>
 public static class DnsResolve
 {
     /// <summary>

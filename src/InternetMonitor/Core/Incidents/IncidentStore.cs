@@ -160,6 +160,8 @@ public sealed class IncidentStore
                     continue;
                 }
 
+                // v1 and v2 share incidents.json; only v1 records have a "Classification" field.
+                // One unreadable record is skipped rather than costing the whole history.
                 Incident? incident = obj.ContainsKey("Classification") ? ReadLegacy(obj) : ReadCurrent(obj);
                 if (incident is not null)
                 {

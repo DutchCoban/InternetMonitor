@@ -4,6 +4,11 @@ using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Tools.LanScan;
 
+/// <summary>
+/// One finished sweep. <see cref="Truncated"/> means the subnet was larger than the scanner's
+/// cap and only its first addresses were scanned; manufacturers keep arriving until
+/// <see cref="VendorResolutionComplete"/> finishes.
+/// </summary>
 public sealed record LanScanResult(
     IReadOnlyList<LanDevice> Devices,
     int AddressesScanned,

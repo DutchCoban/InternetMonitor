@@ -2,6 +2,7 @@ using System.Drawing.Drawing2D;
 
 namespace InternetMonitor.Ui.Theming;
 
+/// <summary>Every icon the app can draw - see <see cref="Icons"/> for how each is built.</summary>
 public enum Glyph
 {
     Status,
