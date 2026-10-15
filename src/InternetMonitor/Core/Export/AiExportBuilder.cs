@@ -91,13 +91,19 @@ public static class AiExportBuilder
         - Provider: Internet (router fine, nothing beyond it answered), Dns (the DNS server failed),
           Target (the HTTPS reachability check failed while the steps before it worked).
         - Other: CaptivePortal (a login page on hotel/train/guest Wi-Fi), Unknown.
-        - Not outages: FirewallSuspected (pings filtered while real traffic works) and
+        - Not outages: FirewallSuspected (pings filtered while real traffic works),
+          Ipv6Broken (the network offers IPv6 but it does not work while IPv4 does - browsers try
+          IPv6 first, so sites load slowly; usually the router or the provider) and
           NetworkHealth (packet-level warnings: retransmissions, loss, TTL errors, rogue DHCP).
 
         **Series units.** Latency series in milliseconds; adapter/link are 1 (up) or 0 (down);
         Wi-Fi signal is Windows' signal quality in percent; traffic and speed tests in Mbit/s;
         "extra ping under load" is how many milliseconds the round trip grew while a speed test
         filled the line (A under 5 ms, B under 30, C under 60, D under 200, F 200 or more).
+
+        **IPv6.** Only tested when the network hands out a global IPv6 address: a ping to public
+        IPv6 resolvers in step 5 and a plain HTTP request over IPv6 in step 7. The "IPv6" series is
+        1 when that request worked and 0 when it failed; it is absent on an IPv4-only network.
 
         **Packet loss and jitter.** Once a minute ten pings, 100 ms apart, go to the first public
         address step 5 uses. Packet loss is the percentage without a reply; jitter is the mean

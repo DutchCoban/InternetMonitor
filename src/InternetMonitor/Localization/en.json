@@ -613,5 +613,17 @@
   "explain.dns.vpn.todo": "Disconnect the VPN and see whether the internet works without it. If it does, reconnect, try another VPN server, or contact whoever provides the VPN. If it does not, the problem is on the line.",
   "explain.target.vpn.what": "The connection failed while all traffic was going through a VPN.",
   "explain.target.vpn.cause": "With a VPN carrying all traffic, everything beyond the router - including name lookups - goes through the VPN's server first. The router answered, so the VPN connection or its server is at least as likely to be the cause as the line itself.",
-  "explain.target.vpn.todo": "Disconnect the VPN and see whether the internet works without it. If it does, reconnect, try another VPN server, or contact whoever provides the VPN. If it does not, the problem is on the line."
+  "explain.target.vpn.todo": "Disconnect the VPN and see whether the internet works without it. If it does, reconnect, try another VPN server, or contact whoever provides the VPN. If it does not, the problem is on the line.",
+  "measure.ipv6": "IPv6",
+  "measure.ipv6.none": "Not offered by this network",
+  "measure.ipv6Ping": "IPv6 ping",
+  "measure.ipv6.noAnswer": "No answer",
+  "measure.ipv6Http": "IPv6 (HTTP)",
+  "step.target.ipv6Broken.detail": "This network hands out IPv6, but IPv6 does not work. Sites may load slowly because browsers try IPv6 first.",
+  "cause.ipv6": "IPv6 not working",
+  "explain.ipv6.what": "The internet works over IPv4, but IPv6 does not, even though this network hands out IPv6 addresses.",
+  "explain.ipv6.cause": "A request over IPv6 failed while the same kind of request over IPv4 succeeded. Browsers and apps try IPv6 first and only fall back to IPv4 after a delay, so sites can load slowly or only sometimes. This is usually the router's IPv6 setup or the provider's.",
+  "explain.ipv6.todo": "Restart the router. If IPv6 still does not work, report it to your provider - or, as a workaround, turn IPv6 off in the router so devices stop trying it.",
+  "series.ipv6": "IPv6",
+  "report.p.ipv6": "This network hands out IPv6, but {0} of the IPv6 checks failed while IPv4 was working. That makes sites load slowly, because browsers try IPv6 first. It does not count as an outage."
 }

@@ -33,6 +33,9 @@ public sealed class StepContext(CheckTargets targets)
 
     /// <summary>An active VPN, as step 3 found it; null when there is none.</summary>
     public Net.VpnInfo? Vpn { get; set; }
+
+    /// <summary>The adapter's global IPv6 address, as step 3 found it; null on an IPv4-only network.</summary>
+    public IPAddress? GlobalIpv6 { get; set; }
 }
 
 /// <summary>

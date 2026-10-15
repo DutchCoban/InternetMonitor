@@ -35,6 +35,12 @@ public enum RootCause
     CaptivePortal,
 
     /// <summary>
+    /// The network hands out IPv6 but IPv6 traffic does not get through, while IPv4 works. A
+    /// warning: everything works, but browsers try IPv6 first and fall back slowly.
+    /// </summary>
+    Ipv6Broken,
+
+    /// <summary>
     /// Raised by <see cref="Monitors.NetworkHealthMonitor"/>, not the step pipeline - a packet-level
     /// condition (retransmissions, loss, TTL errors, a rogue DHCP server) crossed its configured
     /// threshold. Which one is recorded on the incident itself, see <see cref="Incidents.Incident.ConditionKey"/>.
@@ -58,6 +64,7 @@ public static class RootCauseExtensions
         RootCause.Target => "target",
         RootCause.FirewallSuspected => "firewall",
         RootCause.CaptivePortal => "captivePortal",
+        RootCause.Ipv6Broken => "ipv6",
         RootCause.NetworkHealth => "networkHealth",
         _ => "unknown",
     };
@@ -93,7 +100,7 @@ public static class RootCauseExtensions
         RootCause.Gateway => StepId.Gateway,
         RootCause.Internet or RootCause.FirewallSuspected => StepId.PublicIp,
         RootCause.Dns => StepId.Dns,
-        RootCause.Target or RootCause.CaptivePortal => StepId.Target,
+        RootCause.Target or RootCause.CaptivePortal or RootCause.Ipv6Broken => StepId.Target,
         _ => null,
     };
 }

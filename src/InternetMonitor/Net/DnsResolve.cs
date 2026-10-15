@@ -64,21 +64,27 @@ public static class DnsResolve
     /// Successful answers through explicit servers are reused for a minute (see
     /// <see cref="DnsAnswerCache"/>), the way the Windows resolver would have cached them.
     /// </summary>
+    /// <param name="type">A for IPv4 addresses (the default), AAAA for IPv6.</param>
     public static async Task<DnsOutcome> ResolveViaAsync(
         string hostname,
         IReadOnlyList<IPAddress>? servers,
         IPAddress? source,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DnsRecordType type = DnsRecordType.A)
     {
+        AddressFamily family = type == DnsRecordType.Aaaa ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
         if (IPAddress.TryParse(hostname, out IPAddress? literal))
         {
-            return new DnsOutcome([literal], 0, null, false);
+            return literal.AddressFamily == family
+                ? new DnsOutcome([literal], 0, null, false)
+                : new DnsOutcome([], 0, SocketError.HostNotFound, false);
         }
 
         if (servers is null)
         {
-            return await ResolveAsync(hostname, timeout, cancellationToken).ConfigureAwait(false);
+            DnsOutcome system = await ResolveAsync(hostname, timeout, cancellationToken).ConfigureAwait(false);
+            return system with { Addresses = [.. system.Addresses.Where(a => a.AddressFamily == family)] };
         }
 
         if (servers.Count == 0)
@@ -86,18 +92,20 @@ public static class DnsResolve
             return new DnsOutcome([], 0, SocketError.HostNotFound, false);
         }
 
-        if (DnsAnswerCache.Shared.TryGet(hostname, servers, source, out IReadOnlyList<IPAddress> cached))
+        // AAAA answers are cached under their own key, so they never stand in for an A answer.
+        string cacheKey = type == DnsRecordType.Aaaa ? hostname + "|AAAA" : hostname;
+        if (DnsAnswerCache.Shared.TryGet(cacheKey, servers, source, out IReadOnlyList<IPAddress> cached))
         {
             return new DnsOutcome(cached, 0, null, false, FromCache: true);
         }
 
         (IPAddress? _, DnsQueryResult result) = await DnsUdpClient
-            .QueryFirstAnswerAsync(servers, hostname, DnsRecordType.A, timeout, cancellationToken, source)
+            .QueryFirstAnswerAsync(servers, hostname, type, timeout, cancellationToken, source)
             .ConfigureAwait(false);
 
         if (result.Success && result.Addresses.Count > 0)
         {
-            DnsAnswerCache.Shared.Store(hostname, servers, source, result.Addresses);
+            DnsAnswerCache.Shared.Store(cacheKey, servers, source, result.Addresses);
             return new DnsOutcome(result.Addresses, result.ElapsedMs, null, false);
         }
 

@@ -9,6 +9,7 @@ public enum DnsRecordType : ushort
 {
     A = 1,
     Txt = 16,
+    Aaaa = 28,
 }
 
 public sealed record DnsQueryResult(
@@ -34,7 +35,7 @@ public sealed record DnsQueryResult(
 ///  - The traceroute ownership lookup (phase 6) is a TXT query against Team Cymru.
 ///
 /// So this speaks the wire format directly - about as much protocol as v1's SNTP client, and in
-/// the same spirit. It handles exactly what those two callers need: one question, A or TXT
+/// the same spirit. It handles exactly what those two callers need: one question, A, AAAA or TXT
 /// answers, with name decompression, and no caching, no TCP fallback and no EDNS.
 ///
 /// One thing it does copy from real resolvers: an unanswered query is sent once more halfway
@@ -167,7 +168,7 @@ public static class DnsUdpClient
                 pending.Remove(finished);
 
                 (IPAddress server, DnsQueryResult result) = await finished.ConfigureAwait(false);
-                if (result.Success && (type != DnsRecordType.A || result.Addresses.Count > 0))
+                if (result.Success && (type is not (DnsRecordType.A or DnsRecordType.Aaaa) || result.Addresses.Count > 0))
                 {
                     return (server, result);
                 }
@@ -186,6 +187,9 @@ public static class DnsUdpClient
 
         return (null, last);
     }
+
+    private static AddressFamily FamilyOf(DnsRecordType type) =>
+        type == DnsRecordType.Aaaa ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
 
     private static byte[] BuildQuery(string name, DnsRecordType type, out ushort transactionId)
     {
@@ -252,7 +256,7 @@ public static class DnsUdpClient
             }
 
             ReadOnlySpan<byte> data = response.Slice(offset, dataLength);
-            if (recordType == (ushort)DnsRecordType.A && dataLength == 4)
+            if ((recordType == (ushort)DnsRecordType.A && dataLength == 4) || (recordType == (ushort)DnsRecordType.Aaaa && dataLength == 16))
             {
                 addresses.Add(new IPAddress(data.ToArray()));
             }
@@ -285,7 +289,7 @@ public static class DnsUdpClient
         return new DnsQueryResult(
             true,
             responseCode,
-            type == DnsRecordType.A ? addresses : [],
+            type is DnsRecordType.A or DnsRecordType.Aaaa ? [.. addresses.Where(a => a.AddressFamily == FamilyOf(type))] : [],
             type == DnsRecordType.Txt ? texts : [],
             elapsedMs,
             null);

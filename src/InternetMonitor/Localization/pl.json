@@ -613,5 +613,17 @@
   "explain.dns.vpn.todo": "Rozłącz VPN i sprawdź, czy internet działa bez niego. Jeśli tak, połącz się ponownie, wybierz inny serwer VPN lub skontaktuj się z dostawcą VPN. Jeśli nie, problem leży po stronie łącza.",
   "explain.target.vpn.what": "Połączenie przestało działać, gdy cały ruch przechodził przez VPN.",
   "explain.target.vpn.cause": "Gdy VPN przenosi cały ruch, wszystko za routerem - także wyszukiwanie nazw - przechodzi najpierw przez serwer VPN. Router odpowiedział, więc przyczyną jest co najmniej równie prawdopodobnie połączenie VPN lub jego serwer, co samo łącze.",
-  "explain.target.vpn.todo": "Rozłącz VPN i sprawdź, czy internet działa bez niego. Jeśli tak, połącz się ponownie, wybierz inny serwer VPN lub skontaktuj się z dostawcą VPN. Jeśli nie, problem leży po stronie łącza."
+  "explain.target.vpn.todo": "Rozłącz VPN i sprawdź, czy internet działa bez niego. Jeśli tak, połącz się ponownie, wybierz inny serwer VPN lub skontaktuj się z dostawcą VPN. Jeśli nie, problem leży po stronie łącza.",
+  "measure.ipv6": "IPv6",
+  "measure.ipv6.none": "Nieoferowane przez tę sieć",
+  "measure.ipv6Ping": "Ping IPv6",
+  "measure.ipv6.noAnswer": "Brak odpowiedzi",
+  "measure.ipv6Http": "IPv6 (HTTP)",
+  "step.target.ipv6Broken.detail": "Ta sieć przydziela IPv6, ale IPv6 nie działa. Strony mogą ładować się wolno, bo przeglądarki najpierw próbują IPv6.",
+  "cause.ipv6": "IPv6 nie działa",
+  "explain.ipv6.what": "Internet działa przez IPv4, ale nie przez IPv6, choć ta sieć przydziela adresy IPv6.",
+  "explain.ipv6.cause": "Żądanie przez IPv6 nie powiodło się, a takie samo żądanie przez IPv4 tak. Przeglądarki i aplikacje najpierw próbują IPv6 i dopiero po opóźnieniu przechodzą na IPv4, więc strony mogą ładować się wolno lub tylko czasami. Zwykle przyczyną jest konfiguracja IPv6 w routerze lub dostawca.",
+  "explain.ipv6.todo": "Uruchom ponownie router. Jeśli IPv6 nadal nie działa, zgłoś to dostawcy - albo tymczasowo wyłącz IPv6 w routerze, aby urządzenia przestały go używać.",
+  "series.ipv6": "IPv6",
+  "report.p.ipv6": "Ta sieć przydziela adresy IPv6, ale {0} kontroli IPv6 nie powiodło się, gdy IPv4 działało. Przez to strony ładują się wolno, bo przeglądarki najpierw próbują IPv6. Nie jest to liczone jako awaria."
 }

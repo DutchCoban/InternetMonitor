@@ -61,6 +61,12 @@ public sealed record ProviderReportData(
     /// </summary>
     public TimeSpan MeteredTime { get; init; }
 
+    /// <summary>
+    /// The share of IPv6 checks in the period that failed while IPv4 was working; null when IPv6
+    /// was never on offer. Not an outage - IPv4 carried on - but a fault the provider should fix.
+    /// </summary>
+    public double? Ipv6FailureShare { get; init; }
+
     /// <summary>Packet loss and jitter per day; empty when the period predates the series.</summary>
     public IReadOnlyList<DayQuality> QualityByDay { get; init; } = [];
 
@@ -152,6 +158,9 @@ public sealed record ProviderReportData(
             CollectSpeedTests(history, fromUtc, toUtc))
         {
             MeteredTime = meteredTime,
+            Ipv6FailureShare = InPeriod(history(SeriesNames.Ipv6), fromUtc, toUtc) is { Count: > 0 } ipv6
+                ? ipv6.Count(p => p.Value < 0.5) / (double)ipv6.Count
+                : null,
             QualityByDay = ComputeQualityByDay(
                 InPeriod(history(SeriesNames.PacketLoss), fromUtc, toUtc),
                 InPeriod(history(SeriesNames.Jitter), fromUtc, toUtc),
@@ -219,12 +228,12 @@ public sealed record ProviderReportData(
     {
         RootCause.Adapter or RootCause.Link or RootCause.IpConfiguration => OutageSide.ThisComputer,
         RootCause.Gateway => OutageSide.HomeNetwork,
-        RootCause.Internet or RootCause.Dns or RootCause.Target => OutageSide.Provider,
+        RootCause.Internet or RootCause.Dns or RootCause.Target or RootCause.Ipv6Broken => OutageSide.Provider,
         _ => OutageSide.Other,
     };
 
     private static bool IsOutage(RootCause cause) =>
-        cause is not (RootCause.Healthy or RootCause.FirewallSuspected or RootCause.NetworkHealth);
+        cause is not (RootCause.Healthy or RootCause.FirewallSuspected or RootCause.NetworkHealth or RootCause.Ipv6Broken);
 
     private static List<MetricPoint> InPeriod(IReadOnlyList<MetricPoint> points, DateTimeOffset from, DateTimeOffset to) =>
         [.. points.Where(p => p.Timestamp >= from && p.Timestamp <= to)];

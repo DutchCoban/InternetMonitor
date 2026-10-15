@@ -33,6 +33,11 @@ namespace InternetMonitor.Core.Steps.Checks;
 /// one extra plain-HTTP probe asks whether a login page is in the way (hotel, train, guest Wi-Fi).
 /// If so, that is the finding: "log in first" is what the user needs to hear, not which TLS stage
 /// a login page happened to break.
+///
+/// When step 3 found a global IPv6 address, one more request goes out over IPv6 alongside the
+/// rest. IPv6 that is offered but broken is a classic hidden fault - browsers try it first and
+/// sites load slowly or only sometimes - and it shows nowhere else, since every other check is
+/// IPv4. It makes the step a warning, never a failure: IPv4 still works.
 /// </summary>
 public sealed class TargetCheck : IStepCheck
 {
@@ -65,13 +70,28 @@ public sealed class TargetCheck : IStepCheck
             };
         }
 
+        Task<HttpOutcome?> ipv6Check = CheckIpv6Async(context, cancellationToken);
         TargetEndpointResult[] results = await Task.WhenAll(
             targets.Select(t => CheckOneAsync(t, context.Targets.TargetTimeout, context.LocalAddress, context.DnsServers, cancellationToken))).ConfigureAwait(false);
+        HttpOutcome? ipv6 = await ipv6Check.ConfigureAwait(false);
+
+        // A failed AAAA lookup is "not tested", not "broken": without an IPv6 address for a name, a
+        // browser does not try IPv6 for it either, so nothing is slowed down.
+        bool? ipv6Reachable = ipv6 is null || ipv6.FailedStage == HttpStage.Dns ? null : ipv6.Succeeded;
+        string? ipv6Error = ipv6 is { Succeeded: false } failedV6 ? failedV6.Error : null;
 
         CaptivePortalOutcome? portal = await ProbeForLoginPageAsync(targets, results, context, cancellationToken).ConfigureAwait(false);
-        var facts = new TargetFacts(results, portal?.IsPortal == true, portal?.RedirectHost);
+        var facts = new TargetFacts(results, portal?.IsPortal == true, portal?.RedirectHost, ipv6Reachable, ipv6Error);
 
         var measurements = results.Select(r => new Measurement(r.Name, DescribeResult(r, loc))).ToList();
+        if (ipv6 is not null)
+        {
+            measurements.Add(new Measurement(
+                loc.Get("measure.ipv6Http"),
+                ipv6.Succeeded
+                    ? $"HTTP {ipv6.StatusCode} ({ipv6.Timings.Total.TotalMilliseconds:F0} ms)"
+                    : loc.Format("measure.failedAt", loc.Get($"httpStage.{ipv6.FailedStage.ToString().ToLowerInvariant()}"))));
+        }
 
         if (facts.CaptivePortal)
         {
@@ -135,7 +155,7 @@ public sealed class TargetCheck : IStepCheck
         double? slowest = results.Where(r => r.Reachable).Max(ElapsedMsOf);
 
         StepState state = LatencyClassifier.Classify(slowest, context.Targets);
-        if (failed > 0 || anyServerError || anyStatusMismatch)
+        if (failed > 0 || anyServerError || anyStatusMismatch || facts.Ipv6Broken)
         {
             state = StepState.Warning;
         }
@@ -150,7 +170,9 @@ public sealed class TargetCheck : IStepCheck
                 ? MismatchDetail(results.First(r => r.StatusMismatch))
                 : anyServerError
                     ? ("step.target.serverError.detail", [])
-                    : state == StepState.Warning ? LatencyClassifier.WarningDetail(context) : (null, []);
+                    : facts.Ipv6Broken
+                        ? ("step.target.ipv6Broken.detail", [])
+                        : state == StepState.Warning ? LatencyClassifier.WarningDetail(context) : (null, []);
 
         return new StepResult(
             Id,
@@ -195,6 +217,23 @@ public sealed class TargetCheck : IStepCheck
         }
 
         return null;
+    }
+
+    private static async Task<HttpOutcome?> CheckIpv6Async(StepContext context, CancellationToken cancellationToken)
+    {
+        if (context.GlobalIpv6 is not { } source)
+        {
+            return null;
+        }
+
+        return await TlsTimedRequest.RequestAsync(
+            context.Targets.Ipv6CheckUrl,
+            context.Targets.TargetTimeout,
+            [],
+            cancellationToken,
+            context.LocalAddress,
+            context.DnsServers,
+            new IPv6Path(source)).ConfigureAwait(false);
     }
 
     private static double? ElapsedMsOf(TargetEndpointResult r) => r.Timings?.Total.TotalMilliseconds ?? r.ConnectMs;
@@ -273,7 +312,8 @@ public sealed class TargetCheck : IStepCheck
             outcome.Error,
             outcome.Timings,
             outcome.RemoteAddress,
-            null);
+            null,
+            target.IsReachabilityCheck);
     }
 
     /// <summary>"host:port" is what every measurement and headline shows for a TcpPort target, so

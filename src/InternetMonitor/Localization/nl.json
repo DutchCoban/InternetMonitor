@@ -613,5 +613,17 @@
   "explain.dns.vpn.todo": "Verbreek de VPN en kijk of internet zonder werkt. Zo ja, maak opnieuw verbinding, probeer een andere VPN-server of neem contact op met wie de VPN levert. Zo nee, dan zit het probleem op de lijn.",
   "explain.target.vpn.what": "De verbinding viel weg terwijl al het verkeer via een VPN liep.",
   "explain.target.vpn.cause": "Als een VPN al het verkeer draagt, gaat alles voorbij de router - ook het opzoeken van namen - eerst via de server van de VPN. De router antwoordde, dus de VPN-verbinding of de server ervan is minstens zo waarschijnlijk de oorzaak als de lijn zelf.",
-  "explain.target.vpn.todo": "Verbreek de VPN en kijk of internet zonder werkt. Zo ja, maak opnieuw verbinding, probeer een andere VPN-server of neem contact op met wie de VPN levert. Zo nee, dan zit het probleem op de lijn."
+  "explain.target.vpn.todo": "Verbreek de VPN en kijk of internet zonder werkt. Zo ja, maak opnieuw verbinding, probeer een andere VPN-server of neem contact op met wie de VPN levert. Zo nee, dan zit het probleem op de lijn.",
+  "measure.ipv6": "IPv6",
+  "measure.ipv6.none": "Niet aangeboden door dit netwerk",
+  "measure.ipv6Ping": "IPv6-ping",
+  "measure.ipv6.noAnswer": "Geen antwoord",
+  "measure.ipv6Http": "IPv6 (HTTP)",
+  "step.target.ipv6Broken.detail": "Dit netwerk geeft een IPv6-adres, maar IPv6 werkt niet. Sites kunnen traag laden, omdat browsers eerst IPv6 proberen.",
+  "cause.ipv6": "IPv6 werkt niet",
+  "explain.ipv6.what": "Internet werkt via IPv4, maar IPv6 niet, terwijl dit netwerk wel IPv6-adressen uitdeelt.",
+  "explain.ipv6.cause": "Een verzoek via IPv6 mislukte, terwijl hetzelfde soort verzoek via IPv4 lukte. Browsers en apps proberen eerst IPv6 en vallen pas na een vertraging terug op IPv4, dus sites kunnen traag of af en toe niet laden. Meestal ligt het aan de IPv6-instellingen van de router of aan de provider.",
+  "explain.ipv6.todo": "Herstart de router. Werkt IPv6 daarna nog niet, meld het dan bij je provider - of zet als noodoplossing IPv6 uit in de router, zodat apparaten het niet meer proberen.",
+  "series.ipv6": "IPv6",
+  "report.p.ipv6": "Dit netwerk geeft IPv6-adressen, maar {0} van de IPv6-controles mislukte terwijl IPv4 werkte. Daardoor laden sites traag, omdat browsers eerst IPv6 proberen. Dit telt niet als storing."
 }

@@ -25,6 +25,9 @@ public enum HttpStage
     Http,
 }
 
+/// <summary>Asks <see cref="TlsTimedRequest"/> to look up AAAA and connect over IPv6, from <paramref name="Source"/>.</summary>
+public sealed record IPv6Path(IPAddress? Source);
+
 public sealed record HttpTimings(TimeSpan? Dns, TimeSpan? Tcp, TimeSpan? Tls, TimeSpan? Http, TimeSpan Total)
 {
     /// <summary>The address came from <see cref="DnsAnswerCache"/>, so <see cref="Dns"/> measured no lookup.</summary>
@@ -79,7 +82,8 @@ public static class TlsTimedRequest
         IReadOnlyList<RequestHeader> headers,
         CancellationToken cancellationToken,
         IPAddress? source = null,
-        IReadOnlyList<IPAddress>? dnsServers = null)
+        IReadOnlyList<IPAddress>? dnsServers = null,
+        IPv6Path? ipv6 = null)
     {
         var total = Stopwatch.StartNew();
         int port = uri.Port;
@@ -95,7 +99,8 @@ public static class TlsTimedRequest
 
         try
         {
-            DnsOutcome dns = await DnsResolve.ResolveViaAsync(uri.Host, dnsServers, source, DnsSubBudget, budget.Token).ConfigureAwait(false);
+            DnsRecordType recordType = ipv6 is null ? DnsRecordType.A : DnsRecordType.Aaaa;
+            DnsOutcome dns = await DnsResolve.ResolveViaAsync(uri.Host, dnsServers, source, DnsSubBudget, budget.Token, recordType).ConfigureAwait(false);
             dnsTime = TimeSpan.FromMilliseconds(dns.ElapsedMs);
             dnsFromCache = dns.FromCache;
             if (!dns.Success)
@@ -105,12 +110,15 @@ public static class TlsTimedRequest
 
             // Prefer IPv4: the rest of the pipeline (gateway, public-IP reachability) is IPv4, and
             // mixing families here would make the target step's latency incomparable with the
-            // others on a dual-stack network.
+            // others on a dual-stack network. The IPv6 check asks for AAAA records only.
             remote = dns.Addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)
                 ?? dns.Addresses[0];
 
+            // The lookup went out over IPv4 from the adapter's IPv4 address; the connection itself
+            // leaves from the adapter's IPv6 address when this is the IPv6 check.
+            IPAddress? connectFrom = ipv6 is null ? source : ipv6.Source;
             using var tcp = new TcpClient(remote.AddressFamily) { NoDelay = true };
-            if (!TcpConnect.TryBind(tcp.Client, source))
+            if (!TcpConnect.TryBind(tcp.Client, connectFrom))
             {
                 return Fail(HttpStage.Tcp, "Local address not available");
             }

@@ -91,6 +91,13 @@ public static class RootCauseAnalyzer
             return new RootCauseResult(RootCause.Target, Severity.Error, [StepId.Target]);
         }
 
+        // Nothing failed, but IPv6 is offered and broken: a cause of its own, because the advice
+        // (restart the router, or tell the provider) differs from a slow line's.
+        if (snapshot.FactsFor<TargetFacts>(StepId.Target) is { Ipv6Broken: true })
+        {
+            return new RootCauseResult(RootCause.Ipv6Broken, Severity.Degraded, [StepId.Target]);
+        }
+
         // Nothing failed. A warning still means the user is experiencing something - high latency,
         // a 5xx from a monitored endpoint - so it is reported rather than rounded up to healthy.
         List<StepId> warnings =

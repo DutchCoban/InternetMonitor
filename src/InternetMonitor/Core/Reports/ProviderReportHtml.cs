@@ -77,6 +77,11 @@ public static class ProviderReportHtml
             html.Append("<p class=\"note\">").Append(E(loc.Format("report.p.otherOutages", otherCount))).Append("</p>");
         }
 
+        if (data.Ipv6FailureShare is >= 0.01 and { } ipv6Failed)
+        {
+            html.Append("<p class=\"note\">").Append(E(loc.Format("report.p.ipv6", Percent(ipv6Failed, 0)))).Append("</p>");
+        }
+
         if (data.MeteredTime >= TimeSpan.FromMinutes(1))
         {
             html.Append("<p class=\"note\">").Append(E(loc.Format("report.p.metered", Duration(data.MeteredTime, loc)))).Append("</p>");

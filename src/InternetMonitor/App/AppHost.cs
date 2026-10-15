@@ -368,6 +368,11 @@ public sealed class AppHost : ApplicationContext
             _history.Sample(SeriesNames.WifiSignal, link.TimestampUtc, signal, facts.Wifi.Bssid);
         }
 
+        if (snapshot[StepId.Target]?.Facts is TargetFacts { Ipv6Reachable: { } ipv6 })
+        {
+            _history.Sample(SeriesNames.Ipv6, snapshot.TakenUtc, ipv6 ? 1 : 0);
+        }
+
         // Whether the line was metered, so the provider report can tell time spent on a phone's
         // hotspot from time on the line it is about.
         if (snapshot[StepId.Link]?.Facts is LinkFacts { Cost.Metered: { } metered })

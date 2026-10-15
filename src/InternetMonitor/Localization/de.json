@@ -613,5 +613,17 @@
   "explain.dns.vpn.todo": "Trenne das VPN und prüfe, ob das Internet ohne funktioniert. Wenn ja, verbinde dich neu, probiere einen anderen VPN-Server oder wende dich an den Anbieter des VPN. Wenn nein, liegt das Problem am Anschluss.",
   "explain.target.vpn.what": "Die Verbindung fiel aus, während der gesamte Datenverkehr über ein VPN lief.",
   "explain.target.vpn.cause": "Wenn ein VPN den gesamten Datenverkehr trägt, läuft alles hinter dem Router - auch die Namensauflösung - zuerst über den VPN-Server. Der Router hat geantwortet, also ist die VPN-Verbindung oder ihr Server mindestens so wahrscheinlich die Ursache wie der Anschluss selbst.",
-  "explain.target.vpn.todo": "Trenne das VPN und prüfe, ob das Internet ohne funktioniert. Wenn ja, verbinde dich neu, probiere einen anderen VPN-Server oder wende dich an den Anbieter des VPN. Wenn nein, liegt das Problem am Anschluss."
+  "explain.target.vpn.todo": "Trenne das VPN und prüfe, ob das Internet ohne funktioniert. Wenn ja, verbinde dich neu, probiere einen anderen VPN-Server oder wende dich an den Anbieter des VPN. Wenn nein, liegt das Problem am Anschluss.",
+  "measure.ipv6": "IPv6",
+  "measure.ipv6.none": "Von diesem Netzwerk nicht angeboten",
+  "measure.ipv6Ping": "IPv6-Ping",
+  "measure.ipv6.noAnswer": "Keine Antwort",
+  "measure.ipv6Http": "IPv6 (HTTP)",
+  "step.target.ipv6Broken.detail": "Dieses Netzwerk vergibt IPv6, aber IPv6 funktioniert nicht. Seiten können langsam laden, weil Browser zuerst IPv6 versuchen.",
+  "cause.ipv6": "IPv6 funktioniert nicht",
+  "explain.ipv6.what": "Das Internet funktioniert über IPv4, aber nicht über IPv6, obwohl dieses Netzwerk IPv6-Adressen vergibt.",
+  "explain.ipv6.cause": "Eine Anfrage über IPv6 schlug fehl, während dieselbe Art von Anfrage über IPv4 gelang. Browser und Apps versuchen zuerst IPv6 und weichen erst nach einer Verzögerung auf IPv4 aus, daher können Seiten langsam oder nur manchmal laden. Meist liegt es an der IPv6-Einrichtung des Routers oder am Anbieter.",
+  "explain.ipv6.todo": "Starte den Router neu. Funktioniert IPv6 danach immer noch nicht, melde es deinem Anbieter - oder schalte als Notlösung IPv6 im Router ab, damit Geräte es nicht mehr versuchen.",
+  "series.ipv6": "IPv6",
+  "report.p.ipv6": "Dieses Netzwerk vergibt IPv6-Adressen, aber {0} der IPv6-Prüfungen schlugen fehl, während IPv4 funktionierte. Dadurch laden Seiten langsam, weil Browser zuerst IPv6 versuchen. Es zählt nicht als Störung."
 }

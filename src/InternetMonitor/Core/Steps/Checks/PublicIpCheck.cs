@@ -29,16 +29,27 @@ public sealed class PublicIpCheck : IStepCheck
         var watch = Stopwatch.StartNew();
         LocalizationManager loc = LocalizationManager.Instance;
 
+        // IPv6 is pinged alongside, never instead: the step's verdict stays the IPv4 one, the same
+        // family as the steps before it. Only tried when step 3 found a global IPv6 address.
+        Task<PingOutcome?> ipv6 = PingIpv6Async(context, cancellationToken);
         IReadOnlyList<PublicIpEndpointResult> endpoints = await PingUntilFirstAnswerAsync(context, cancellationToken).ConfigureAwait(false);
+        PingOutcome? ipv6Outcome = await ipv6.ConfigureAwait(false);
 
         double? best = endpoints.Where(e => e.Reachable).Select(e => e.LatencyMs).Min();
-        var facts = new PublicIpFacts(endpoints, best);
+        var facts = new PublicIpFacts(endpoints, best, ipv6Outcome?.Success, ipv6Outcome?.RoundtripMs);
 
         var measurements = endpoints
             .Select(e => new Measurement(
                 e.Address.ToString(),
                 e.Reachable ? $"{e.LatencyMs:F0} ms" : e.Status.ToString()))
             .ToList();
+
+        if (ipv6Outcome is { } v6)
+        {
+            measurements.Add(new Measurement(
+                loc.Get("measure.ipv6Ping"),
+                v6.Success ? $"{v6.RoundtripMs:F0} ms" : loc.Get("measure.ipv6.noAnswer")));
+        }
 
         if (facts.AllUnreachable)
         {
@@ -78,6 +89,25 @@ public sealed class PublicIpCheck : IStepCheck
             DetailKey = detailKey,
             DetailArgs = detailArgs,
         };
+    }
+
+    /// <summary>
+    /// The IPv6 targets, all at once; the first answer wins, as for IPv4. Null when the adapter has
+    /// no global IPv6 address, so there is nothing to test.
+    /// </summary>
+    private static async Task<PingOutcome?> PingIpv6Async(StepContext context, CancellationToken cancellationToken)
+    {
+        if (context.GlobalIpv6 is null || context.Targets.PublicIpv6Targets.Count == 0)
+        {
+            return null;
+        }
+
+        PingOutcome[] outcomes = await Task.WhenAll(context.Targets.PublicIpv6Targets
+            .Select(target => IcmpPing.SendAsync(target, context.Targets.PublicIpTimeout, cancellationToken))).ConfigureAwait(false);
+
+        return outcomes.Where(o => o.Success).OrderBy(o => o.RoundtripMs).FirstOrDefault() is { Success: true } best
+            ? best
+            : outcomes[0];
     }
 
     /// <summary>

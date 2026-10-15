@@ -56,7 +56,11 @@ public sealed record IpAddressFacts(
     IPAddress? Gateway,
 
     // An active VPN connection, if any - see Net.VpnDetector.
-    VpnInfo? Vpn = null) : StepFacts;
+    VpnInfo? Vpn = null,
+
+    // The adapter's global IPv6 address, when the network offers IPv6 at all. Null on an
+    // IPv4-only network, which is normal and not a fault.
+    IPAddress? GlobalIpv6 = null) : StepFacts;
 
 public sealed record GatewayFacts(
     IPAddress? Address,
@@ -71,7 +75,11 @@ public sealed record PublicIpEndpointResult(IPAddress Address, bool Reachable, d
 
 public sealed record PublicIpFacts(
     IReadOnlyList<PublicIpEndpointResult> Endpoints,
-    double? BestLatencyMs)
+    double? BestLatencyMs,
+
+    // The IPv6 ping, only when the adapter has a global IPv6 address: null when not tried.
+    bool? Ipv6Reachable = null,
+    double? Ipv6LatencyMs = null)
     : StepFacts
 {
     public int ReachableCount => Endpoints.Count(e => e.Reachable);
@@ -115,7 +123,8 @@ public sealed record TargetEndpointResult(
 
     // Set only for a TcpPort target: HttpTimings is an HTTP-shaped record that does not fit a bare
     // connect, so its one meaningful number - the time to connect - is carried separately instead.
-    double? ConnectMs)
+    double? ConnectMs,
+    bool IsReachabilityCheck = false)
 {
     /// <summary>True when a URL target answered with something other than the one status code it was configured to expect.</summary>
     public bool StatusMismatch => Reachable && ExpectedStatusCode is { } expected && StatusCode != expected;
@@ -127,8 +136,19 @@ public sealed record TargetFacts(
     // Set when the reachability check failed and the follow-up probe found a login page in the
     // way (see Net.CaptivePortalProbe). PortalHost is where it redirected to, for display only.
     bool CaptivePortal = false,
-    string? PortalHost = null) : StepFacts
+    string? PortalHost = null,
+
+    // The reachability check repeated over IPv6, only when the adapter has a global IPv6 address:
+    // null when not tried. Ipv6Error says which stage failed.
+    bool? Ipv6Reachable = null,
+    string? Ipv6Error = null) : StepFacts
 {
+    /// <summary>
+    /// IPv6 is offered but does not work, while the same check over IPv4 does. Browsers try IPv6
+    /// first, so this is the classic cause of sites that load slowly or only sometimes.
+    /// </summary>
+    public bool Ipv6Broken => Ipv6Reachable == false && Endpoints.Any(e => e.IsReachabilityCheck && e.Reachable);
+
     public bool AnyReachable => Endpoints.Any(e => e.Reachable);
 
     public bool AllUnreachable => Endpoints.Count > 0 && !AnyReachable;

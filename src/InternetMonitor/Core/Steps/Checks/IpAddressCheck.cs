@@ -73,6 +73,9 @@ public sealed class IpAddressCheck : IStepCheck
         VpnInfo? vpn = VpnDetector.Detect();
         context.Vpn = vpn;
 
+        IPAddress? ipv6 = PickGlobalIpv6(properties.UnicastAddresses.Select(a => (a.Address, a.SuffixOrigin, a.DuplicateAddressDetectionState)));
+        context.GlobalIpv6 = ipv6;
+
         var facts = new IpAddressFacts(
             address,
             unicast?.IPv4Mask,
@@ -80,7 +83,8 @@ public sealed class IpAddressCheck : IStepCheck
             dhcpEnabled,
             dnsServers,
             gateway,
-            vpn);
+            vpn,
+            ipv6);
 
         var measurements = new List<Measurement>();
         if (address is not null)
@@ -106,6 +110,12 @@ public sealed class IpAddressCheck : IStepCheck
         measurements.Add(new Measurement(
             loc.Get("measure.dhcp"),
             loc.Get(dhcpEnabled ? "measure.dhcp.on" : "measure.dhcp.off")));
+
+        // The prefix only: the rest of a global IPv6 address is this device's own, and the prefix
+        // is all that says whether - and from whom - IPv6 is on offer.
+        measurements.Add(new Measurement(
+            loc.Get("measure.ipv6"),
+            ipv6 is null ? loc.Get("measure.ipv6.none") : Prefix64(ipv6)));
 
         if (vpn is not null)
         {
@@ -138,6 +148,31 @@ public sealed class IpAddressCheck : IStepCheck
             HeadlineArgs = headlineArgs,
             DetailKey = detailKey,
         });
+    }
+
+    /// <summary>
+    /// The address that says IPv6 is on offer: global unicast (2000::/3, so not link-local, not a
+    /// private ULA, not a transition tunnel's), usable (not still being checked for duplicates),
+    /// and preferably the stable one rather than a temporary privacy address. Null on an IPv4-only
+    /// network, where only a link-local address exists.
+    /// </summary>
+    public static IPAddress? PickGlobalIpv6(IEnumerable<(IPAddress Address, SuffixOrigin Suffix, DuplicateAddressDetectionState State)> addresses) =>
+        addresses
+            .Where(a => a.Address.AddressFamily == AddressFamily.InterNetworkV6
+                && (a.Address.GetAddressBytes()[0] & 0xE0) == 0x20
+                && !a.Address.IsIPv6Teredo
+                && a.State is DuplicateAddressDetectionState.Preferred or DuplicateAddressDetectionState.Deprecated)
+            .OrderBy(a => a.State == DuplicateAddressDetectionState.Preferred ? 0 : 1)
+            .ThenBy(a => a.Suffix == SuffixOrigin.Random ? 1 : 0)
+            .Select(a => a.Address)
+            .FirstOrDefault();
+
+    /// <summary>"2a02:a46b:1234:5678::/64" - the network part of an IPv6 address.</summary>
+    public static string Prefix64(IPAddress address)
+    {
+        byte[] bytes = address.GetAddressBytes();
+        Array.Clear(bytes, 8, 8);
+        return new IPAddress(bytes) + "/64";
     }
 
     /// <summary>

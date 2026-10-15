@@ -85,6 +85,9 @@ public static class SeriesNames
     /// <summary>How much the round trip varied within the same burst, in ms.</summary>
     public const string Jitter = "jitter";
 
+    /// <summary>1 when step 7's request over IPv6 worked, 0 when it failed; nothing when IPv6 was not on offer.</summary>
+    public const string Ipv6 = "ipv6";
+
     /// <summary>1 while Windows treated the connection as metered (mobile data, a hotspot), else 0. Not charted.</summary>
     public const string Metered = "metered";
 
@@ -109,6 +112,7 @@ public static class SeriesNames
         new(Jitter, "series.jitter", "ms", false),
         new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns), LatencyBands: true),
         new(For(StepId.Target)!, "step.target.name", UnitFor(StepId.Target), IsStateSeries(StepId.Target), LatencyBands: true),
+        new(Ipv6, "series.ipv6", string.Empty, true),
         new(TrafficDown, "series.trafficDown", "Mbps", false),
         new(TrafficUp, "series.trafficUp", "Mbps", false),
         new(SpeedTestDownload, "speedtest.download.name", "Mbps", false),

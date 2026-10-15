@@ -60,6 +60,24 @@ public sealed record CheckTargets
         IPAddress.Parse("1.1.1.1"),
     ];
 
+    /// <summary>
+    /// The same three resolvers' IPv6 addresses, pinged by step 5 only when the adapter has a
+    /// global IPv6 address - the IPv6 half of the same question.
+    /// </summary>
+    public IReadOnlyList<IPAddress> PublicIpv6Targets { get; init; } =
+    [
+        IPAddress.Parse("2620:fe::fe"),
+        IPAddress.Parse("2001:4860:4860::8888"),
+        IPAddress.Parse("2606:4700:4700::1111"),
+    ];
+
+    /// <summary>
+    /// The page step 7 fetches over IPv6 when the adapter has a global IPv6 address: Windows' own
+    /// IPv6 connectivity test, which has only an IPv6 address. The reachability check above has no
+    /// IPv6 address at all, so it cannot serve here. Plain HTTP, like Windows' own test.
+    /// </summary>
+    public Uri Ipv6CheckUrl { get; init; } = new("http://ipv6.msftconnecttest.com/connecttest.txt");
+
     /// <summary>The hostname step 6 resolves. A stable, neutral, European name.</summary>
     public string DnsProbeHostname { get; init; } = "www.ripe.net";
 
