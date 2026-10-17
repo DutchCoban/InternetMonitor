@@ -827,5 +827,10 @@
   "mtu.target.help": "Un nom d'hôte ou une adresse à mesurer. Une adresse publique qui répond aux pings fonctionne le mieux.",
   "settings.webhook.status.pending": "{0} en attente du retour d'internet.",
   "settings.webhook.label": "Libellé de cette machine",
-  "settings.webhook.label.help": "Comment les messages nomment cette machine, pour qu'un destinataire alimenté par de nombreuses machines sache laquelle parle : un nom d'hôte, une adresse, un poste - à vous de choisir. Vide l'omet ; rien d'autre dans le message n'identifie la machine."
+  "settings.webhook.label.help": "Comment les messages nomment cette machine, pour qu'un destinataire alimenté par de nombreuses machines sache laquelle parle : un nom d'hôte, une adresse, un poste - à vous de choisir. Vide l'omet ; rien d'autre dans le message n'identifie la machine.",
+  "settings.export.detail": "Niveau de détail de l'export IA",
+  "settings.export.detail.compact": "Compact - tient dans n'importe quelle fenêtre de chat",
+  "settings.export.detail.standard": "Standard - les 20 derniers incidents en entier",
+  "settings.export.detail.full": "Complet - peut devenir très volumineux",
+  "settings.export.detail.help": "Ce qui va dans l'export IA. Compact garde les 10 derniers incidents en entier et le reste sur une ligne, raccourcit les longues chronologies et liste les 30 derniers tests de vitesse - environ 15 000 tokens au plus. Standard permet 20 incidents et 60 tests, environ 30 000 tokens. Complet n'omet rien et peut dépasser ce qu'une IA accepte. L'export zip contient toujours tout."
 }

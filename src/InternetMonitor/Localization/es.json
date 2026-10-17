@@ -827,5 +827,10 @@
   "mtu.target.help": "Un nombre de host o dirección contra la que medir. Una dirección pública que responda a pings funciona mejor.",
   "settings.webhook.status.pending": "{0} en espera hasta que vuelva internet.",
   "settings.webhook.label": "Etiqueta de este equipo",
-  "settings.webhook.label.help": "Cómo llaman los mensajes a este equipo, para que un receptor con muchos equipos sepa cuál habla: un nombre de host, una dirección, un puesto - tú eliges. Vacío lo omite; nada más en el mensaje identifica el equipo."
+  "settings.webhook.label.help": "Cómo llaman los mensajes a este equipo, para que un receptor con muchos equipos sepa cuál habla: un nombre de host, una dirección, un puesto - tú eliges. Vacío lo omite; nada más en el mensaje identifica el equipo.",
+  "settings.export.detail": "Detalle de la exportación para IA",
+  "settings.export.detail.compact": "Compacto - cabe en cualquier ventana de chat",
+  "settings.export.detail.standard": "Estándar - las 20 incidencias más recientes completas",
+  "settings.export.detail.full": "Completo - puede ser muy grande",
+  "settings.export.detail.help": "Cuánto va en la exportación para IA. Compacto conserva las 10 incidencias más recientes completas y el resto en una línea, acorta las cronologías largas y lista los últimos 30 tests de velocidad - unos 15.000 tokens como máximo. Estándar permite 20 incidencias y 60 tests, unos 30.000 tokens. Completo no omite nada y puede superar lo que una IA acepta. La exportación zip siempre lo contiene todo."
 }

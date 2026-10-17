@@ -827,5 +827,10 @@
   "mtu.target.help": "Een hostnaam of adres om tegen te meten. Een publiek adres dat pings beantwoordt werkt het best.",
   "settings.webhook.status.pending": "{0} in de wacht tot het internet terug is.",
   "settings.webhook.label": "Label voor deze machine",
-  "settings.webhook.label.help": "Hoe de berichten deze machine noemen, zodat een ontvanger met veel machines weet welke er spreekt: een hostnaam, een adres, een werkplek - jouw keuze. Leeg laat het weg; niets anders in het bericht identificeert de machine."
+  "settings.webhook.label.help": "Hoe de berichten deze machine noemen, zodat een ontvanger met veel machines weet welke er spreekt: een hostnaam, een adres, een werkplek - jouw keuze. Leeg laat het weg; niets anders in het bericht identificeert de machine.",
+  "settings.export.detail": "Detail in de AI-export",
+  "settings.export.detail.compact": "Compact - past in elk chatvenster",
+  "settings.export.detail.standard": "Standaard - de nieuwste 20 incidenten volledig",
+  "settings.export.detail.full": "Alles - kan erg groot worden",
+  "settings.export.detail.help": "Hoeveel er in de AI-export komt. Compact houdt de nieuwste 10 incidenten volledig en de rest als één regel, kort lange tijdlijnen in en toont de laatste 30 snelheidstests - hooguit zo'n 15.000 tokens. Standaard laat 20 incidenten en 60 tests toe, zo'n 30.000 tokens. Alles laat niets weg en kan groter zijn dan een AI aanneemt. De zip-export bevat altijd alles."
 }

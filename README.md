@@ -290,6 +290,10 @@ Reports → Export covers three kinds of export, and two more are available else
   itself has (a line without NAT) are replaced by stable stand-ins ("Wi-Fi network A", "AP-1",
   "MAC-1", "IP-1"), so it can be pasted into any AI tool. Private addresses, the app's own ping
   targets and resolvers, and the adapter's DNS servers stay as they are - they identify nobody.
+  A detail level keeps it within what an AI accepts: *compact* writes the newest 10 incidents in
+  full and the rest as one line each, shortens long timelines and lists the last 30 speed tests
+  (roughly 15k tokens at most); *standard* allows 20 incidents and 60 tests (roughly 30k);
+  *full* leaves nothing out. The document says what it left out; the zip always has everything.
 - **Export plain data** - the same document without the AI-facing instructions.
 - **Per-incident export** - a Markdown report for a single incident, from the Incidents screen.
   Unlike the two exports above this one is *not* pseudonymised, and neither is the zip: both show
@@ -502,13 +506,15 @@ with `verify <public-key-base64> <path-to-InternetMonitor.exe>` (the `.sig` is e
 
 ```powershell
 InternetMonitor.exe --export report C:\reports\this-week.html   # also: zip, ai, plain
+InternetMonitor.exe --export ai C:\reports\for-ai.md compact      # detail: compact, standard, full
 InternetMonitor.exe --selftest C:\temp\selftest.txt
 InternetMonitor.exe --trace 9.9.9.9
 ```
 
 `--export` writes one of the Reports page's exports without opening a window, from the same stored
 settings, history and incidents, and works while the app is running - for a scheduled task that
-mails the provider report every Monday, say. The exit code is 0 on success.
+mails the provider report every Monday, say. The exit code is 0 on success. The optional last
+argument sets the AI export's detail level; without it the level chosen on the Reports page applies.
 
 ## Settings and data locations
 

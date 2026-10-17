@@ -260,6 +260,9 @@ public sealed class AppSettings
     /// <summary>Which earlier period the report compares against; none by default.</summary>
     public ReportComparison ReportComparison { get; set; } = ReportComparison.None;
 
+    /// <summary>How much goes into the AI export - see <see cref="Core.Export.AiExportDetail"/>. Standard fits a paid chat window; Compact a free one.</summary>
+    public Core.Export.AiExportDetail AiExportDetail { get; set; } = Core.Export.AiExportDetail.Standard;
+
     /// <summary>How far back the provider report looks. Longer than <see cref="HistoryRetentionDays"/> is allowed; the report's coverage figure then shows how much of it was kept.</summary>
     public int ReportPeriodDays
     {

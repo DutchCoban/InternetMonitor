@@ -64,13 +64,14 @@ internal static class Program
         {
             if (exportIndex + 2 >= args.Length)
             {
-                Console.Error.WriteLine($"usage: InternetMonitor {ExportArgument} {string.Join("|", HeadlessExport.Kinds)} <path>");
+                Console.Error.WriteLine($"usage: InternetMonitor {ExportArgument} {string.Join("|", HeadlessExport.Kinds)} <path> [compact|standard|full]");
                 Environment.ExitCode = 1;
                 return;
             }
 
             // Like the self-test: before the single-instance check, so it works while the app runs.
-            Environment.ExitCode = HeadlessExport.RunAsync(args[exportIndex + 1], args[exportIndex + 2]).GetAwaiter().GetResult();
+            string? detail = exportIndex + 3 < args.Length && !args[exportIndex + 3].StartsWith("--", StringComparison.Ordinal) ? args[exportIndex + 3] : null;
+            Environment.ExitCode = HeadlessExport.RunAsync(args[exportIndex + 1], args[exportIndex + 2], detail).GetAwaiter().GetResult();
             return;
         }
 

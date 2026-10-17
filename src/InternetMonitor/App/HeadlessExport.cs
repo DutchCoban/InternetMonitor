@@ -19,8 +19,12 @@ public static class HeadlessExport
 {
     public static readonly IReadOnlyList<string> Kinds = ["zip", "ai", "plain", "report"];
 
-    /// <summary>Writes the export of <paramref name="kind"/> to <paramref name="path"/>; 0 on success, 1 on a bad request or a failure to write.</summary>
-    public static async Task<int> RunAsync(string kind, string path)
+    /// <summary>
+    /// Writes the export of <paramref name="kind"/> to <paramref name="path"/>; 0 on success, 1 on a
+    /// bad request or a failure to write. <paramref name="detailArgument"/> is the AI export's detail
+    /// level (compact, standard, full); null means the level chosen in the app.
+    /// </summary>
+    public static async Task<int> RunAsync(string kind, string path, string? detailArgument = null)
     {
         kind = kind.Trim().ToLowerInvariant();
         if (!Kinds.Contains(kind))
@@ -30,6 +34,13 @@ public static class HeadlessExport
         }
 
         AppSettings settings = AppSettings.Load();
+        AiExportDetail detail = settings.AiExportDetail;
+        if (detailArgument is not null && !Enum.TryParse(detailArgument.Trim(), ignoreCase: true, out detail))
+        {
+            Console.Error.WriteLine($"Unknown detail level '{detailArgument}'. Use one of: compact, standard, full.");
+            return 1;
+        }
+
         LocalizationManager.Initialize(settings.Language);
         string version = (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3);
 
@@ -48,10 +59,10 @@ public static class HeadlessExport
             switch (kind)
             {
                 case "ai":
-                    await File.WriteAllTextAsync(path, AiExportBuilder.Build(incidents.All, series, settings, version)).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(path, AiExportBuilder.Build(incidents.All, series, settings, version, detail: detail)).ConfigureAwait(false);
                     break;
                 case "plain":
-                    await File.WriteAllTextAsync(path, AiExportBuilder.BuildPlain(incidents.All, series, settings, version)).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(path, AiExportBuilder.BuildPlain(incidents.All, series, settings, version, detail: detail)).ConfigureAwait(false);
                     break;
                 case "report":
                     await File.WriteAllTextAsync(path, Report(settings, incidents, history, version)).ConfigureAwait(false);
@@ -66,7 +77,7 @@ public static class HeadlessExport
 
                     var documents = new Dictionary<string, string>
                     {
-                        ["summary.md"] = AiExportBuilder.BuildPlain(incidents.All, series, settings, version),
+                        ["summary.md"] = AiExportBuilder.BuildPlain(incidents.All, series, settings, version, detail: detail),
                         ["provider-report.html"] = Report(settings, incidents, history, version),
                     };
                     await File.WriteAllBytesAsync(path, DataExportBuilder.Build(settings, incidents.All, series, log, documents)).ConfigureAwait(false);

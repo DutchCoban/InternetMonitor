@@ -26,8 +26,46 @@ namespace InternetMonitor.Core.Export;
 /// stable stand-ins (see <see cref="Pseudonymizer"/>) so the document can be pasted into any AI
 /// tool. A pure function over data the caller already has.
 /// </summary>
+/// <summary>
+/// How much detail the document carries - the trade-off between completeness and fitting into an
+/// AI's window. Compact and Standard keep the newest incidents in full and the rest as one line
+/// each, shorten long timelines and cap the speed-test rows; Full leaves nothing out.
+/// </summary>
+public enum AiExportDetail
+{
+    Compact,
+    Standard,
+    Full,
+}
+
 public static class AiExportBuilder
 {
+    /// <summary>What a detail level allows; <see cref="int.MaxValue"/> means no limit.</summary>
+    private sealed record Limits(int FullIncidents, int TimelineHead, int TimelineTail, int SpeedTestRows)
+    {
+        public static Limits For(AiExportDetail detail) => detail switch
+        {
+            AiExportDetail.Compact => new(10, 10, 10, 30),
+            AiExportDetail.Standard => new(20, 20, 20, 60),
+            // Head and tail are added together, so they stay far from int.MaxValue.
+            _ => new(int.MaxValue, 1_000_000, 1_000_000, int.MaxValue),
+        };
+    }
+
+    /// <summary>What the limits cut, counted up front so "About this export" can say so before the sections come.</summary>
+    private sealed record Trimmed(AiExportDetail Detail, int IncidentsSummarised, int TimelinesShortened, int TimelineEntriesLeftOut, int SpeedTestRowsLeftOut)
+    {
+        public bool Anything => IncidentsSummarised > 0 || TimelinesShortened > 0 || SpeedTestRowsLeftOut > 0;
+
+        public static Trimmed Count(AiExportDetail detail, Limits limits, IReadOnlyList<Incident> incidents, int speedTests)
+        {
+            List<Incident> newestFirst = [.. incidents.OrderByDescending(i => i.StartUtc)];
+            List<Incident> full = [.. newestFirst.Take(limits.FullIncidents)];
+            int shortened = full.Count(i => i.Timeline.Count > limits.TimelineHead + limits.TimelineTail);
+            int entriesLeftOut = full.Where(i => i.Timeline.Count > limits.TimelineHead + limits.TimelineTail).Sum(i => i.Timeline.Count - limits.TimelineHead - limits.TimelineTail);
+            return new Trimmed(detail, Math.Max(0, newestFirst.Count - full.Count), shortened, entriesLeftOut, Math.Max(0, speedTests - limits.SpeedTestRows));
+        }
+    }
 
     private const string Instructions = """
         ## Instructions for the AI
@@ -65,6 +103,19 @@ public static class AiExportBuilder
         Ground every claim in the data. Where the data cannot answer a question, say so rather than
         speculating. Mind the coverage figure: time the app was not running is simply absent, not
         "up" or "down". Times are given in UTC and in the computer's local time zone.
+
+        This document may be shortened to fit your window - "About this export" says what was left
+        out. If a finding needs more detail than is here, say so: the user can give you the full
+        "export all data" zip, which holds every incident and every measurement.
+        """;
+
+    private const string Closing = """
+        ## Reminder for the AI
+
+        Now produce the five parts listed under "Instructions for the AI": summary, findings with
+        evidence and confidence, ranked root causes, recommendations with who should act, and what
+        to measure next. Ground every claim in the data above, cite incident ids and dates, and say
+        where the data cannot answer.
         """;
 
     private const string HowToRead = """
@@ -89,11 +140,27 @@ public static class AiExportBuilder
           own equipment).
         - Provider: Internet (router fine, nothing beyond it answered), Dns (the DNS server failed),
           Target (the HTTPS reachability check failed while the steps before it worked).
+        - Metered connection: the same causes while the computer was on mobile data or a phone's
+          hotspot - the mobile network, not the line; these do not count against availability.
         - Other: CaptivePortal (a login page on hotel/train/guest Wi-Fi), Unknown.
         - Not outages: FirewallSuspected (pings filtered while real traffic works),
           Ipv6Broken (the network offers IPv6 but it does not work while IPv4 does - browsers try
           IPv6 first, so sites load slowly; usually the router or the provider) and
           NetworkHealth (packet-level warnings: retransmissions, loss, TTL errors, rogue DHCP).
+
+        **Names in this document.** Wi-Fi network names, access points, hardware addresses and any
+        public address of this computer are replaced by stable stand-ins: "Wi-Fi network A",
+        "AP-1", "MAC-1", "IP-1". The same stand-in always means the same network, device or
+        address, so you can follow them across incidents; they are not missing data. The public
+        ping targets, the public DNS resolvers and the user's own DNS servers are left readable.
+        A VPN appears as "VPN (all traffic)" or "VPN (some traffic only)". Traceroute hops are the
+        provider's routers and are shown as they are.
+
+        **Periods.** The summary, the per-day tables and the Wi-Fi section cover the summary period
+        named in "About this export" (as far back as history is kept). The incidents and the table
+        of all recorded series cover everything ever kept, which can reach further back.
+
+        **Percentiles** are nearest-rank over the samples in the row.
 
         **Series units.** Latency series in milliseconds; adapter/link are 1 (up) or 0 (down);
         Wi-Fi signal is Windows' signal quality in percent; traffic and speed tests in Mbit/s;
@@ -126,8 +193,9 @@ public static class AiExportBuilder
         AppSettings settings,
         string appVersion = "",
         TimeZoneInfo? timeZone = null,
-        DateTimeOffset? now = null) =>
-        Compose("# Internet Monitor - Data Export for AI Analysis", Instructions, incidents, historySeries, settings, appVersion, timeZone, now);
+        DateTimeOffset? now = null,
+        AiExportDetail detail = AiExportDetail.Standard) =>
+        Compose("# Internet Monitor - Data Export for AI Analysis", Instructions, incidents, historySeries, settings, appVersion, timeZone, now, detail);
 
     /// <summary>
     /// The same document without the instructions for an AI - for a user who wants the data
@@ -139,8 +207,9 @@ public static class AiExportBuilder
         AppSettings settings,
         string appVersion = "",
         TimeZoneInfo? timeZone = null,
-        DateTimeOffset? now = null) =>
-        Compose("# Internet Monitor - Data Export", null, incidents, historySeries, settings, appVersion, timeZone, now);
+        DateTimeOffset? now = null,
+        AiExportDetail detail = AiExportDetail.Standard) =>
+        Compose("# Internet Monitor - Data Export", null, incidents, historySeries, settings, appVersion, timeZone, now, detail);
 
     private static string Compose(
         string title,
@@ -150,7 +219,8 @@ public static class AiExportBuilder
         AppSettings settings,
         string appVersion,
         TimeZoneInfo? timeZone,
-        DateTimeOffset? now)
+        DateTimeOffset? now,
+        AiExportDetail detail)
     {
         TimeZoneInfo zone = timeZone ?? TimeZoneInfo.Local;
         DateTimeOffset to = now ?? DateTimeOffset.UtcNow;
@@ -165,6 +235,8 @@ public static class AiExportBuilder
 
         ProviderReportData report = ProviderReportData.Compute(incidents, Series, from, to, zone);
         var doc = new Doc(zone, names);
+        Limits limits = Limits.For(detail);
+        Trimmed trimmed = Trimmed.Count(detail, limits, incidents, report.SpeedTests.Count);
 
         doc.Line(title).Blank();
         if (instructions is not null)
@@ -172,18 +244,24 @@ public static class AiExportBuilder
             doc.Line(instructions).Blank();
         }
 
-        AppendContext(doc, settings, appVersion, from, to);
+        AppendContext(doc, settings, appVersion, from, to, trimmed);
         doc.Line(HowToRead).Blank();
         AppendSummary(doc, report, settings);
         AppendOutagePatterns(doc, report);
-        AppendIncidents(doc, incidents);
+        AppendIncidents(doc, incidents, limits);
         AppendLatency(doc, Series, from, to);
         AppendLineQuality(doc, report);
-        AppendSpeedTests(doc, report, settings);
+        AppendSpeedTests(doc, report, settings, limits);
         AppendWifi(doc, Series(SeriesNames.WifiSignal), from, to);
         AppendTraffic(doc, Series(SeriesNames.TrafficDown), Series(SeriesNames.TrafficUp), report, from, to);
         AppendSeriesStatistics(doc, history);
         AppendNetworkHealth(doc, incidents, settings);
+
+        if (instructions is not null)
+        {
+            // Long documents: the task is followed better when it is repeated at the end.
+            doc.Line(Closing).Blank();
+        }
 
         return doc.ToString();
     }
@@ -194,7 +272,7 @@ public static class AiExportBuilder
     /// When, from which version and with which settings the data was collected - what an AI needs to
     /// read the numbers in the rest of the document.
     /// </summary>
-    private static void AppendContext(Doc doc, AppSettings settings, string appVersion, DateTimeOffset from, DateTimeOffset to)
+    private static void AppendContext(Doc doc, AppSettings settings, string appVersion, DateTimeOffset from, DateTimeOffset to, Trimmed trimmed)
     {
         doc.Line("## About this export").Blank()
             .Item("Generated", doc.Both(to))
@@ -219,7 +297,34 @@ public static class AiExportBuilder
                 : "not entered")
             .Item("Automatic speed test", settings.SpeedTestAutoRunEnabled ? I($"every {settings.SpeedTestIntervalHours} h") : "off")
             .Item("Network-health monitoring", settings.NetworkHealthMonitoringEnabled ? string.Join(", ", settings.EnabledNetworkHealthConditions) : "off")
-            .Blank();
+            .Item("Detail level", trimmed.Detail.ToString().ToLowerInvariant());
+
+        if (trimmed.Anything)
+        {
+            var cuts = new List<string>();
+            if (trimmed.IncidentsSummarised > 0)
+            {
+                cuts.Add(I($"{trimmed.IncidentsSummarised} older incidents are summarised to one line each"));
+            }
+
+            if (trimmed.TimelinesShortened > 0)
+            {
+                cuts.Add(I($"{trimmed.TimelinesShortened} timelines are shortened ({trimmed.TimelineEntriesLeftOut} entries left out, marked where they were)"));
+            }
+
+            if (trimmed.SpeedTestRowsLeftOut > 0)
+            {
+                cuts.Add(I($"{trimmed.SpeedTestRowsLeftOut} speed-test rows are left out (a per-week table covers them)"));
+            }
+
+            doc.Item("Left out to fit", string.Join("; ", cuts) + ". The full data is in the \"export all data\" zip.");
+        }
+        else
+        {
+            doc.Item("Left out to fit", "nothing was left out");
+        }
+
+        doc.Blank();
     }
 
     /// <summary>
@@ -272,12 +377,13 @@ public static class AiExportBuilder
     /// </summary>
     private static void AppendOutagePatterns(Doc doc, ProviderReportData report)
     {
+        doc.Line("### When outages start (local time)").Blank();
         if (report.Outages.Count == 0)
         {
+            doc.Line("No outages in the period.").Blank();
             return;
         }
 
-        doc.Line("### When outages start (local time)").Blank();
 
         var byHour = report.Outages
             .GroupBy(o => doc.Local(o.StartUtc).Hour)
@@ -292,7 +398,7 @@ public static class AiExportBuilder
         doc.Item("By day of week", string.Join(", ", byDay)).Blank();
     }
 
-    private static void AppendIncidents(Doc doc, IReadOnlyList<Incident> incidents)
+    private static void AppendIncidents(Doc doc, IReadOnlyList<Incident> incidents, Limits limits)
     {
         doc.Line("## Incidents (all recorded, newest first)").Blank();
         if (incidents.Count == 0)
@@ -301,12 +407,16 @@ public static class AiExportBuilder
             return;
         }
 
+        List<Incident> newestFirst = [.. incidents.OrderByDescending(i => i.StartUtc)];
+        List<Incident> full = [.. newestFirst.Take(limits.FullIncidents)];
+        List<Incident> summarised = [.. newestFirst.Skip(limits.FullIncidents)];
+
         // Every free-text field goes through doc.Names, which swaps network names and hardware
         // addresses for their stand-ins; measurement labels and fixed values are translated back
         // to English, since they were recorded in whatever language the app showed at the time.
-        foreach (Incident incident in incidents.OrderByDescending(i => i.StartUtc))
+        foreach (Incident incident in full)
         {
-            string side = incident.ConditionKey is null ? SideName(ProviderReportData.SideOf(incident.Cause)) : "packet-level warning";
+            string side = IncidentSide(incident);
             doc.Line(I($"### {incident.Id} - {doc.Names.Text(incident.Headline)}")).Blank()
                 .Item("Cause", incident.ConditionKey is { } condition ? I($"{incident.Cause} ({condition})") : incident.Cause.ToString())
                 .Item("Side", side)
@@ -353,8 +463,17 @@ public static class AiExportBuilder
             if (incident.Timeline.Count > 0)
             {
                 doc.Line("- Timeline:");
-                foreach (TimelineEntry entry in incident.Timeline)
+                int leftOut = incident.Timeline.Count - limits.TimelineHead - limits.TimelineTail;
+                for (int i = 0; i < incident.Timeline.Count; i++)
                 {
+                    if (leftOut > 0 && i == limits.TimelineHead)
+                    {
+                        doc.Line(I($"  - ... {leftOut} entries left out ..."));
+                        i += leftOut - 1;
+                        continue;
+                    }
+
+                    TimelineEntry entry = incident.Timeline[i];
                     doc.Line(I($"  - {doc.LocalTime(entry.AtUtc)} - ") + doc.Names.Text(entry.Text));
                 }
             }
@@ -381,7 +500,32 @@ public static class AiExportBuilder
 
             doc.Blank();
         }
+
+        if (summarised.Count == 0)
+        {
+            return;
+        }
+
+        doc.Line("### Older incidents (one line each)").Blank()
+            .Line(I($"{summarised.Count} older incidents, newest first. Their full detail is in the \"export all data\" zip."))
+            .Blank()
+            .Row("Id", "Cause", "Side", "Start (local)", "Duration", "Headline").Rule(6);
+        foreach (Incident incident in summarised)
+        {
+            doc.Row(
+                incident.Id,
+                incident.ConditionKey is { } condition ? I($"{incident.Cause} ({condition})") : incident.Cause.ToString(),
+                IncidentSide(incident),
+                doc.LocalTime(incident.StartUtc),
+                incident.Duration is { } d ? Duration(d) : "ongoing",
+                doc.Names.Text(incident.Headline));
+        }
+
+        doc.Blank();
     }
+
+    private static string IncidentSide(Incident incident) =>
+        incident.ConditionKey is null ? SideName(ProviderReportData.SideOf(incident.Cause)) : "packet-level warning";
 
     /// <summary>
     /// Latency per local day for the four round-trip series, and the public-internet latency by hour of
@@ -400,12 +544,13 @@ public static class AiExportBuilder
         Dictionary<string, List<MetricPoint>> inPeriod = latencySeries.ToDictionary(
             s => s.Id,
             s => series(s.Id).Where(p => p.Timestamp >= from && p.Timestamp <= to).ToList());
+        doc.Line("## Latency per day (ms, local dates)").Blank();
         if (inPeriod.Values.All(p => p.Count == 0))
         {
+            doc.Line("Not measured in this period.").Blank();
             return;
         }
 
-        doc.Line("## Latency per day (ms, local dates)").Blank();
         doc.Line("Average / 95th percentile per series; n = samples of the public-internet series.").Blank();
         doc.Row(["Date", .. latencySeries.Select(s => s.Name), "n"]).Rule(latencySeries.Length + 2);
 
@@ -443,13 +588,14 @@ public static class AiExportBuilder
     /// <summary>Packet loss and jitter per day, from the provider report's figures. Left out before the series existed.</summary>
     private static void AppendLineQuality(Doc doc, ProviderReportData report)
     {
+        doc.Line("## Packet loss and jitter").Blank();
         if (report.QualityByDay.Count == 0)
         {
+            doc.Line("Not measured in this period.").Blank();
             return;
         }
 
-        doc.Line("## Packet loss and jitter").Blank()
-            .Item("Average packet loss", I($"{report.AverageLossPercent:F2}% over {report.QualityByDay.Sum(d => d.Bursts)} one-minute bursts"))
+        doc.Item("Average packet loss", I($"{report.AverageLossPercent:F2}% over {report.QualityByDay.Sum(d => d.Bursts)} one-minute bursts"))
             .Blank()
             .Row("Date", "Loss %", "Bursts with loss", "Bursts", "Jitter ms").Rule(5);
         foreach (DayQuality day in report.QualityByDay)
@@ -466,7 +612,7 @@ public static class AiExportBuilder
     }
 
     /// <summary>Every speed test in the period, against the subscription and with its bufferbloat grade.</summary>
-    private static void AppendSpeedTests(Doc doc, ProviderReportData report, AppSettings settings)
+    private static void AppendSpeedTests(Doc doc, ProviderReportData report, AppSettings settings, Limits limits)
     {
         doc.Line("## Speed tests").Blank();
         if (report.SpeedTests.Count == 0)
@@ -475,8 +621,15 @@ public static class AiExportBuilder
             return;
         }
 
+        List<SpeedTestEntry> ordered = [.. report.SpeedTests.OrderBy(t => t.AtUtc)];
+        bool trimmed = ordered.Count > limits.SpeedTestRows;
+        if (trimmed)
+        {
+            doc.Line(I($"{ordered.Count} tests in the period; the latest {limits.SpeedTestRows} are listed, the per-week table below covers all of them.")).Blank();
+        }
+
         doc.Row("When (local)", "Download Mbit/s", "Upload Mbit/s", "% of subscribed down", "Ping ms", "Extra ping under load").Rule(6);
-        foreach (SpeedTestEntry test in report.SpeedTests)
+        foreach (SpeedTestEntry test in trimmed ? ordered.TakeLast(limits.SpeedTestRows) : ordered)
         {
             doc.Row(
                 doc.LocalTime(test.AtUtc),
@@ -488,7 +641,28 @@ public static class AiExportBuilder
         }
 
         doc.Blank();
+        if (!trimmed)
+        {
+            return;
+        }
+
+        doc.Line("### Per week (all tests in the period)").Blank()
+            .Row("Week", "Tests", "Download avg / min Mbit/s", "Upload avg Mbit/s", "Ping avg ms").Rule(5);
+        foreach (IGrouping<string, SpeedTestEntry> week in ordered.GroupBy(t => IsoWeek(doc.Local(t.AtUtc))).OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            double[] pings = [.. week.Where(t => t.PingMs is not null).Select(t => t.PingMs!.Value)];
+            doc.Row(
+                week.Key,
+                I($"{week.Count()}"),
+                I($"{week.Average(t => t.DownloadMbps):F1} / {week.Min(t => t.DownloadMbps):F1}"),
+                I($"{week.Average(t => t.UploadMbps):F1}"),
+                pings.Length > 0 ? I($"{pings.Average():F0}") : "-");
+        }
+
+        doc.Blank();
     }
+
+    private static string IsoWeek(DateTime local) => I($"{ISOWeek.GetYear(local)}-W{ISOWeek.GetWeekOfYear(local):00}");
 
     /// <summary>
     /// Signal statistics, time spent at weak/medium/good signal, and every switch of access point -
@@ -497,15 +671,16 @@ public static class AiExportBuilder
     private static void AppendWifi(Doc doc, IReadOnlyList<MetricPoint> wifi, DateTimeOffset from, DateTimeOffset to)
     {
         List<MetricPoint> points = [.. wifi.Where(p => p.Timestamp >= from && p.Timestamp <= to)];
+        doc.Line("## Wi-Fi").Blank();
         if (points.Count == 0)
         {
+            doc.Line("Not measured in this period (no Wi-Fi, or a cable).").Blank();
             return;
         }
 
         double[] values = [.. points.Select(p => p.Value).Order()];
-        doc.Line("## Wi-Fi").Blank()
-            .Item("Signal (Windows quality %)", I($"min {values[0]:F0}, average {values.Average():F0}, p5 {Percentile(values, 0.05):F0}, max {values[^1]:F0} over {values.Length} samples"))
-            .Item("Time below 40% / 40-60% / above 60%", I($"{Pct(Share(values, v => v < 40), 1)} / {Pct(Share(values, v => v is >= 40 and <= 60), 1)} / {Pct(Share(values, v => v > 60), 1)}"));
+        doc.Item("Signal (Windows quality %)", I($"min {values[0]:F0}, average {values.Average():F0}, p5 {Percentile(values, 0.05):F0}, max {values[^1]:F0} over {values.Length} samples"))
+            .Item("Share of samples below 40% / 40-60% / above 60%", I($"{Pct(Share(values, v => v < 40), 1)} / {Pct(Share(values, v => v is >= 40 and <= 60), 1)} / {Pct(Share(values, v => v > 60), 1)}"));
 
         var switches = new List<string>();
         string? previous = null;
@@ -548,13 +723,14 @@ public static class AiExportBuilder
     {
         double[] d = [.. down.Where(p => p.Timestamp >= from && p.Timestamp <= to).Select(p => p.Value).Order()];
         double[] u = [.. up.Where(p => p.Timestamp >= from && p.Timestamp <= to).Select(p => p.Value).Order()];
+        doc.Line("## This computer's own traffic (Mbit/s per cycle)").Blank();
         if (d.Length == 0)
         {
+            doc.Line("Not measured in this period.").Blank();
             return;
         }
 
-        doc.Line("## This computer's own traffic (Mbit/s per cycle)").Blank()
-            .Item("Download", I($"average {d.Average():F1}, p95 {Percentile(d, 0.95):F1}, max {d[^1]:F1}"))
+        doc.Item("Download", I($"average {d.Average():F1}, p95 {Percentile(d, 0.95):F1}, max {d[^1]:F1}"))
             .Item("Upload", u.Length > 0 ? I($"average {u.Average():F1}, p95 {Percentile(u, 0.95):F1}, max {u[^1]:F1}") : "-");
 
         if (report.SpeedTests.LastOrDefault() is { DownloadMbps: >= 1 } latest)
@@ -606,12 +782,13 @@ public static class AiExportBuilder
     /// <summary>The packet-level warnings by condition. Left out when monitoring is off and none were ever recorded.</summary>
     private static void AppendNetworkHealth(Doc doc, IReadOnlyList<Incident> incidents, AppSettings settings)
     {
+        doc.Line("## Network-health warnings").Blank();
         if (!settings.NetworkHealthMonitoringEnabled && !incidents.Any(i => i.ConditionKey is not null))
         {
+            doc.Line("Not monitored: every packet-level condition is switched off, and none was ever recorded.").Blank();
             return;
         }
 
-        doc.Line("## Network-health warnings").Blank();
         var grouped = incidents.Where(i => i.ConditionKey is { Length: > 0 }).GroupBy(i => i.ConditionKey!).OrderByDescending(g => g.Count()).ToList();
         if (grouped.Count == 0)
         {

@@ -29,6 +29,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
     private readonly List<(Label Label, Control Field)> _rows = [];
 
     private Card _exportCard = null!;
+    private ComboBox _exportDetail = null!;
     private AppButton _exportAll = null!;
     private AppButton _exportAi = null!;
     private AppButton _exportPlain = null!;
@@ -42,6 +43,19 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         BuildReportSection();
 
         _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
+
+        // How much the AI export carries; the zip is always complete.
+        _exportDetail = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(260) };
+        _exportDetail.SelectedIndexChanged += (_, _) =>
+        {
+            if (_exportDetail.SelectedItem is DetailItem item)
+            {
+                Services.Settings.AiExportDetail = item.Detail;
+                Services.Settings.Save();
+            }
+        };
+        AddRow(_exportCard, "settings.export.detail", _exportDetail);
+
         _exportAll = AddActionButton(_exportCard, _exportButtons, () => _ = ExportAllDataAsync());
         _exportAi = AddActionButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: true));
         _exportPlain = AddActionButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: false));
@@ -218,6 +232,19 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         }
 
         _comparison.SelectedItem = _comparison.Items.Cast<ComparisonItem>().First(i => i.Kind == Services.Settings.ReportComparison);
+
+        _exportDetail.Items.Clear();
+        foreach (AiExportDetail detail in Enum.GetValues<AiExportDetail>())
+        {
+            _exportDetail.Items.Add(new DetailItem(detail, Loc.Get($"settings.export.detail.{detail.ToString().ToLowerInvariant()}")));
+        }
+
+        _exportDetail.SelectedItem = _exportDetail.Items.Cast<DetailItem>().First(i => i.Detail == Services.Settings.AiExportDetail);
+    }
+
+    private sealed record DetailItem(AiExportDetail Detail, string Display)
+    {
+        public override string ToString() => Display;
     }
 
     private sealed record PeriodItem(int Days, string Display)
@@ -258,7 +285,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         Dictionary<string, IReadOnlyList<MetricPoint>> history = BuildHistorySnapshot();
         var documents = new Dictionary<string, string>
         {
-            ["summary.md"] = AiExportBuilder.BuildPlain(Services.Incidents.All, history, Services.Settings, AppVersion),
+            ["summary.md"] = AiExportBuilder.BuildPlain(Services.Incidents.All, history, Services.Settings, AppVersion, detail: Services.Settings.AiExportDetail),
             ["provider-report.html"] = BuildProviderReport(),
         };
 
@@ -271,9 +298,10 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         await Services.History.Loaded.ConfigureAwait(true);
 
         Dictionary<string, IReadOnlyList<MetricPoint>> history = BuildHistorySnapshot();
+        AiExportDetail detail = Services.Settings.AiExportDetail;
         string markdown = forAi
-            ? AiExportBuilder.Build(Services.Incidents.All, history, Services.Settings, AppVersion)
-            : AiExportBuilder.BuildPlain(Services.Incidents.All, history, Services.Settings, AppVersion);
+            ? AiExportBuilder.Build(Services.Incidents.All, history, Services.Settings, AppVersion, detail: detail)
+            : AiExportBuilder.BuildPlain(Services.Incidents.All, history, Services.Settings, AppVersion, detail: detail);
         string fileName = forAi
             ? $"internetmonitor-ai-export-{DateTime.Now:yyyy-MM-dd}.md"
             : $"internetmonitor-data-export-{DateTime.Now:yyyy-MM-dd}.md";
@@ -321,7 +349,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         int rowHeight = Dp(36);
         int width = Math.Max(Dp(200), content.Width);
         int y = content.Top;
-        foreach ((Label label, Control field) in _rows)
+        foreach ((Label label, Control field) in _rows.Where(r => r.Label.Parent == _reportCard))
         {
             // A hidden field (the custom day count, unless "custom" is chosen) takes no row.
             label.Visible = field.Visible;
@@ -345,7 +373,32 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
         _reportCard.Height = y + Dp(32) + _reportCard.Inset;
 
-        LayoutButtonRow(_exportCard, _exportButtons);
+        // The export card: its one row (the AI export's detail level), then the three buttons.
+        Rectangle exportContent = _exportCard.DisplayRectangle;
+        int exportWidth = Math.Max(Dp(200), exportContent.Width);
+        int exportY = exportContent.Top;
+        foreach ((Label label, Control field) in _rows.Where(r => r.Label.Parent == _exportCard))
+        {
+            label.Bounds = new Rectangle(exportContent.Left, exportY, Math.Max(0, exportWidth - field.Width - Sp(3)), rowHeight);
+            field.Location = new Point(exportContent.Left + exportWidth - field.Width, exportY + ((rowHeight - field.Height) / 2));
+            exportY += rowHeight;
+        }
+
+        int exportX = exportContent.Left;
+        exportY += Sp(2);
+        foreach (AppButton button in _exportButtons)
+        {
+            if (exportX > exportContent.Left && exportX + button.Width > exportContent.Right)
+            {
+                exportX = exportContent.Left;
+                exportY += Dp(32) + Sp(1);
+            }
+
+            button.Location = new Point(exportX, exportY);
+            exportX += button.Width + Sp(2);
+        }
+
+        _exportCard.Height = exportY + Dp(32) + _exportCard.Inset;
     }
 
     protected override void OnResize(EventArgs e)

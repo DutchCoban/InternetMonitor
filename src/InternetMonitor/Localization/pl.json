@@ -827,5 +827,10 @@
   "mtu.target.help": "Nazwa hosta lub adres do pomiaru. Najlepiej działa adres publiczny odpowiadający na ping.",
   "settings.webhook.status.pending": "{0} czeka, aż internet wróci.",
   "settings.webhook.label": "Etykieta tego komputera",
-  "settings.webhook.label.help": "Jak wiadomości nazywają ten komputer, aby odbiorca obsługujący wiele komputerów wiedział, który mówi: nazwa hosta, adres, stanowisko - Twój wybór. Puste pomija pole; nic innego w wiadomości nie identyfikuje komputera."
+  "settings.webhook.label.help": "Jak wiadomości nazywają ten komputer, aby odbiorca obsługujący wiele komputerów wiedział, który mówi: nazwa hosta, adres, stanowisko - Twój wybór. Puste pomija pole; nic innego w wiadomości nie identyfikuje komputera.",
+  "settings.export.detail": "Szczegółowość eksportu dla AI",
+  "settings.export.detail.compact": "Kompaktowy - mieści się w każdym oknie czatu",
+  "settings.export.detail.standard": "Standardowy - 20 najnowszych incydentów w całości",
+  "settings.export.detail.full": "Pełny - może być bardzo duży",
+  "settings.export.detail.help": "Ile trafia do eksportu dla AI. Kompaktowy zachowuje 10 najnowszych incydentów w całości, a resztę jako jedną linię, skraca długie osie czasu i wypisuje ostatnie 30 testów prędkości - najwyżej około 15 000 tokenów. Standardowy dopuszcza 20 incydentów i 60 testów, około 30 000 tokenów. Pełny niczego nie pomija i może przekroczyć to, co AI przyjmuje. Eksport zip zawsze zawiera wszystko."
 }
