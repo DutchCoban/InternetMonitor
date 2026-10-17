@@ -127,8 +127,8 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   network, internet, DNS, and each configured endpoint working, and which step is being re-checked
   right now?
 - **Diagnostics** (right-click → Diagnostics): every probe's raw measurements, the derived
-  diagnosis, a network-health summary (see below), and a table you can expand per step for exact
-  detail.
+  diagnosis, a network-health summary (see below), the clock check against a time server, and a
+  table you can expand per step for exact detail.
 - **History**: a zoomable, pannable chart per check (mouse wheel to zoom, drag to pan,
   double-click to reset), switchable between any chartable series and a 15 min/1 hour/6 hour/24
   hour/7 day/30 day/all-time range. Kept for 30 days by default, up to 90. Besides the checks
@@ -140,7 +140,9 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   resolution. Incident text (headline, explanation, step snapshots) is always recorded in English
   regardless of the active display language, so an exported incident reads the same no matter who
   opens it later. A search box and filters narrow the list down by where an incident originated
-  (provider, home network, this computer) and when (ongoing, 24 hours, 7 or 30 days).
+  (provider, home network, this computer) and when (ongoing, 24 hours, 7 or 30 days). Each
+  incident takes a note of your own (a ticket number, what the provider said), and a provider-side
+  incident records a traceroute the moment it opens, so its detail shows where the packets stopped.
 - **Tools**: a live-filling **Traceroute** (each hop optionally annotated with who owns it - your
   own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings - and,
   when ICMP doesn't reach the destination at all, a plain TCP connect to the destination to tell
@@ -148,7 +150,11 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   a **Network scan** of the local subnet (which devices answer a ping, with hostname, MAC address,
   and manufacturer - looked up via two free, alternating MAC-vendor APIs, toggleable in Settings -
   for each; addresses that don't answer a ping also get a TCP-port sweep, toggleable, so a device
-  that ignores ICMP but has an open port still shows up); and a **Speed test** (see below).
+  that ignores ICMP but has an open port still shows up - and the scan remembers every device it
+  has seen, marks what is new since last time, counts known devices that did not answer, and lets
+  you name a device by double-clicking it); a **Speed test** (see below); and a **Path MTU**
+  measurement (don't-fragment pings) that tells a normal line (1500), a PPPoE line (1492) and a
+  tunnel or VPN in the path apart.
 - **Reports**: the [report for your provider](#report-for-your-provider) and the
   [data exports](#exporting-data).
 
@@ -167,6 +173,9 @@ strength in dBm and the channel, so the app derives the signal percentage from t
 "≈") and the band from the second. The weak-signal warning and the signal chart keep working; only
 the network name and access-point switches are missing. Step 2's details then link straight to the
 location settings.
+
+With location access on, step 2 also counts the access points that share your channel and says so
+when a 2.4 GHz channel is crowded - the usual reason a Wi-Fi with a fine signal is still slow.
 
 ## Login pages
 
@@ -255,6 +264,11 @@ and opens it in your browser (print it to PDF to send it on), or saves it. It sh
 - every speed test against the subscription speed you enter on the same page, with the extra ping
   under load.
 
+The period is 7, 30 or 90 days, or any number of days up to a year. Optionally the report sets the
+period against an earlier one - the period before, the same period a week earlier, or a month
+earlier - and shows each headline figure next to its earlier value with the change coloured by
+whether it improved.
+
 It contains no network names, addresses or hardware identifiers - only times, durations and speeds.
 
 ## Exporting data
@@ -329,8 +343,11 @@ endpoints, of two kinds:
   refused connection as "reachable" (either proves something answered); UDP is inherently
   ambiguous, so a plain timeout is reported as "uncertain" rather than a false success/failure.
 
+- **Ping** - an ICMP echo to a host, the named ping target of old: the simplest "is it there, and
+  how far".
+
 Each enabled endpoint is checked every cycle alongside the built-in checks and shown by name (not
-raw URL/host) on the Status screen.
+raw URL/host) on the Status screen, and each has its own chart on the History page.
 
 ## Uptime Kuma heartbeat
 
@@ -340,12 +357,35 @@ check, matching how Uptime Kuma push monitors are normally used. Off by default 
 configured). See the [Uptime Kuma project](https://github.com/louislam/uptime-kuma) for what it is
 and how to set up a push monitor to get a URL from.
 
+## Webhook
+
+Settings → Integrations → Webhook URL: an https address that receives one JSON `POST` when an
+incident opens and one when it closes (`event`, `kind`, `id`, `cause`, `side`, `headline`,
+`startUtc`, `endUtc`, `durationSeconds`, `appVersion`). That is enough for Home Assistant, ntfy, a
+Discord or Slack webhook, or anything else that takes JSON. A test button sends a sample.
+
+## Pausing
+
+The tray menu pauses monitoring for 30 minutes, an hour, four hours, or until you resume it. Nothing
+is measured or recorded meanwhile - a planned router restart does not end up in your history or
+your report - and the Status page and the tray tooltip say so.
+
 ## Other settings
 
-- **Language** (General) - English, Dutch, German, or Polish. Switching takes effect immediately
-  across the whole app, including an already-open Settings window.
+- **Language** (General) - English, Dutch, German, or Polish. A new installation starts in the
+  Windows display language when it is one of these. Switching takes effect immediately across the
+  whole app, including an already-open Settings window.
 - **Theme** (General) - follows Windows, or forced light/dark.
-- **Incident pop-ups** (General) - a brief on-screen notice when a new incident opens.
+- **Incident pop-ups** (General) - a notice when a problem is detected and when the connection is
+  back, as the app's own pop-up or as a Windows notification.
+- **Adapter to monitor** (General) - automatic (the adapter Windows routes over), a preferred
+  adapter while it is connected, or always one fixed adapter.
+- **Compact widget** (General, or the tray menu) - a small window with the seven steps, the verdict
+  and the last fifteen minutes of latency; off by default, draggable, optionally kept on top.
+- **Thresholds** (Check interval) - from how many milliseconds latency counts as slow or severe,
+  and below which signal quality Wi-Fi counts as weak.
+- **Time server** (Public internet) - the NTP server the hourly clock check asks; `pool.ntp.org`
+  by default.
 
 ## Project status
 
@@ -361,12 +401,13 @@ weak-signal diagnosis; latency-under-load detection and a bufferbloat grade; pac
 jitter; IPv6, VPN and metered-connection awareness; an uptime strip and searchable incidents; a
 report for your provider; configurable history retention (up to 90 days); network-health monitoring (TCP retransmissions, packet loss, TTL errors, rogue DHCP);
 traceroute hop ownership; LAN-scan manufacturer lookup with a TCP fallback; an AI-ready export;
-and fully automatic self-update.
+signed self-update; a webhook; notes on incidents and a route traced when an incident opens; named
+ping targets with their own charts; a report over any period with a comparison; adapter choice; a
+path-MTU tool; a clock check; a network scan that remembers; a command-line export; a portable mode;
+and a compact widget.
 
-**Not (yet) back from v1**:
-
-- Continuous named ping targets with their own per-target latency graphs.
-- Quiet hours (suppressing incident pop-ups during a configured daily window).
+Everything v1 did is back. Quiet hours were dropped on purpose: a pop-up suppressed while you are at
+the keyboard and shown when you are not would defeat the point - pop-ups can simply be switched off.
 
 Missing something, or found a problem? [Open an issue](https://github.com/DutchCoban/InternetMonitor/issues) -
 that's the best way to influence what comes next.
@@ -441,6 +482,18 @@ private key lives with the maintainer, outside the repository; `keygen` makes a 
 the public half to put in `Core/Updates/ReleaseSignature.cs`. Anyone can check a download by hand
 with `verify <public-key-base64> <path-to-InternetMonitor.exe>` (the `.sig` is expected next to it).
 
+### Command line
+
+```powershell
+InternetMonitor.exe --export report C:\reports\this-week.html   # also: zip, ai, plain
+InternetMonitor.exe --selftest C:\temp\selftest.txt
+InternetMonitor.exe --trace 9.9.9.9
+```
+
+`--export` writes one of the Reports page's exports without opening a window, from the same stored
+settings, history and incidents, and works while the app is running - for a scheduled task that
+mails the provider report every Monday, say. The exit code is 0 on success.
+
 ## Settings and data locations
 
 - Settings: `%AppData%\InternetMonitor\settings.json` (the same file v1 used - an existing
@@ -452,6 +505,10 @@ with `verify <public-key-base64> <path-to-InternetMonitor.exe>` (the `.sig` is e
 
 None of these live inside the application directory, so the app itself can be replaced/updated
 (by hand, or via the self-update feature above) without touching configuration or history.
+
+**Portable mode:** put an empty file named `portable.txt` next to `InternetMonitor.exe` and
+everything above lives in a `data` folder next to the executable instead - for a USB stick or a
+shared tools folder. The `INTERNETMONITOR_DATA_DIR` environment variable, when set, wins over both.
 
 ## Known limitations
 
@@ -473,8 +530,10 @@ None of these live inside the application directory, so the app itself can be re
 - The DNS step queries the adapter's DNS servers directly over plain UDP port 53, not through
   Windows' own resolver. That's what lets it test exactly that adapter's servers and report which
   one answered, but it also means a setup that only resolves through Windows' encrypted DNS
-  (DNS over HTTPS) with plain DNS blocked would show a DNS failure here even though browsing works.
-  An adapter that has no DNS server at all is reported as exactly that.
+  (DNS over HTTPS) with plain DNS blocked gets a warning rather than a failure: when no server
+  answers plain DNS, the step asks Windows' own resolver, and when that resolves the name it says
+  so instead of calling DNS broken. An adapter that has no DNS server at all is reported as exactly
+  that.
 - Application endpoints are entirely user-configured with no target allowlist, by design (this
   is a local, single-user tool) - see [Security notes](#security-notes) below.
 - The self-update only installs a release that carries both `InternetMonitor.exe` and

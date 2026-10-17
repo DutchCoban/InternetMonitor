@@ -46,6 +46,10 @@ public sealed partial class SettingsPage
         _notificationStyle.SelectedIndexChanged += OnNotificationStyleChanged;
         AddRow(_generalCard, "settings.notificationStyle", _notificationStyle);
 
+        _widget = new Toggle();
+        _widget.CheckedChanged += (_, _) => WidgetToggled?.Invoke(_widget.Checked);
+        AddRow(_generalCard, "settings.widget", _widget);
+
         // Which adapter the checks describe: automatic, a preferred one, or a fixed one.
         _adapterMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(260) };
         _adapterMode.SelectedIndexChanged += OnAdapterSettingsChanged;
@@ -54,6 +58,18 @@ public sealed partial class SettingsPage
         _adapterChoice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(260) };
         _adapterChoice.SelectedIndexChanged += OnAdapterSettingsChanged;
         AddRow(_generalCard, "settings.adapter", _adapterChoice);
+    }
+
+    /// <summary>The widget toggle was flipped by the user; the host shows or hides the widget.</summary>
+    public event Action<bool>? WidgetToggled;
+
+    /// <summary>The widget was shown or hidden from the tray or the widget itself; keep the toggle honest without firing it.</summary>
+    public void SetWidgetShown(bool shown)
+    {
+        if (_widget is not null)
+        {
+            _widget.SetWithoutNotify(shown);
+        }
     }
 
     /// <summary>Fills both adapter combos from the settings and from what Windows lists right now, without firing the change handler.</summary>

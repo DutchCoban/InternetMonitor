@@ -13,4 +13,13 @@ namespace InternetMonitor.Core.Tools.LanScan;
 /// null both while pending and when the lookup finished without a match, so the UI needs this
 /// separate flag to tell "still looking" apart from "looked, found nothing".
 /// </param>
-public sealed record LanDevice(IPAddress Address, string? Hostname, string? MacAddress, double? RoundtripMs, string? Vendor = null, bool VendorPending = false);
+public sealed record LanDevice(
+    IPAddress Address,
+    string? Hostname,
+    string? MacAddress,
+    double? RoundtripMs,
+    string? Vendor = null,
+    bool VendorPending = false,
+    bool IsNew = false,
+    string? Name = null,
+    DateTimeOffset? FirstSeenUtc = null);

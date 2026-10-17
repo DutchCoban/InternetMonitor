@@ -13,14 +13,16 @@ public static class LanScanCsvBuilder
     public static string Build(IReadOnlyList<LanDevice> devices)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("IP,Hostname,MAC,Vendor,ResponseTimeMs");
+        sb.AppendLine("IP,Name,Hostname,MAC,Vendor,FirstSeenUtc,ResponseTimeMs");
 
         foreach (LanDevice device in devices.OrderBy(d => d.Address, IpAddressComparer.Instance))
         {
             sb.Append(Csv.Field(device.Address.ToString())).Append(',')
+                .Append(Csv.Field(device.Name)).Append(',')
                 .Append(Csv.Field(device.Hostname)).Append(',')
                 .Append(Csv.Field(device.MacAddress)).Append(',')
                 .Append(Csv.Field(device.Vendor)).Append(',')
+                .Append(device.FirstSeenUtc is { } seen ? seen.UtcDateTime.ToString("O") : string.Empty).Append(',')
                 .AppendLine(device.RoundtripMs is { } ms ? ms.ToString("F0") : string.Empty);
         }
 

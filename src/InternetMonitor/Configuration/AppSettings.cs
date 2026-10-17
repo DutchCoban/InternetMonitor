@@ -182,6 +182,16 @@ public sealed class AppSettings
 
     public bool WindowMaximized { get; set; }
 
+    /// <summary>The compact always-available widget (see <c>WidgetWindow</c>): off by default, the app stays out of the way unless asked.</summary>
+    public bool WidgetEnabled { get; set; }
+
+    public bool WidgetTopMost { get; set; } = true;
+
+    /// <summary>Where the widget was last left; (0, 0) before it was ever moved means "a corner of the primary screen".</summary>
+    public int WidgetX { get; set; }
+
+    public int WidgetY { get; set; }
+
     // ---- Tools --------------------------------------------------------------------------------
 
     /// <summary>

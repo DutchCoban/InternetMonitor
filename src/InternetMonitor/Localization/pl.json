@@ -755,5 +755,13 @@
   "diagnostics.clock.ok": "Zgodny z {0} (odchylenie {1} s), sprawdzono o {2}.",
   "diagnostics.clock.drift": "Odchylenie {1} s od {0}, sprawdzono o {2}. Ustaw zegar: bezpieczne połączenia zawodzą przy odchyleniu o minuty.",
   "diagnostics.clock.failed": "Nie udało się połączyć z {0} ({1}), próbowano o {2}.",
-  "step.target.clockDrift": "Zegar tego komputera jest przesunięty o {0} s; bezpieczne połączenia zawodzą przy błędnym czasie."
+  "step.target.clockDrift": "Zegar tego komputera jest przesunięty o {0} s; bezpieczne połączenia zawodzą przy błędnym czasie.",
+  "lanScan.badge.new": "Nowe",
+  "lanScan.changes": "{0} nowych od ostatniego skanu, {1} znanych urządzeń nie odpowiedziało.",
+  "lanScan.name.title": "Nazwij to urządzenie",
+  "lanScan.name.label": "Własna nazwa dla {0} - zostaw puste, aby usunąć nazwę.",
+  "widget.topMost": "Trzymaj nad innymi oknami",
+  "widget.hide": "Ukryj widżet",
+  "widget.lastCheck": "Ostatnia kontrola {0}",
+  "settings.widget": "Pokaż kompaktowy widżet"
 }

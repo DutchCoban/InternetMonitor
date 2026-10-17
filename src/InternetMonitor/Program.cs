@@ -42,6 +42,12 @@ internal static class Program
     /// <summary>Opens the Tools page and immediately traces a route to the given target.</summary>
     private const string TraceArgument = "--trace";
 
+    /// <summary>
+    /// Writes one export and exits, without a window: "--export zip|ai|plain|report &lt;path&gt;".
+    /// For scripts and scheduled tasks - see <see cref="HeadlessExport"/>.
+    /// </summary>
+    private const string ExportArgument = "--export";
+
     [STAThread]
     private static void Main(string[] args)
     {
@@ -51,6 +57,21 @@ internal static class Program
         if (int.TryParse(TryGetArgumentValue(args, SimulateDelayArgument), out int delayMs) && delayMs > 0)
         {
             FaultSimulation.StepDelay = TimeSpan.FromMilliseconds(delayMs);
+        }
+
+        int exportIndex = Array.FindIndex(args, a => string.Equals(a, ExportArgument, StringComparison.OrdinalIgnoreCase));
+        if (exportIndex >= 0)
+        {
+            if (exportIndex + 2 >= args.Length)
+            {
+                Console.Error.WriteLine($"usage: InternetMonitor {ExportArgument} {string.Join("|", HeadlessExport.Kinds)} <path>");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            // Like the self-test: before the single-instance check, so it works while the app runs.
+            Environment.ExitCode = HeadlessExport.RunAsync(args[exportIndex + 1], args[exportIndex + 2]).GetAwaiter().GetResult();
+            return;
         }
 
         if (TryGetArgumentValue(args, SelfTestArgument) is { } selfTestPath)

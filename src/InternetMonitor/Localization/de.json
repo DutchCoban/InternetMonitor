@@ -755,5 +755,13 @@
   "diagnostics.clock.ok": "Synchron mit {0} (Abweichung {1} s), geprüft um {2}.",
   "diagnostics.clock.drift": "Weicht {1} s von {0} ab, geprüft um {2}. Stellen Sie die Uhr richtig: Sichere Verbindungen scheitern bei Minuten Abweichung.",
   "diagnostics.clock.failed": "{0} war nicht erreichbar ({1}), versucht um {2}.",
-  "step.target.clockDrift": "Die Uhr dieses Computers weicht {0} s ab; sichere Verbindungen scheitern bei falscher Uhrzeit."
+  "step.target.clockDrift": "Die Uhr dieses Computers weicht {0} s ab; sichere Verbindungen scheitern bei falscher Uhrzeit.",
+  "lanScan.badge.new": "Neu",
+  "lanScan.changes": "{0} neu seit dem letzten Scan, {1} bekannte Geräte haben nicht geantwortet.",
+  "lanScan.name.title": "Dieses Gerät benennen",
+  "lanScan.name.label": "Ein eigener Name für {0} - leer lassen, um den Namen zu entfernen.",
+  "widget.topMost": "Über anderen Fenstern halten",
+  "widget.hide": "Widget ausblenden",
+  "widget.lastCheck": "Letzte Prüfung {0}",
+  "settings.widget": "Kompaktes Widget anzeigen"
 }

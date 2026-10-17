@@ -44,6 +44,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private Toggle _showIncidentPopups = null!;
     private ComboBox _notificationStyle = null!;
     private ComboBox _adapterMode = null!;
+    private Toggle _widget = null!;
     private ComboBox _adapterChoice = null!;
     private NumericUpDown _latencyWarning = null!;
     private NumericUpDown _latencyError = null!;
@@ -326,6 +327,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _autoStart.CheckedChanged += OnAutoStartChanged;
 
         _showIncidentPopups.SetWithoutNotify(settings.ShowIncidentPopups);
+        _widget.SetWithoutNotify(settings.WidgetEnabled);
         ReloadAdapterCombos();
 
         _notificationStyle.SelectedIndexChanged -= OnNotificationStyleChanged;

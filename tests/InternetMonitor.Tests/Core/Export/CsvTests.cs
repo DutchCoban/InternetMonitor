@@ -41,8 +41,8 @@ public sealed class CsvTests
         string csv = LanScanCsvBuilder.Build(devices);
         string[] lines = csv.TrimEnd().Split(Environment.NewLine);
 
-        Assert.Equal("IP,Hostname,MAC,Vendor,ResponseTimeMs", lines[0]);
-        Assert.Equal("192.168.1.2,printer,AA:BB:CC:00:11:22,,", lines[1]);
-        Assert.Equal("192.168.1.10,\"'=HYPERLINK(\"\"http://evil\"\")\",AA:BB:CC:DD:EE:FF,'+ACME,2", lines[2]);
+        Assert.Equal("IP,Name,Hostname,MAC,Vendor,FirstSeenUtc,ResponseTimeMs", lines[0]);
+        Assert.Equal("192.168.1.2,,printer,AA:BB:CC:00:11:22,,,", lines[1]);
+        Assert.Equal("192.168.1.10,,\"'=HYPERLINK(\"\"http://evil\"\")\",AA:BB:CC:DD:EE:FF,'+ACME,,2", lines[2]);
     }
 }

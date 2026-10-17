@@ -755,5 +755,13 @@
   "diagnostics.clock.ok": "Gelijk met {0} (afwijking {1} s), gecontroleerd om {2}.",
   "diagnostics.clock.drift": "Wijkt {1} s af van {0}, gecontroleerd om {2}. Zet de klok goed: beveiligde verbindingen mislukken als hij minuten afwijkt.",
   "diagnostics.clock.failed": "{0} was niet bereikbaar ({1}), geprobeerd om {2}.",
-  "step.target.clockDrift": "De klok van deze computer wijkt {0} s af; beveiligde verbindingen mislukken als de klok niet klopt."
+  "step.target.clockDrift": "De klok van deze computer wijkt {0} s af; beveiligde verbindingen mislukken als de klok niet klopt.",
+  "lanScan.badge.new": "Nieuw",
+  "lanScan.changes": "{0} nieuw sinds de vorige scan, {1} bekende apparaten antwoordden niet.",
+  "lanScan.name.title": "Dit apparaat een naam geven",
+  "lanScan.name.label": "Een eigen naam voor {0} - laat leeg om de naam te verwijderen.",
+  "widget.topMost": "Boven andere vensters houden",
+  "widget.hide": "Widget verbergen",
+  "widget.lastCheck": "Laatste controle {0}",
+  "settings.widget": "Compacte widget tonen"
 }

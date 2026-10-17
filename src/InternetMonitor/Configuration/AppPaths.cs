@@ -19,12 +19,32 @@ public static class AppPaths
 
     public static string Root { get; } = ResolveRoot();
 
+    /// <summary>A file by this name next to the executable keeps all data next to it too - a USB stick, a shared tools folder.</summary>
+    public const string PortableMarker = "portable.txt";
+
     private static string ResolveRoot()
     {
         string? overridden = Environment.GetEnvironmentVariable(DataDirectoryVariable);
-        return string.IsNullOrWhiteSpace(overridden)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "InternetMonitor")
-            : overridden;
+        if (!string.IsNullOrWhiteSpace(overridden))
+        {
+            return overridden;
+        }
+
+        if (PortableRoot() is { } portable)
+        {
+            return portable;
+        }
+
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "InternetMonitor");
+    }
+
+    /// <summary>The portable data folder, when the marker file sits next to the executable; null otherwise.</summary>
+    public static string? PortableRoot()
+    {
+        string? directory = Path.GetDirectoryName(Environment.ProcessPath);
+        return directory is not null && File.Exists(Path.Combine(directory, PortableMarker))
+            ? Path.Combine(directory, "data")
+            : null;
     }
 
     /// <summary>

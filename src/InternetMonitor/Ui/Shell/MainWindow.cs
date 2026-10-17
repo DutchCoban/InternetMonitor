@@ -36,6 +36,7 @@ public sealed class MainWindow : Form
 
     public MainWindow(AppServices services)
     {
+        Services = services;
         _services = services;
         _settings = services.Settings;
 
@@ -73,7 +74,9 @@ public sealed class MainWindow : Form
         _pages["history"] = new HistoryPage(services);
         _pages["incidents"] = new IncidentsPage(services);
         _pages["tools"] = new ToolsPage(services);
-        _pages["settings"] = new SettingsPage(services);
+        var settingsPage = new SettingsPage(services);
+        settingsPage.WidgetToggled += shown => WidgetToggled?.Invoke(shown);
+        _pages["settings"] = settingsPage;
         _pages["reports"] = new ReportsPage(services);
 
         foreach (PageBase page in _pages.Values)
@@ -157,6 +160,21 @@ public sealed class MainWindow : Form
         if (_rail.SelectedId != id)
         {
             _rail.Select(id);
+        }
+    }
+
+    /// <summary>The services the pages share, for the host to hand to the widget.</summary>
+    public AppServices Services { get; }
+
+    /// <summary>The Settings page's widget toggle was flipped; the host shows or hides the widget.</summary>
+    public event Action<bool>? WidgetToggled;
+
+    /// <summary>Keeps the Settings page's toggle in step when the widget was shown or hidden elsewhere.</summary>
+    public void SetWidgetShown(bool shown)
+    {
+        if (_pages["settings"] is SettingsPage settings)
+        {
+            settings.SetWidgetShown(shown);
         }
     }
 

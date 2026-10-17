@@ -37,6 +37,9 @@ public sealed class LanDeviceList : ThemedControl
 
     public IReadOnlyList<LanDevice> Devices => _devices;
 
+    /// <summary>A row was double-clicked: the page asks for a name.</summary>
+    public event Action<LanDevice>? NameRequested;
+
     public string Status
     {
         get => _status;
@@ -68,6 +71,11 @@ public sealed class LanDeviceList : ThemedControl
         if (index >= 0)
         {
             _devices[index] = device;
+        }
+        else if (device.IsNew)
+        {
+            // What was not there last time is what the user is looking for: it goes on top.
+            _devices.Insert(0, device);
         }
         else
         {
@@ -121,6 +129,16 @@ public sealed class LanDeviceList : ThemedControl
     {
         base.OnResize(e);
         Invalidate();
+    }
+
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        base.OnMouseDoubleClick(e);
+        int index = (e.Y - Sp(1) + _scrollOffset - HeaderHeight - Sp(1)) / Math.Max(1, RowHeight);
+        if (e.Button == MouseButtons.Left && index >= 0 && index < _devices.Count)
+        {
+            NameRequested?.Invoke(_devices[index]);
+        }
     }
 
     /// <summary>Column left edges, as a fraction of the available width - IP, hostname, MAC, vendor, then response time (right-aligned, so no left edge of its own).</summary>
@@ -213,11 +231,26 @@ public sealed class LanDeviceList : ThemedControl
             new Rectangle(ipX, y, Math.Max(0, hostX - ipX), RowHeight),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 
+        int nameX = hostX;
+        if (device.IsNew)
+        {
+            // A small pill, so a device that was not there last time is seen before it is read.
+            string badge = LocalizationManager.Instance.Get("lanScan.badge.new").ToUpperInvariant();
+            Size badgeSize = GdiExtensions.MeasureCrisp(badge, Theme.Font(FontRole.SmallStrong));
+            var pill = new RectangleF(hostX, y + ((RowHeight - Dp(16)) / 2f), badgeSize.Width + Dp(10), Dp(16));
+            g.FillRounded(pill, Dp(8), p.AccentSoft);
+            g.DrawTextCrisp(badge, Theme.Font(FontRole.SmallStrong), p.Accent, Rectangle.Round(pill), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            nameX += (int)pill.Width + Sp(1);
+        }
+
+        string shown = device.Name is { Length: > 0 } name
+            ? device.Hostname is { Length: > 0 } host ? $"{name} ({host})" : name
+            : device.Hostname ?? "-";
         g.DrawTextCrisp(
-            device.Hostname ?? "-",
-            Theme.Font(FontRole.Small),
-            device.Hostname is null ? p.TextMuted : p.TextSecondary,
-            new Rectangle(hostX, y, Math.Max(0, macX - hostX), RowHeight),
+            shown,
+            Theme.Font(device.Name is null ? FontRole.Small : FontRole.SmallStrong),
+            device.Hostname is null && device.Name is null ? p.TextMuted : p.TextSecondary,
+            new Rectangle(nameX, y, Math.Max(0, macX - nameX), RowHeight),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 
         g.DrawTextCrisp(

@@ -8,6 +8,7 @@ using InternetMonitor.Core.Tools.SpeedTest;
 using InternetMonitor.Core.Tools.Traceroute;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
+using InternetMonitor.Ui.Windows;
 
 namespace InternetMonitor.Ui.Shell.Pages;
 
@@ -44,6 +45,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     private Panel _lanBar = null!;
 
     private CancellationTokenSource? _scanning;
+    private LanScanHistory? _lanHistory;
 
     private Card _speedTestCard = null!;
     private SpeedTestResultView _speedTestView = null!;
@@ -263,6 +265,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     private void BuildLanScanCard()
     {
         _lanDevices = new LanDeviceList { Dock = DockStyle.Fill };
+        _lanDevices.NameRequested += NameDevice;
 
         _scan = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Gateway };
         _scan.Click += (_, _) => StartOrCancelScan();
@@ -278,6 +281,20 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _lanScanCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Gateway, Visible = false };
         _lanScanCard.Controls.Add(_lanDevices);
         _lanScanCard.Controls.Add(_lanBar);
+    }
+
+    /// <summary>A row was double-clicked: ask for a name, remember it, and show it on the row.</summary>
+    private void NameDevice(LanDevice device)
+    {
+        _lanHistory ??= LanScanHistory.Load();
+        string? name = TextPromptWindow.Ask(FindForm(), Loc.Get("lanScan.name.title"), Loc.Format("lanScan.name.label", device.Address), device.Name ?? string.Empty);
+        if (name is null)
+        {
+            return;
+        }
+
+        _lanHistory.SetName(device, name);
+        _lanDevices.Upsert(device with { Name = string.IsNullOrWhiteSpace(name) ? null : name.Trim() });
     }
 
     private void LayoutLanBar()
@@ -323,7 +340,25 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         LayoutLanBar();
 
         var scanner = new LanScanner();
-        var progress = new Progress<LanDevice>(device => _lanDevices.Upsert(device));
+
+        // What the scanner remembers from last time decides which rows are new; decided once per
+        // device the moment it first appears, so the vendor update that follows keeps the badge.
+        LanScanHistory history = _lanHistory = LanScanHistory.Load();
+        var newKeys = new HashSet<string>(StringComparer.Ordinal);
+        var seenKeys = new HashSet<string>(StringComparer.Ordinal);
+        LanDevice Decorate(LanDevice device)
+        {
+            string key = LanScanHistory.KeyOf(device);
+            if (seenKeys.Add(key) && !history.IsKnown(device))
+            {
+                newKeys.Add(key);
+            }
+
+            KnownDevice? known = history.Lookup(device);
+            return device with { IsNew = newKeys.Contains(key), Name = known?.Name, FirstSeenUtc = known?.FirstSeenUtc };
+        }
+
+        var progress = new Progress<LanDevice>(device => _lanDevices.Upsert(Decorate(device)));
 
         // The only thing in the LAN scanner that tells a third party anything (a MAC prefix)
         // about this network - same reasoning as RunAsync's ownership lookup for traceroute - so
@@ -336,11 +371,17 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
                 .ScanAsync(address, mask, progress, cts.Token, vendorLookup, Services.Settings.LanScanTcpFallback)
                 .ConfigureAwait(true);
 
+            int newCount = history.RecordScan(result.Devices, DateTimeOffset.UtcNow);
+            int missing = history.Missing(result.Devices).Count;
             _lanDevices.Status = result.Devices.Count == 0
                 ? Loc.Get("lanScan.none")
                 : result.Truncated
                     ? Loc.Format("lanScan.doneTruncated", result.Devices.Count, result.AddressesScanned)
                     : Loc.Format("lanScan.done", result.Devices.Count, result.AddressesScanned);
+            if (result.Devices.Count > 0 && (newCount > 0 || missing > 0))
+            {
+                _lanDevices.Status += " " + Loc.Format("lanScan.changes", newCount, missing);
+            }
 
             // The scan itself (ping + hostnames) is done and already shown above - manufacturer
             // names are still trickling in through `progress` at this point. Waiting for them here

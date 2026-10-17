@@ -755,5 +755,13 @@
   "diagnostics.clock.ok": "In sync with {0} (off by {1} s), checked at {2}.",
   "diagnostics.clock.drift": "Off by {1} s from {0}, checked at {2}. Set the clock right: secure connections fail when it is minutes off.",
   "diagnostics.clock.failed": "Could not reach {0} ({1}), tried at {2}.",
-  "step.target.clockDrift": "This computer's clock is {0} s off; secure connections fail when the clock is wrong."
+  "step.target.clockDrift": "This computer's clock is {0} s off; secure connections fail when the clock is wrong.",
+  "lanScan.badge.new": "New",
+  "lanScan.changes": "{0} new since the last scan, {1} known devices did not answer.",
+  "lanScan.name.title": "Name this device",
+  "lanScan.name.label": "A name of your own for {0} - leave it empty to remove the name.",
+  "widget.topMost": "Keep on top of other windows",
+  "widget.hide": "Hide widget",
+  "widget.lastCheck": "Last check {0}",
+  "settings.widget": "Show the compact widget"
 }
