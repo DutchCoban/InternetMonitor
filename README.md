@@ -516,6 +516,23 @@ settings, history and incidents, and works while the app is running - for a sche
 mails the provider report every Monday, say. The exit code is 0 on success. The optional last
 argument sets the AI export's detail level; without it the level chosen on the Reports page applies.
 
+### Tests
+
+```powershell
+dotnet test tests/InternetMonitor.Tests/InternetMonitor.Tests.csproj
+```
+
+Around 470 tests (xUnit, no other packages) cover about 69% of the app's lines: the seven checks'
+verdicts over made-up adapters, substituted DNS answers and a listener on 127.0.0.1; the pipeline,
+incident tracker, cadence and history store; the network-health monitor over substituted counters;
+the lookups over played-back HTTP; every page built, localised in all eight languages, laid out
+and painted without a window; and the exports, settings rules and localisation files. The tests
+never leave the machine. Nothing in the app is public for the tests' sake: the few seams are
+`internal` (reached through `InternalsVisibleTo`) and the public constructors keep calling them.
+On a machine whose security client intercepts loopback connections, the handful of loopback HTTP
+tests notice and step aside with a note in the test output rather than failing. Coverage is
+measured with `dotnet test --collect:"Code Coverage;Format=cobertura"`.
+
 ## Settings and data locations
 
 - Settings: `%AppData%\InternetMonitor\settings.json` (the same file v1 used - an existing
