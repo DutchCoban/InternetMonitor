@@ -44,6 +44,19 @@ public sealed class DnsCheck : IStepCheck
 
     private sealed record Attempt(IPAddress Server, AttemptOutcome Outcome);
 
+    private readonly DnsProbes _probes;
+
+    public DnsCheck()
+        : this(DnsProbes.Real)
+    {
+    }
+
+    /// <summary>The same step over substituted probes, so the tests can walk the whole chain without a network.</summary>
+    internal DnsCheck(DnsProbes probes)
+    {
+        _probes = probes;
+    }
+
     public async Task<StepResult> RunAsync(StepContext context, CancellationToken cancellationToken)
     {
         var watch = Stopwatch.StartNew();
@@ -57,8 +70,8 @@ public sealed class DnsCheck : IStepCheck
             new(loc.Get("measure.dnsServers"), servers.Count > 0 ? string.Join(", ", servers) : "-"),
         };
 
-        (IPAddress? answeredBy, DnsQueryResult result) = await DnsUdpClient
-            .QueryFirstAnswerAsync(servers, hostname, DnsRecordType.A, context.Targets.DnsTimeout, cancellationToken, context.LocalAddress)
+        (IPAddress? answeredBy, DnsQueryResult result) = await _probes
+            .AskAll(servers, hostname, context.Targets.DnsTimeout, cancellationToken, context.LocalAddress)
             .ConfigureAwait(false);
 
         if (answeredBy is not null)
@@ -116,7 +129,7 @@ public sealed class DnsCheck : IStepCheck
         // fine, and that is a warning about what this step can see, not an outage.
         if (publicWinner is null && customWinner is null)
         {
-            DnsOutcome system = await DnsResolve.ResolveAsync(hostname, context.Targets.DnsTimeout, cancellationToken).ConfigureAwait(false);
+            DnsOutcome system = await _probes.SystemResolve(hostname, context.Targets.DnsTimeout, cancellationToken).ConfigureAwait(false);
             if (system.Success)
             {
                 measurements.Add(new Measurement(loc.Get("measure.dnsSystemResolver"), string.Join(", ", system.Addresses.Take(3))));
@@ -173,7 +186,7 @@ public sealed class DnsCheck : IStepCheck
     }
 
     /// <summary>Asks each server in turn, stopping at the first that resolves the name.</summary>
-    private static async Task<List<Attempt>> WalkAsync(
+    private async Task<List<Attempt>> WalkAsync(
         IReadOnlyList<IPAddress> servers,
         string hostname,
         StepContext context,
@@ -199,7 +212,7 @@ public sealed class DnsCheck : IStepCheck
     /// started at the same moment, so finding out "silent on DNS, but is it there at all?" costs
     /// no extra time on top of the query's own timeout.
     /// </summary>
-    private static async Task<Attempt> TryServerAsync(
+    private async Task<Attempt> TryServerAsync(
         IPAddress server,
         string hostname,
         StepContext context,
@@ -209,11 +222,11 @@ public sealed class DnsCheck : IStepCheck
         TimeSpan timeout = context.Targets.PublicResolverTimeout;
         using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task<TcpOutcome>? probe = probeReachability
-            ? TcpConnect.TryConnectAsync(server, ReachabilityProbePort, timeout, probeCts.Token, context.LocalAddress)
+            ? _probes.Reach(server, ReachabilityProbePort, timeout, probeCts.Token, context.LocalAddress)
             : null;
 
-        DnsQueryResult result = await DnsUdpClient
-            .QueryAsync(server, hostname, DnsRecordType.A, timeout, cancellationToken, context.LocalAddress)
+        DnsQueryResult result = await _probes
+            .AskOne(server, hostname, timeout, cancellationToken, context.LocalAddress)
             .ConfigureAwait(false);
 
         AttemptOutcome outcome;
@@ -255,4 +268,22 @@ public sealed class DnsCheck : IStepCheck
         AttemptOutcome.NoAnswerButReachable => loc.Get("measure.dnsTry.blocked"),
         _ => loc.Get("measure.dnsTry.noAnswer"),
     };
+}
+
+/// <summary>
+/// The four things step 6 asks of the outside world, as functions: the race over the adapter's
+/// servers, one query to one server, the port-443 probe, and Windows' own resolver. The app
+/// uses <see cref="Real"/>; the tests substitute answers.
+/// </summary>
+internal sealed record DnsProbes(
+    Func<IReadOnlyList<IPAddress>, string, TimeSpan, CancellationToken, IPAddress?, Task<(IPAddress? Server, DnsQueryResult Result)>> AskAll,
+    Func<IPAddress, string, TimeSpan, CancellationToken, IPAddress?, Task<DnsQueryResult>> AskOne,
+    Func<IPAddress, int, TimeSpan, CancellationToken, IPAddress?, Task<TcpOutcome>> Reach,
+    Func<string, TimeSpan, CancellationToken, Task<DnsOutcome>> SystemResolve)
+{
+    public static DnsProbes Real { get; } = new(
+        (servers, name, timeout, token, source) => DnsUdpClient.QueryFirstAnswerAsync(servers, name, DnsRecordType.A, timeout, token, source),
+        (server, name, timeout, token, source) => DnsUdpClient.QueryAsync(server, name, DnsRecordType.A, timeout, token, source),
+        (server, port, timeout, token, source) => TcpConnect.TryConnectAsync(server, port, timeout, token, source),
+        DnsResolve.ResolveAsync);
 }

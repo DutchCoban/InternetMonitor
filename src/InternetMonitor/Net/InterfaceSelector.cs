@@ -172,7 +172,8 @@ public static class InterfaceSelector
 
     public static NetworkInterface? GetPrimary() => GetPrimary(GetAll());
 
-    private static NetworkInterface? GuessPhysical(IReadOnlyList<NetworkInterface> all) =>
+    /// <summary>The fallback ranking on its own: up before down, with a gateway before without, physical before virtual, fast before slow. Internal so the tests can rank made-up adapters.</summary>
+    internal static NetworkInterface? GuessPhysical(IReadOnlyList<NetworkInterface> all) =>
         Candidates(all)
             .OrderByDescending(nic => nic.OperationalStatus == OperationalStatus.Up)
             .ThenByDescending(HasIPv4Gateway)

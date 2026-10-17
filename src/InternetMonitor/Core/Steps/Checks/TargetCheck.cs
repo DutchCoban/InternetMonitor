@@ -77,10 +77,20 @@ public sealed class TargetCheck : IStepCheck
 
         // A failed AAAA lookup is "not tested", not "broken": without an IPv6 address for a name, a
         // browser does not try IPv6 for it either, so nothing is slowed down.
+        CaptivePortalOutcome? portal = await ProbeForLoginPageAsync(targets, results, context, cancellationToken).ConfigureAwait(false);
+        return Evaluate(context, results, ipv6, portal, watch.Elapsed);
+    }
+
+    /// <summary>
+    /// The verdict over what the probes found: a captive portal, everything down, some down, a
+    /// status mismatch, a server error, broken IPv6, or a slow but working target. Pure over its
+    /// inputs, so the tests can feed it outcomes without a network; internal for that reason only.
+    /// </summary>
+    internal static StepResult Evaluate(StepContext context, TargetEndpointResult[] results, HttpOutcome? ipv6, CaptivePortalOutcome? portal, TimeSpan elapsed)
+    {
+        LocalizationManager loc = LocalizationManager.Instance;
         bool? ipv6Reachable = ipv6 is null || ipv6.FailedStage == HttpStage.Dns ? null : ipv6.Succeeded;
         string? ipv6Error = ipv6 is { Succeeded: false } failedV6 ? failedV6.Error : null;
-
-        CaptivePortalOutcome? portal = await ProbeForLoginPageAsync(targets, results, context, cancellationToken).ConfigureAwait(false);
         var facts = new TargetFacts(results, portal?.IsPortal == true, portal?.RedirectHost, ipv6Reachable, ipv6Error);
 
         var measurements = results.Select(r => new Measurement(r.Name, DescribeResult(r, loc))).ToList();
@@ -98,12 +108,12 @@ public sealed class TargetCheck : IStepCheck
             measurements.Add(new Measurement(loc.Get("measure.captivePortal"), facts.PortalHost ?? $"HTTP {portal!.StatusCode}"));
 
             return new StepResult(
-                Id,
+                StepId.Target,
                 StepState.Failed,
                 loc.Get("step.target.captivePortal"),
                 loc.Get("step.target.captivePortal.detail"),
                 null,
-                watch.Elapsed,
+                elapsed,
                 DateTimeOffset.UtcNow,
                 measurements,
                 facts)
@@ -140,12 +150,12 @@ public sealed class TargetCheck : IStepCheck
             }
 
             return new StepResult(
-                Id,
+                StepId.Target,
                 StepState.Failed,
                 loc.Format(headlineKey, headlineArgs),
                 detail,
                 null,
-                watch.Elapsed,
+                elapsed,
                 DateTimeOffset.UtcNow,
                 measurements,
                 facts)
@@ -183,12 +193,12 @@ public sealed class TargetCheck : IStepCheck
                         : state == StepState.Warning ? LatencyClassifier.WarningDetail(context) : (null, []);
 
         return new StepResult(
-            Id,
+            StepId.Target,
             state,
             loc.Format(headlineKey2, headlineArgs2),
             detailKey is null ? null : loc.Format(detailKey, detailArgs2),
             slowest,
-            watch.Elapsed,
+            elapsed,
             DateTimeOffset.UtcNow,
             measurements,
             facts)
