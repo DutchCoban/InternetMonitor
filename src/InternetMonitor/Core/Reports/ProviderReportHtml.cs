@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Localization;
 
@@ -31,7 +32,21 @@ public static class ProviderReportHtml
 {
     private const double BelowPlanThreshold = 0.8;
 
-    public static string Render(ProviderReportData data, ProviderReportOptions options, LocalizationManager loc)
+    /// <summary>The earlier period a comparison of <paramref name="kind"/> sets [from, to] against, or null for none.</summary>
+    public static (DateTimeOffset From, DateTimeOffset To)? ComparisonWindow(DateTimeOffset from, DateTimeOffset to, ReportComparison kind) => kind switch
+    {
+        ReportComparison.PreviousPeriod => (from - (to - from), from),
+        ReportComparison.WeekEarlier => (from.AddDays(-7), to.AddDays(-7)),
+        ReportComparison.MonthEarlier => (from.AddMonths(-1), to.AddMonths(-1)),
+        _ => null,
+    };
+
+    public static string Render(
+        ProviderReportData data,
+        ProviderReportOptions options,
+        LocalizationManager loc,
+        ProviderReportData? comparison = null,
+        ReportComparison comparisonKind = ReportComparison.None)
     {
         var html = new StringBuilder();
         string E(string text) => WebUtility.HtmlEncode(text);
@@ -88,6 +103,11 @@ public static class ProviderReportHtml
         }
 
         html.Append("</section>");
+
+        if (comparison is not null && comparisonKind != ReportComparison.None)
+        {
+            Comparison(html, data, comparison, comparisonKind, loc);
+        }
 
         // ---- Outages ----
         html.Append("<section><h2>").Append(E(loc.Get("report.p.outages"))).Append("</h2>");
@@ -219,6 +239,92 @@ public static class ProviderReportHtml
 
     /// <summary>A day averaging this much loss is highlighted: around 1% is where calls and games start to suffer.</summary>
     private const double NoticeableLossPercent = 1.0;
+
+    /// <summary>Below this much measured time in the earlier period, a comparison would be noise and is left out.</summary>
+    private static readonly TimeSpan MinimumComparableTime = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// The same headline figures for an earlier period, side by side with this one, and the
+    /// change - coloured by whether it is an improvement. Only what both periods measured is
+    /// compared: a figure missing in either is left out rather than shown against nothing.
+    /// </summary>
+    private static void Comparison(StringBuilder html, ProviderReportData now, ProviderReportData then, ReportComparison kind, LocalizationManager loc)
+    {
+        string E(string text) => WebUtility.HtmlEncode(text);
+        int days = Math.Max(1, (int)Math.Round((now.ToUtc - now.FromUtc).TotalDays));
+        string earlier = kind switch
+        {
+            ReportComparison.PreviousPeriod => loc.Format("report.p.compare.previous", days),
+            ReportComparison.WeekEarlier => loc.Get("report.p.compare.weekEarlier"),
+            _ => loc.Get("report.p.compare.monthEarlier"),
+        };
+
+        html.Append("<section><h2>").Append(E(loc.Format("report.p.compare", earlier))).Append("</h2>");
+        if (then.Monitored < MinimumComparableTime)
+        {
+            html.Append("<p class=\"note\">").Append(E(loc.Get("report.p.compare.noData"))).Append("</p></section>");
+            return;
+        }
+
+        html.Append("<table><thead><tr>")
+            .Append(Th(loc.Get("report.p.compare.col.metric"))).Append(Th(loc.Get("report.p.compare.col.now"), true))
+            .Append(Th(loc.Get("report.p.compare.col.then"), true)).Append(Th(loc.Get("report.p.compare.col.change"), true))
+            .Append("</tr></thead><tbody>");
+
+        if (now.Availability is { } a1 && then.Availability is { } a2)
+        {
+            Row(loc.Get("report.p.availability"), Percent(a1, 2), Percent(a2, 2), (a1 - a2) * 100, "pp", higherIsBetter: true);
+        }
+
+        int outages1 = now.ProviderOutages.Count();
+        int outages2 = then.ProviderOutages.Count();
+        Row(loc.Get("report.p.providerOutages"), Invariant($"{outages1}"), Invariant($"{outages2}"), outages1 - outages2, string.Empty, higherIsBetter: false);
+
+        TimeSpan total1 = now.ProviderOutages.Aggregate(TimeSpan.Zero, (sum, o) => sum + o.Duration);
+        TimeSpan total2 = then.ProviderOutages.Aggregate(TimeSpan.Zero, (sum, o) => sum + o.Duration);
+        Row(loc.Get("report.p.compare.totalOutage"), Duration(total1, loc), Duration(total2, loc), (total1 - total2).TotalMinutes, "min", higherIsBetter: false);
+
+        if (WeightedLatency(now) is { } l1 && WeightedLatency(then) is { } l2)
+        {
+            Row(loc.Get("report.p.compare.avgLatency"), Invariant($"{l1:F0} ms"), Invariant($"{l2:F0} ms"), l1 - l2, "ms", higherIsBetter: false);
+        }
+
+        if (now.AverageLossPercent is { } loss1 && then.AverageLossPercent is { } loss2)
+        {
+            Row(loc.Get("report.p.loss"), Invariant($"{loss1:F2}%"), Invariant($"{loss2:F2}%"), loss1 - loss2, "pp", higherIsBetter: false);
+        }
+
+        if (now.SpeedTests.Count > 0 && then.SpeedTests.Count > 0)
+        {
+            double d1 = now.SpeedTests.Average(t => t.DownloadMbps);
+            double d2 = then.SpeedTests.Average(t => t.DownloadMbps);
+            Row(loc.Get("report.p.compare.avgDownload"), Number(d1) + " Mbit/s", Number(d2) + " Mbit/s", d1 - d2, "Mbit/s", higherIsBetter: true);
+        }
+
+        html.Append("</tbody></table></section>");
+
+        void Row(string label, string current, string earlierValue, double delta, string unit, bool higherIsBetter)
+        {
+            bool same = Math.Abs(delta) < 0.005;
+            string css = same ? "same" : (delta > 0) == higherIsBetter ? "better" : "worse";
+            string arrow = same ? "=" : delta > 0 ? "\u25B2" : "\u25BC";
+            string change = same
+                ? "="
+                : Invariant($"{arrow} {Math.Abs(delta).ToString(Math.Abs(delta) >= 10 ? "F0" : "F2", CultureInfo.InvariantCulture)} {unit}").TrimEnd();
+            html.Append("<tr>").Append(Td(label)).Append(Td(current, true)).Append(Td(earlierValue, true))
+                .Append("<td class=\"num ").Append(css).Append("\">").Append(E(change)).Append("</td></tr>");
+        }
+
+        string Th(string text, bool numeric = false) => (numeric ? "<th class=\"num\">" : "<th>") + E(text) + "</th>";
+        string Td(string text, bool numeric = false) => (numeric ? "<td class=\"num\">" : "<td>") + E(text) + "</td>";
+    }
+
+    /// <summary>The period's average round trip, each day weighted by how many samples it had.</summary>
+    private static double? WeightedLatency(ProviderReportData data)
+    {
+        int samples = data.LatencyByDay.Sum(d => d.Samples);
+        return samples == 0 ? null : data.LatencyByDay.Sum(d => d.AverageMs * d.Samples) / samples;
+    }
 
     private static void Tile(StringBuilder html, string label, string value, string? note)
     {
@@ -390,6 +496,9 @@ public static class ProviderReportHtml
         th { color:var(--muted); font-weight:600; }
         .num { text-align:right; white-space:nowrap; }
         tr.provider td { background:#fdf3f2; }
+        td.better { color:#1f7a4d; font-weight:600; }
+        td.worse { color:var(--bad); font-weight:600; }
+        td.same { color:var(--muted); }
         svg { width:100%; height:auto; display:block; margin:8px 0 2px; }
         svg .grid { stroke:var(--line); stroke-width:1; }
         svg .axis { fill:var(--muted); font-size:11px; }

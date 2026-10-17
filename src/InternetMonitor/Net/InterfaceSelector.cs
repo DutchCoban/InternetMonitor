@@ -2,8 +2,12 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using InternetMonitor.Configuration;
 
 namespace InternetMonitor.Net;
+
+/// <summary>What <see cref="InterfaceSelector.Choose"/> decided: an adapter id, automatic selection (null), or a fixed adapter that is not there.</summary>
+public sealed record AdapterChoice(string? Id, bool MissingFixed);
 
 /// <summary>
 /// Decides which adapter the whole pipeline is talking about, so steps 1 to 4 never end up
@@ -130,6 +134,41 @@ public static class InterfaceSelector
     /// *which* adapter has no link.
     /// </summary>
     public static NetworkInterface? GetPrimary(IReadOnlyList<NetworkInterface> all) => GetRouted(all) ?? GuessPhysical(all);
+
+    /// <summary>
+    /// The adapter the pipeline should describe under the user's adapter setting: the chosen one
+    /// when the mode says so and it is there, automatic otherwise, and null for a fixed adapter
+    /// that Windows no longer lists - which step 1 reports as exactly that.
+    /// </summary>
+    public static NetworkInterface? GetPrimary(IReadOnlyList<NetworkInterface> all, AdapterMode mode, string? adapterId)
+    {
+        AdapterChoice choice = Choose(all.Select(nic => (nic.Id, nic.OperationalStatus == OperationalStatus.Up)), mode, adapterId);
+        if (choice.Id is { } id)
+        {
+            return all.First(nic => nic.Id == id);
+        }
+
+        return choice.MissingFixed ? null : GetPrimary(all);
+    }
+
+    /// <summary>The decision on its own, over ids and up/down flags, so it can be tested without real adapters.</summary>
+    public static AdapterChoice Choose(IEnumerable<(string Id, bool Up)> adapters, AdapterMode mode, string? wantedId)
+    {
+        if (mode == AdapterMode.Automatic || string.IsNullOrEmpty(wantedId))
+        {
+            return new AdapterChoice(null, false);
+        }
+
+        (string Id, bool Up) wanted = adapters.FirstOrDefault(a => a.Id == wantedId);
+        if (wanted.Id is null)
+        {
+            return new AdapterChoice(null, mode == AdapterMode.Fixed);
+        }
+
+        return mode == AdapterMode.Fixed || wanted.Up
+            ? new AdapterChoice(wanted.Id, false)
+            : new AdapterChoice(null, false);
+    }
 
     public static NetworkInterface? GetPrimary() => GetPrimary(GetAll());
 

@@ -32,23 +32,31 @@ public sealed class AdapterCheck : IStepCheck
         IReadOnlyList<NetworkInterface> all = InterfaceSelector.GetAll();
         context.AllAdapters = all;
         IReadOnlyList<NetworkInterface> candidates = InterfaceSelector.Candidates(all);
-        NetworkInterface? adapter = InterfaceSelector.GetPrimary(all);
+        Configuration.CheckTargets targets = context.Targets;
+        NetworkInterface? adapter = InterfaceSelector.GetPrimary(all, targets.AdapterMode, targets.AdapterId);
 
         if (adapter is null)
         {
+            // Either Windows lists no adapter at all, or Settings insist on one it no longer lists.
+            bool chosenMissing = targets.AdapterMode == Configuration.AdapterMode.Fixed && !string.IsNullOrEmpty(targets.AdapterId);
+            string headlineKey = chosenMissing ? "step.adapter.chosenMissing" : "step.adapter.none";
+            object[] headlineArgs = chosenMissing ? [targets.AdapterName is { Length: > 0 } ? targets.AdapterName : targets.AdapterId!] : [];
+            string detailKey = chosenMissing ? "step.adapter.chosenMissing.detail" : "step.adapter.none.detail";
+
             return Task.FromResult(new StepResult(
                 Id,
                 StepState.Failed,
-                loc.Get("step.adapter.none"),
-                loc.Get("step.adapter.none.detail"),
+                loc.Format(headlineKey, headlineArgs),
+                loc.Get(detailKey),
                 0,
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,
                 [],
-                new AdapterFacts(false, false, null, null, null, null, null, false, false, candidates.Count))
+                new AdapterFacts(candidates.Count > 0, false, null, null, null, null, null, false, false, candidates.Count))
             {
-                HeadlineKey = "step.adapter.none",
-                DetailKey = "step.adapter.none.detail",
+                HeadlineKey = headlineKey,
+                HeadlineArgs = headlineArgs,
+                DetailKey = detailKey,
             });
         }
 

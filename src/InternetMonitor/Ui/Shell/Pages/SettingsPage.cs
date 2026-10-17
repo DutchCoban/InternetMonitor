@@ -43,6 +43,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private Toggle _autoStart = null!;
     private Toggle _showIncidentPopups = null!;
     private ComboBox _notificationStyle = null!;
+    private ComboBox _adapterMode = null!;
+    private ComboBox _adapterChoice = null!;
     private NumericUpDown _latencyWarning = null!;
     private NumericUpDown _latencyError = null!;
     private NumericUpDown _weakWifi = null!;
@@ -323,6 +325,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _autoStart.CheckedChanged += OnAutoStartChanged;
 
         _showIncidentPopups.SetWithoutNotify(settings.ShowIncidentPopups);
+        ReloadAdapterCombos();
 
         _notificationStyle.SelectedIndexChanged -= OnNotificationStyleChanged;
         PopulateNotificationStyleItems();
@@ -541,6 +544,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _settingsBackupCard.Subtitle = Loc.Get("settings.section.configBackup.subtitle");
         _settingsBackupNote.Text = Loc.Get("settings.backup.note");
         RefreshKumaStatus(Services.Kuma.LastPush);
+        ReloadAdapterCombos();
 
         foreach ((Label label, _) in _rows)
         {
@@ -616,7 +620,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
             label.BackColor = p.Surface;
         }
 
-        foreach (ComboBox box in new[] { _language, _theme, _notificationStyle, _logLevel, _speedTestInterval, _historyRetention })
+        foreach (ComboBox box in new[] { _language, _theme, _notificationStyle, _adapterMode, _adapterChoice, _logLevel, _speedTestInterval, _historyRetention })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;

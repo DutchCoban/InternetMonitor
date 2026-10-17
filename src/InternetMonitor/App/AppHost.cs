@@ -82,6 +82,9 @@ public sealed class AppHost : ApplicationContext
                 LatencyWarningMs = warningMs,
                 LatencyErrorMs = errorMs,
                 WeakWifiSignalPercent = _settings.WeakWifiSignalPercent,
+                AdapterMode = _settings.AdapterMode,
+                AdapterId = _settings.AdapterId.Length > 0 ? _settings.AdapterId : null,
+                AdapterName = _settings.AdapterName.Length > 0 ? _settings.AdapterName : null,
                 Targets =
                 [
                     .. defaultTargets.Targets,

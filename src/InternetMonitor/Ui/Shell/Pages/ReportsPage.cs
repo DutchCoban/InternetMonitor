@@ -19,6 +19,8 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 {
     private Card _reportCard = null!;
     private ComboBox _period = null!;
+    private NumericUpDown _customDays = null!;
+    private ComboBox _comparison = null!;
     private NumericUpDown _subscribedDown = null!;
     private NumericUpDown _subscribedUp = null!;
     private AppButton _createReport = null!;
@@ -55,16 +57,41 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
     {
         AppSettings settings = Services.Settings;
 
-        _period = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
+        _period = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(200) };
         _period.SelectedIndexChanged += (_, _) =>
         {
-            if (_period.SelectedItem is PeriodItem item)
+            if (_period.SelectedItem is not PeriodItem item)
             {
-                Services.Settings.ReportPeriodDays = item.Days;
+                return;
+            }
+
+            // The presets are a guide; "custom" reveals a field for any number of days.
+            bool custom = item.Days == 0;
+            _customDays.Visible = custom;
+            Services.Settings.ReportPeriodDays = custom ? (int)_customDays.Value : item.Days;
+            Services.Settings.Save();
+            LayoutCards();
+        };
+        AddRow(_reportCard, "reports.provider.period", _period);
+
+        _customDays = new NumericUpDown { Minimum = 1, Maximum = AppSettings.MaxReportPeriodDays, Value = Math.Clamp(settings.ReportPeriodDays, 1, AppSettings.MaxReportPeriodDays), Width = Dp(90), TextAlign = HorizontalAlignment.Right, Visible = false };
+        _customDays.ValueChanged += (_, _) =>
+        {
+            Services.Settings.ReportPeriodDays = (int)_customDays.Value;
+            Services.Settings.Save();
+        };
+        AddRow(_reportCard, "reports.provider.customDays", _customDays);
+
+        _comparison = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(200) };
+        _comparison.SelectedIndexChanged += (_, _) =>
+        {
+            if (_comparison.SelectedItem is ComparisonItem item)
+            {
+                Services.Settings.ReportComparison = item.Kind;
                 Services.Settings.Save();
             }
         };
-        AddRow(_reportCard, "reports.provider.period", _period);
+        AddRow(_reportCard, "reports.provider.compare", _comparison);
 
         _subscribedDown = MakeSpeedField(settings.SubscribedDownloadMbps);
         _subscribedDown.ValueChanged += (_, _) =>
@@ -144,10 +171,20 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         DateTimeOffset to = DateTimeOffset.UtcNow;
         DateTimeOffset from = to.AddDays(-Services.Settings.ReportPeriodDays);
         ProviderReportData data = ProviderReportData.Compute(Services.Incidents.All, Services.History.Get, from, to, TimeZoneInfo.Local);
+
+        ReportComparison kind = Services.Settings.ReportComparison;
+        ProviderReportData? comparison = null;
+        if (ProviderReportHtml.ComparisonWindow(from, to, kind) is { } window)
+        {
+            comparison = ProviderReportData.Compute(Services.Incidents.All, Services.History.Get, window.From, window.To, TimeZoneInfo.Local);
+        }
+
         return ProviderReportHtml.Render(
             data,
             new ProviderReportOptions(Services.Settings.SubscribedDownloadMbps, Services.Settings.SubscribedUploadMbps, AppVersion, DateTimeOffset.Now, TimeZoneInfo.Local),
-            Loc);
+            Loc,
+            comparison,
+            kind);
     }
 
     /// <summary>
@@ -157,6 +194,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
     private void PopulatePeriodItems()
     {
         int retention = Services.Settings.HistoryRetentionDays;
+        int chosen = Services.Settings.ReportPeriodDays;
         _period.Items.Clear();
         foreach (int days in AppSettings.AllowedReportPeriodDays)
         {
@@ -166,10 +204,28 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
             _period.Items.Add(new PeriodItem(days, display));
         }
 
-        _period.SelectedItem = _period.Items.Cast<PeriodItem>().FirstOrDefault(i => i.Days == Services.Settings.ReportPeriodDays);
+        _period.Items.Add(new PeriodItem(0, Loc.Get("reports.provider.periodCustom")));
+
+        bool preset = AppSettings.AllowedReportPeriodDays.Contains(chosen);
+        _period.SelectedItem = _period.Items.Cast<PeriodItem>().First(i => i.Days == (preset ? chosen : 0));
+        _customDays.Value = Math.Clamp(chosen, 1, AppSettings.MaxReportPeriodDays);
+        _customDays.Visible = !preset;
+
+        _comparison.Items.Clear();
+        foreach (ReportComparison kind in Enum.GetValues<ReportComparison>())
+        {
+            _comparison.Items.Add(new ComparisonItem(kind, Loc.Get($"reports.provider.compare.{char.ToLowerInvariant(kind.ToString()[0])}{kind.ToString()[1..]}")));
+        }
+
+        _comparison.SelectedItem = _comparison.Items.Cast<ComparisonItem>().First(i => i.Kind == Services.Settings.ReportComparison);
     }
 
     private sealed record PeriodItem(int Days, string Display)
+    {
+        public override string ToString() => Display;
+    }
+
+    private sealed record ComparisonItem(ReportComparison Kind, string Display)
     {
         public override string ToString() => Display;
     }
@@ -267,6 +323,13 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         int y = content.Top;
         foreach ((Label label, Control field) in _rows)
         {
+            // A hidden field (the custom day count, unless "custom" is chosen) takes no row.
+            label.Visible = field.Visible;
+            if (!field.Visible)
+            {
+                continue;
+            }
+
             label.Bounds = new Rectangle(content.Left, y, Math.Max(0, width - field.Width - Sp(3)), rowHeight);
             field.Location = new Point(content.Left + width - field.Width, y + ((rowHeight - field.Height) / 2));
             y += rowHeight;
@@ -354,5 +417,6 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         }
 
         _period.FlatStyle = FlatStyle.Flat;
+        _comparison.FlatStyle = FlatStyle.Flat;
     }
 }

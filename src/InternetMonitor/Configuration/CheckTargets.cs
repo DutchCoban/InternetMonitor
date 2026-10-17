@@ -156,6 +156,13 @@ public sealed record CheckTargets
     /// </summary>
     public int WeakWifiSignalPercent { get; init; } = 40;
 
+    /// <summary>Which adapter step 1 describes - see <see cref="AppSettings.AdapterMode"/>.</summary>
+    public AdapterMode AdapterMode { get; init; } = AdapterMode.Automatic;
+
+    public string? AdapterId { get; init; }
+
+    public string? AdapterName { get; init; }
+
     /// <summary>Above this, a latency reading is reported as degraded rather than healthy.</summary>
     public int LatencyWarningMs { get; init; } = 300;
 

@@ -7,6 +7,34 @@ using InternetMonitor.Ui.Theming;
 
 namespace InternetMonitor.Configuration;
 
+/// <summary>Which earlier period the provider report sets the chosen one against.</summary>
+public enum ReportComparison
+{
+    None,
+
+    /// <summary>The same number of days directly before the period.</summary>
+    PreviousPeriod,
+
+    /// <summary>The same period one week earlier - weekdays have their own patterns.</summary>
+    WeekEarlier,
+
+    /// <summary>The same period one month earlier.</summary>
+    MonthEarlier,
+}
+
+/// <summary>Which adapter the checks describe - see <see cref="Net.InterfaceSelector.Choose"/>.</summary>
+public enum AdapterMode
+{
+    /// <summary>The adapter Windows routes internet traffic over, falling back to the most plausible physical one.</summary>
+    Automatic,
+
+    /// <summary>The chosen adapter while it is up; automatic when it is not.</summary>
+    Preferred,
+
+    /// <summary>Always the chosen adapter, even when Windows routes over another; step 1 fails when it is gone.</summary>
+    Fixed,
+}
+
 /// <summary>How the app tells the user a problem began or ended.</summary>
 public enum NotificationStyle
 {
@@ -55,6 +83,13 @@ public sealed class AppSettings
     public ThemeMode Theme { get; set; } = ThemeMode.System;
 
     public bool AutoStartWithWindows { get; set; }
+
+    /// <summary>Which adapter the checks describe. The chosen adapter's Windows id and, for the message when it is gone, its name.</summary>
+    public AdapterMode AdapterMode { get; set; } = AdapterMode.Automatic;
+
+    public string AdapterId { get; set; } = string.Empty;
+
+    public string AdapterName { get; set; } = string.Empty;
 
     /// <summary>
     /// A brief pop-up when a new incident opens. On by default, matching v1's equivalent
@@ -214,15 +249,21 @@ public sealed class AppSettings
     /// <summary>The subscription's advertised upload speed in Mbit/s, for the provider report; 0 = not entered.</summary>
     public int SubscribedUploadMbps { get; set; }
 
+    /// <summary>The periods offered as a guide; any number of days from 1 to 365 is accepted as well.</summary>
     public static readonly int[] AllowedReportPeriodDays = [7, 30, 90];
 
+    public const int MaxReportPeriodDays = 365;
+
     private int _reportPeriodDays = 30;
+
+    /// <summary>Which earlier period the report compares against; none by default.</summary>
+    public ReportComparison ReportComparison { get; set; } = ReportComparison.None;
 
     /// <summary>How far back the provider report looks. Longer than <see cref="HistoryRetentionDays"/> is allowed; the report's coverage figure then shows how much of it was kept.</summary>
     public int ReportPeriodDays
     {
         get => _reportPeriodDays;
-        set => _reportPeriodDays = Array.IndexOf(AllowedReportPeriodDays, value) >= 0 ? value : _reportPeriodDays;
+        set => _reportPeriodDays = Math.Clamp(value, 1, MaxReportPeriodDays);
     }
 
     // ---- Updates -------------------------------------------------------------------------------

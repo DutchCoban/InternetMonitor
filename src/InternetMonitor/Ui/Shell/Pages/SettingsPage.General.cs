@@ -3,6 +3,7 @@ using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Localization;
+using InternetMonitor.Net;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
 using InternetMonitor.Ui.Windows;
@@ -44,6 +45,70 @@ public sealed partial class SettingsPage
         _notificationStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
         _notificationStyle.SelectedIndexChanged += OnNotificationStyleChanged;
         AddRow(_generalCard, "settings.notificationStyle", _notificationStyle);
+
+        // Which adapter the checks describe: automatic, a preferred one, or a fixed one.
+        _adapterMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(260) };
+        _adapterMode.SelectedIndexChanged += OnAdapterSettingsChanged;
+        AddRow(_generalCard, "settings.adapterMode", _adapterMode);
+
+        _adapterChoice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(260) };
+        _adapterChoice.SelectedIndexChanged += OnAdapterSettingsChanged;
+        AddRow(_generalCard, "settings.adapter", _adapterChoice);
+    }
+
+    /// <summary>Fills both adapter combos from the settings and from what Windows lists right now, without firing the change handler.</summary>
+    private void ReloadAdapterCombos()
+    {
+        AppSettings settings = Services.Settings;
+        _adapterMode.SelectedIndexChanged -= OnAdapterSettingsChanged;
+        _adapterChoice.SelectedIndexChanged -= OnAdapterSettingsChanged;
+
+        _adapterMode.Items.Clear();
+        foreach (AdapterMode mode in Enum.GetValues<AdapterMode>())
+        {
+            _adapterMode.Items.Add(new ComboItem(mode.ToString(), Loc.Get($"settings.adapterMode.{mode.ToString().ToLowerInvariant()}")));
+        }
+
+        SelectComboItem(_adapterMode, settings.AdapterMode.ToString());
+
+        _adapterChoice.Items.Clear();
+        _adapterChoice.Items.Add(new ComboItem(string.Empty, Loc.Get("settings.adapter.none")));
+        foreach (System.Net.NetworkInformation.NetworkInterface nic in InterfaceSelector.GetAll().OrderBy(n => n.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            _adapterChoice.Items.Add(new ComboItem(nic.Id, $"{nic.Name} - {nic.Description}"));
+        }
+
+        // The chosen adapter may be unplugged right now; it still has to be selectable, by name.
+        if (settings.AdapterId.Length > 0 && !_adapterChoice.Items.Cast<ComboItem>().Any(i => i.Key == settings.AdapterId))
+        {
+            _adapterChoice.Items.Add(new ComboItem(settings.AdapterId, settings.AdapterName.Length > 0 ? settings.AdapterName : settings.AdapterId));
+        }
+
+        SelectComboItem(_adapterChoice, settings.AdapterId);
+        _adapterChoice.Enabled = settings.AdapterMode != AdapterMode.Automatic;
+
+        _adapterMode.SelectedIndexChanged += OnAdapterSettingsChanged;
+        _adapterChoice.SelectedIndexChanged += OnAdapterSettingsChanged;
+    }
+
+    private void OnAdapterSettingsChanged(object? sender, EventArgs e)
+    {
+        if (_adapterMode.SelectedItem is ComboItem modeItem && Enum.TryParse(modeItem.Key, out AdapterMode mode))
+        {
+            Services.Settings.AdapterMode = mode;
+        }
+
+        if (_adapterChoice.SelectedItem is ComboItem adapter)
+        {
+            Services.Settings.AdapterId = adapter.Key;
+            Services.Settings.AdapterName = adapter.Key.Length > 0 ? adapter.Display : string.Empty;
+        }
+
+        _adapterChoice.Enabled = Services.Settings.AdapterMode != AdapterMode.Automatic;
+        Services.Settings.Save();
+
+        // Takes effect on the very next cycle; the pipeline reads its targets fresh each time.
+        Services.Cadence.RunNow();
     }
 
     // ---- Updates ------------------------------------------------------------------------------
