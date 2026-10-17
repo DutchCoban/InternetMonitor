@@ -1,8 +1,13 @@
 using System.Text;
+using InternetMonitor.Core.Export;
 
 namespace InternetMonitor.Core.Tools.LanScan;
 
-/// <summary>Builds the CSV behind the LAN scanner's export button - a pure function, like <see cref="Diagnosis.DiagnosticReportBuilder"/>.</summary>
+/// <summary>
+/// Builds the CSV behind the LAN scanner's export button - a pure function, like
+/// <see cref="Diagnosis.DiagnosticReportBuilder"/>. Host names and manufacturers are text other
+/// parties chose, so every field goes through <see cref="Csv.Field"/>.
+/// </summary>
 public static class LanScanCsvBuilder
 {
     public static string Build(IReadOnlyList<LanDevice> devices)
@@ -12,19 +17,15 @@ public static class LanScanCsvBuilder
 
         foreach (LanDevice device in devices.OrderBy(d => d.Address, IpAddressComparer.Instance))
         {
-            sb.Append(Escape(device.Address.ToString())).Append(',')
-                .Append(Escape(device.Hostname ?? string.Empty)).Append(',')
-                .Append(Escape(device.MacAddress ?? string.Empty)).Append(',')
-                .Append(Escape(device.Vendor ?? string.Empty)).Append(',')
+            sb.Append(Csv.Field(device.Address.ToString())).Append(',')
+                .Append(Csv.Field(device.Hostname)).Append(',')
+                .Append(Csv.Field(device.MacAddress)).Append(',')
+                .Append(Csv.Field(device.Vendor)).Append(',')
                 .AppendLine(device.RoundtripMs is { } ms ? ms.ToString("F0") : string.Empty);
         }
 
         return sb.ToString();
     }
-
-    /// <summary>Quotes a field only when it needs it, matching how every common CSV reader expects an unquoted field to look.</summary>
-    private static string Escape(string value) =>
-        value.IndexOfAny([',', '"', '\n', '\r']) < 0 ? value : $"\"{value.Replace("\"", "\"\"")}\"";
 
     /// <summary>Sorts addresses numerically (10.0.0.2 before 10.0.0.10) rather than as text.</summary>
     private sealed class IpAddressComparer : IComparer<System.Net.IPAddress>

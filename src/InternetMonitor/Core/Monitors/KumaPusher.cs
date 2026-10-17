@@ -4,8 +4,12 @@ namespace InternetMonitor.Core.Monitors;
 /// Sends an unconditional periodic heartbeat GET to a fully-formed Uptime Kuma push-monitor URL.
 /// Deliberately independent of everything else in the app - no dependency on the step pipeline or
 /// its state - matching the reference implementation this is a push monitor for: push, then sleep,
-/// forever. "Active" is defined purely as "a non-empty URL is configured"; there is no separate
+/// forever. "Active" is defined purely as "a valid URL is configured"; there is no separate
 /// enabled flag, carried over unchanged from v1's identically-named pusher.
+///
+/// Valid means an absolute https address, checked here and not only in the Settings page: the URL
+/// carries the monitor's token, and a hand-edited or imported settings.json with a plain http URL
+/// would otherwise send that token in the clear every minute.
 /// </summary>
 public sealed class KumaPusher : IAsyncDisposable
 {
@@ -21,6 +25,13 @@ public sealed class KumaPusher : IAsyncDisposable
     /// <summary>Whether the most recent push succeeded - for a future status indicator; not acted on internally.</summary>
     public bool LastPushFailed { get; private set; }
 
+    /// <summary>Whether a push loop is running - that is, whether a usable URL is configured.</summary>
+    public bool IsActive => _loopTask is not null;
+
+    /// <summary>The only URLs the pusher will call: absolute, and https so the token in them stays encrypted.</summary>
+    public static bool IsUsableUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && uri.Scheme == Uri.UriSchemeHttps;
+
     /// <summary>
     /// Applies settings and starts/stops/restarts the loop as needed. Idempotent: calling this
     /// again with the same URL and interval while already running is a no-op, which matters
@@ -29,6 +40,11 @@ public sealed class KumaPusher : IAsyncDisposable
     public void Reconfigure(string url, int intervalSeconds)
     {
         string trimmedUrl = url.Trim();
+        if (!IsUsableUrl(trimmedUrl))
+        {
+            trimmedUrl = string.Empty;
+        }
+
         var newInterval = TimeSpan.FromSeconds(Math.Max(MinimumIntervalSeconds, intervalSeconds));
         bool changed = trimmedUrl != _url || newInterval != _interval;
         _url = trimmedUrl;
@@ -102,11 +118,11 @@ public sealed class KumaPusher : IAsyncDisposable
             using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
             LastPushFailed = !response.IsSuccessStatusCode;
         }
-        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException or InvalidOperationException)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException or InvalidOperationException or NotSupportedException)
         {
-            // InvalidOperationException covers a malformed push URL (e.g. from a hand-edited
-            // settings.json) - without this, a bad URL would permanently kill the push loop instead
-            // of just failing this one push.
+            // InvalidOperationException and NotSupportedException cover a URL HttpClient will not
+            // send to - belt and braces next to the check in Reconfigure - so a bad URL fails this
+            // one push rather than silently ending the loop.
             LastPushFailed = true;
         }
     }

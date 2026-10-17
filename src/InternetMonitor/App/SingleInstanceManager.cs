@@ -4,16 +4,17 @@ namespace InternetMonitor.App;
 /// Holds a named mutex for the lifetime of the process so a second launch exits instead of
 /// starting a second tray icon and a second set of probe loops.
 ///
-/// The mutex name is global to the user session rather than machine-wide: two different users
-/// logged into the same machine should each get their own monitor, since each has their own
-/// settings, their own history and their own tray.
+/// The names are explicitly in the session-local namespace ("Local\") rather than machine-wide:
+/// two different users logged into the same machine should each get their own monitor, since each
+/// has their own settings, their own history and their own tray - and nothing in another session
+/// can reach these objects at all.
 /// </summary>
 public sealed class SingleInstanceManager : IDisposable
 {
-    private const string MutexName = "InternetMonitor.SingleInstance.Mutex";
+    private const string MutexName = @"Local\InternetMonitor.SingleInstance.Mutex";
 
     /// <summary>Set by a second launch to ask the running instance to show its window.</summary>
-    private const string ShowEventName = "InternetMonitor.SingleInstance.Show";
+    private const string ShowEventName = @"Local\InternetMonitor.SingleInstance.Show";
 
     private readonly Mutex? _mutex;
     private EventWaitHandle? _showEvent;

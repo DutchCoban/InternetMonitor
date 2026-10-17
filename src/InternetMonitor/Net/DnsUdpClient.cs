@@ -117,8 +117,10 @@ public static class DnsUdpClient
                 }
 
                 // UDP is connectionless, so a stray datagram from anything else on the machine can
-                // land here. Matching the transaction id is what makes the answer ours.
-                if (BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(0, 2)) != transactionId)
+                // land here. Matching the transaction id and the question is what makes the answer
+                // ours - the id alone is sixteen bits, which a sender guessing at it can hit.
+                if (BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(0, 2)) != transactionId
+                    || !IsAnswerTo(buffer.AsSpan(0, received.ReceivedBytes), query))
                 {
                     continue;
                 }
@@ -231,6 +233,42 @@ public static class DnsUdpClient
 
         return [.. message];
     }
+
+    /// <summary>
+    /// Whether <paramref name="response"/> is a reply (QR bit set) that echoes exactly the one
+    /// question <paramref name="query"/> asked - same name, type and class. A datagram that only
+    /// matches on transaction id is not accepted as the answer.
+    /// </summary>
+    public static bool IsAnswerTo(ReadOnlySpan<byte> response, ReadOnlySpan<byte> query)
+    {
+        if (response.Length < query.Length || query.Length < HeaderSize)
+        {
+            return false;
+        }
+
+        bool isReply = (response[2] & 0x80) != 0;
+        int questionCount = BinaryPrimitives.ReadUInt16BigEndian(response[4..6]);
+        if (!isReply || questionCount != 1)
+        {
+            return false;
+        }
+
+        // Resolvers answer with the question as asked; comparing the labels without regard to
+        // ASCII case allows for one that normalises it.
+        ReadOnlySpan<byte> asked = query[HeaderSize..];
+        ReadOnlySpan<byte> echoed = response.Slice(HeaderSize, asked.Length);
+        for (int i = 0; i < asked.Length; i++)
+        {
+            if (ToLowerAscii(asked[i]) != ToLowerAscii(echoed[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static byte ToLowerAscii(byte b) => b is >= (byte)'A' and <= (byte)'Z' ? (byte)(b + 32) : b;
 
     private static DnsQueryResult Parse(ReadOnlySpan<byte> response, DnsRecordType type, double elapsedMs)
     {

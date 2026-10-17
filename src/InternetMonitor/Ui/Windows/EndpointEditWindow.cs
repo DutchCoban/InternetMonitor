@@ -36,6 +36,7 @@ public sealed class EndpointEditWindow : Form
     private readonly TextBox _host;
     private readonly Label _portLabel;
     private readonly NumericUpDown _port;
+    private readonly Label _warning;
     private readonly Label _error;
     private readonly AppButton _save;
     private readonly AppButton _cancel;
@@ -70,6 +71,7 @@ public sealed class EndpointEditWindow : Form
 
         _urlLabel = MakeLabel(_loc.Get("settings.endpoint.url"));
         _url = MakeTextBox(existing is { Kind: EndpointKind.Url } ? existing.Url : "https://");
+        _url.TextChanged += (_, _) => LayoutFields();
 
         // 0 means "any response counts" - see OnSaveClicked.
         _expectedStatusLabel = MakeLabel(_loc.Get("settings.endpoint.expectedStatus"));
@@ -85,6 +87,19 @@ public sealed class EndpointEditWindow : Form
 
         _portLabel = MakeLabel(_loc.Get("settings.endpoint.port"));
         _port = MakeNumeric(1, 65535, existing is { Kind: EndpointKind.TcpPort } ? existing.Port : 443);
+
+        // Shown only for a plain-http URL with headers: the header values are usually an API key
+        // or a token, and over http they travel in the clear. A warning, not a block - a check
+        // against an internal service that only speaks http is a legitimate thing to set up.
+        _warning = new Label
+        {
+            AutoSize = false,
+            ForeColor = _palette.TextMuted,
+            BackColor = _palette.Bg,
+            Font = Theme.Font(FontRole.Small),
+            Text = _loc.Get("settings.endpoint.warn.httpHeaders"),
+            Visible = false,
+        };
 
         _error = new Label
         {
@@ -117,6 +132,7 @@ public sealed class EndpointEditWindow : Form
         Controls.Add(_host);
         Controls.Add(_portLabel);
         Controls.Add(_port);
+        Controls.Add(_warning);
         Controls.Add(_error);
         Controls.Add(_cancel);
         Controls.Add(_save);
@@ -212,9 +228,17 @@ public sealed class EndpointEditWindow : Form
 
             _addHeader.Location = new Point(left, y);
             y += _addHeader.Height + Sp(2);
+
+            _warning.Visible = SendsHeadersOverPlainHttp();
+            if (_warning.Visible)
+            {
+                _warning.Bounds = new Rectangle(left, y, fieldWidth, Dp(32));
+                y += Dp(34);
+            }
         }
         else
         {
+            _warning.Visible = false;
             Row(_hostLabel, _host, Dp(24));
             Row(_portLabel, _port, Dp(24));
         }
@@ -227,6 +251,11 @@ public sealed class EndpointEditWindow : Form
         _save.Location = new Point(ClientSize.Width - left - _save.Width, buttonsY);
         _cancel.Location = new Point(_save.Left - Sp(2) - _cancel.Width, buttonsY);
     }
+
+    private bool SendsHeadersOverPlainHttp() =>
+        Uri.TryCreate(_url.Text.Trim(), UriKind.Absolute, out Uri? uri)
+        && uri.Scheme == Uri.UriSchemeHttp
+        && _headerRows.Any(r => r.Name.Text.Trim().Length > 0);
 
     /// <summary>
     /// Adds one empty or pre-filled header row (name, value, a small remove button) and relies on
@@ -245,6 +274,7 @@ public sealed class EndpointEditWindow : Form
 
         var row = (nameBox, valueBox, remove);
         _headerRows.Add(row);
+        nameBox.TextChanged += (_, _) => LayoutFields();
 
         remove.Click += (_, _) =>
         {

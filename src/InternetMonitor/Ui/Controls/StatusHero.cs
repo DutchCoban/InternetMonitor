@@ -35,7 +35,7 @@ public sealed class StatusHero : ThemedControl
     public StatusHero()
     {
         _loginButton = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Globe, Visible = false };
-        _loginButton.Click += (_, _) => ShellOpen.Open(CaptivePortalProbe.LoginPageUrl);
+        _loginButton.Click += (_, _) => ShellOpen.OpenUrl(CaptivePortalProbe.LoginPageUrl);
         Controls.Add(_loginButton);
     }
 

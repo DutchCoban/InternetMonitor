@@ -69,6 +69,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private Label _publicIpError = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
+    private Label _settingsBackupNote = null!;
     private AppButton _kumaAbout = null!;
     private EndpointList _endpoints = null!;
     private AppButton _addEndpoint = null!;
@@ -408,7 +409,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
 
     // The folder may not exist yet (nothing has logged there) - not worth surfacing for a
     // convenience shortcut the user can open themselves via Explorer.
-    private void OpenLogFolder() => ShellOpen.Open(Services.DiagnosticLog.ResolvedDirectory());
+    private void OpenLogFolder() => ShellOpen.OpenPath(Services.DiagnosticLog.ResolvedDirectory());
 
     private void RefreshLogDirectoryText() => _logDirectory.Text = Services.DiagnosticLog.ResolvedDirectory();
 
@@ -621,7 +622,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _integrationsCard.Controls.Add(_kumaAbout);
     }
 
-    private static void OpenUptimeKumaProjectPage() => ShellOpen.Open("https://github.com/louislam/uptime-kuma");
+    private static void OpenUptimeKumaProjectPage() => ShellOpen.OpenUrl("https://github.com/louislam/uptime-kuma");
 
     private void OnKumaSettingsChanged(object? sender, EventArgs e)
     {
@@ -732,6 +733,16 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     {
         _exportSettings = AddExportButton(_settingsBackupCard, _settingsBackupButtons, ExportSettings);
         _importSettings = AddExportButton(_settingsBackupCard, _settingsBackupButtons, ImportSettings);
+
+        // The export is deliberately unredacted (see ExportSettings), which is worth one line of
+        // warning next to the button rather than a dialog in the way of every export.
+        _settingsBackupNote = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.TopLeft,
+            Font = Theme.Font(FontRole.Small),
+        };
+        _settingsBackupCard.Controls.Add(_settingsBackupNote);
     }
 
     private static AppButton AddExportButton(Card card, List<AppButton> buttons, Action onClick)
@@ -976,6 +987,12 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _endpointsCard.Height = content.Top + contentHeight + _endpointsCard.Inset;
 
         LayoutExportButtons(_settingsBackupCard, _settingsBackupButtons);
+
+        // The note goes under the buttons the row layout just placed, same shape as the Kuma extras.
+        Rectangle backupContent = _settingsBackupCard.DisplayRectangle;
+        int backupY = _settingsBackupCard.Height - _settingsBackupCard.Inset + Sp(1);
+        _settingsBackupNote.Bounds = new Rectangle(backupContent.Left, backupY, backupContent.Width, Dp(32));
+        _settingsBackupCard.Height = backupY + Dp(32) + _settingsBackupCard.Inset;
     }
 
     protected override void OnResize(EventArgs e)
@@ -1195,6 +1212,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _endpointsCard.Subtitle = Loc.Get("settings.section.endpoints.subtitle");
         _settingsBackupCard.Title = Loc.Get("settings.section.configBackup");
         _settingsBackupCard.Subtitle = Loc.Get("settings.section.configBackup.subtitle");
+        _settingsBackupNote.Text = Loc.Get("settings.backup.note");
 
         foreach ((Label label, _) in _rows)
         {
@@ -1306,6 +1324,8 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         _kumaUrl.ForeColor = p.TextPrimary;
         _kumaError.BackColor = p.Surface;
         _kumaError.ForeColor = p.Error;
+        _settingsBackupNote.BackColor = p.Surface;
+        _settingsBackupNote.ForeColor = p.TextMuted;
 
         foreach (TextBox box in new[] { _publicIpTargets, _customDnsServers })
         {

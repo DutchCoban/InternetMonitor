@@ -661,5 +661,7 @@
   "networkHealth.tcpRetransmissions.speedTest.cause": "{0} retransmisji w ciągu ostatnich {1} minut, podczas testu prędkości. Test prędkości celowo wypełnia łącze, a TCP musi wtedy ponownie wysyłać pakiety - to normalne i nie jest awarią.",
   "networkHealth.tcpRetransmissions.speedTest.todo": "Nic, jeśli wystąpiło tylko podczas testu. Jeśli powtarza się także bez testu prędkości, sprawdź sygnał Wi-Fi i kable.",
   "networkHealth.packetLoss.speedTest.cause": "Średnio {0}% utraty pakietów w ciągu ostatnich {1} minut, podczas testu prędkości. Gdy łącze jest celowo wypełnione, pingi czekają w kolejce za ruchem testu i część z nich ginie - to normalne i nie jest awarią.",
-  "networkHealth.packetLoss.speedTest.todo": "Nic, jeśli wystąpiło tylko podczas testu. Jeśli powtarza się także bez testu prędkości, sprawdź sygnał Wi-Fi i kable."
+  "networkHealth.packetLoss.speedTest.todo": "Nic, jeśli wystąpiło tylko podczas testu. Jeśli powtarza się także bez testu prędkości, sprawdź sygnał Wi-Fi i kable.",
+  "settings.endpoint.warn.httpHeaders": "Ten adres URL używa zwykłego http://, więc wartości nagłówków (klucze API, tokeny) są wysyłane bez szyfrowania. Jeśli to możliwe, użyj https://.",
+  "settings.backup.note": "Eksport zawiera adres URL Uptime Kuma i nagłówki punktów końcowych w oryginalnej postaci, więc nie udostępniaj tego pliku."
 }

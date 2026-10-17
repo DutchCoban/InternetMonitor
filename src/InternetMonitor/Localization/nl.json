@@ -661,5 +661,7 @@
   "networkHealth.tcpRetransmissions.speedTest.cause": "{0} retransmissies in de laatste {1} minuten, terwijl er een snelheidstest liep. Een snelheidstest trekt de lijn bewust vol, en dan moet TCP pakketten opnieuw versturen - dat is normaal en geen storing.",
   "networkHealth.tcpRetransmissions.speedTest.todo": "Niets, als het alleen tijdens de test gebeurde. Komt het ook zonder snelheidstest terug, controleer dan het wifi-signaal en de kabels.",
   "networkHealth.packetLoss.speedTest.cause": "Gemiddeld {0}% pakketverlies in de laatste {1} minuten, terwijl er een snelheidstest liep. Met de lijn bewust vol staan pings in de rij achter het verkeer van de test en vallen er een paar weg - dat is normaal en geen storing.",
-  "networkHealth.packetLoss.speedTest.todo": "Niets, als het alleen tijdens de test gebeurde. Komt het ook zonder snelheidstest terug, controleer dan het wifi-signaal en de kabels."
+  "networkHealth.packetLoss.speedTest.todo": "Niets, als het alleen tijdens de test gebeurde. Komt het ook zonder snelheidstest terug, controleer dan het wifi-signaal en de kabels.",
+  "settings.endpoint.warn.httpHeaders": "Deze URL gebruikt gewoon http://, dus deze header-waarden (API-sleutels, tokens) gaan onversleuteld over de lijn. Gebruik waar mogelijk https://.",
+  "settings.backup.note": "De export bevat de Uptime Kuma-URL en endpoint-headers onbewerkt; deel het bestand dus niet."
 }

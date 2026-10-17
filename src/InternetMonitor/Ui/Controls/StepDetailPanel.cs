@@ -39,7 +39,8 @@ public sealed class StepDetailPanel : ThemedControl
         base.OnMouseClick(e);
         if (e.Button == MouseButtons.Left && _actionBounds.Contains(e.Location) && _result?.Action is { } action)
         {
-            ShellOpen.Open(action.Target);
+            // The only action a step offers is a Windows settings page - see LinkCheck.
+            ShellOpen.OpenSettings(action.Target);
         }
     }
 

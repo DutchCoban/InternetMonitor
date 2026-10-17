@@ -129,7 +129,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
             Directory.CreateDirectory(directory);
             string path = Path.Combine(directory, fileName);
             await File.WriteAllTextAsync(path, html).ConfigureAwait(true);
-            ShellOpen.Open(path);
+            ShellOpen.OpenPath(path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

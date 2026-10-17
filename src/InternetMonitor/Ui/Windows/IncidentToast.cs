@@ -65,7 +65,7 @@ public sealed class IncidentToast : Form
         {
             if (opensLoginPage)
             {
-                ShellOpen.Open(CaptivePortalProbe.LoginPageUrl);
+                ShellOpen.OpenUrl(CaptivePortalProbe.LoginPageUrl);
             }
 
             Close();

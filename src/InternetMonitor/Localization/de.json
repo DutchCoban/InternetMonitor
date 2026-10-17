@@ -661,5 +661,7 @@
   "networkHealth.tcpRetransmissions.speedTest.cause": "{0} Neuübertragungen in den letzten {1} Minuten, während ein Geschwindigkeitstest lief. Ein Geschwindigkeitstest lastet die Leitung bewusst aus, und TCP muss dann Pakete erneut senden - das ist normal und keine Störung.",
   "networkHealth.tcpRetransmissions.speedTest.todo": "Nichts, wenn es nur während des Tests auftrat. Kommt es auch ohne Geschwindigkeitstest wieder, prüfe das WLAN-Signal und die Kabel.",
   "networkHealth.packetLoss.speedTest.cause": "Durchschnittlich {0} % Paketverlust in den letzten {1} Minuten, während ein Geschwindigkeitstest lief. Bei bewusst ausgelasteter Leitung stehen Pings hinter dem Testverkehr an und einige gehen verloren - das ist normal und keine Störung.",
-  "networkHealth.packetLoss.speedTest.todo": "Nichts, wenn es nur während des Tests auftrat. Kommt es auch ohne Geschwindigkeitstest wieder, prüfe das WLAN-Signal und die Kabel."
+  "networkHealth.packetLoss.speedTest.todo": "Nichts, wenn es nur während des Tests auftrat. Kommt es auch ohne Geschwindigkeitstest wieder, prüfe das WLAN-Signal und die Kabel.",
+  "settings.endpoint.warn.httpHeaders": "Diese URL verwendet einfaches http://, daher werden diese Header-Werte (API-Schlüssel, Tokens) unverschlüsselt gesendet. Verwenden Sie möglichst https://.",
+  "settings.backup.note": "Der Export enthält die Uptime-Kuma-URL und Endpoint-Header unverändert - die Datei also nicht weitergeben."
 }

@@ -25,6 +25,9 @@ public sealed class MacVendorLookup : IDisposable
 {
     private static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(4);
 
+    /// <summary>A vendor answer is one name or a short JSON array; the client refuses anything larger rather than buffering it.</summary>
+    private const long MaxResponseBytes = 64 * 1024;
+
     // api.macvendors.com documents a hard 1/second cap on its free tier; macvendorlookup.com
     // documents no hard number but asks for restraint - both margins are deliberately a bit
     // under what each provider actually allows.
@@ -42,7 +45,7 @@ public sealed class MacVendorLookup : IDisposable
 
     public MacVendorLookup()
     {
-        _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = MaxResponseBytes };
         _http.DefaultRequestHeaders.Add("User-Agent", "InternetMonitor/2.0");
         LoadCache();
     }

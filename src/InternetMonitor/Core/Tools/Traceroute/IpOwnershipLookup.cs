@@ -35,6 +35,9 @@ public sealed class IpOwnershipLookup : IDisposable
     private static readonly TimeSpan DnsTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan RdapTimeout = TimeSpan.FromSeconds(4);
 
+    /// <summary>An RDAP record is a few KB; the client refuses anything larger rather than buffering it.</summary>
+    private const long MaxRdapResponseBytes = 64 * 1024;
+
     private static readonly IPAddress[] Resolvers =
     [
         IPAddress.Parse("9.9.9.9"),
@@ -54,6 +57,7 @@ public sealed class IpOwnershipLookup : IDisposable
         _http = new HttpClient
         {
             Timeout = Timeout.InfiniteTimeSpan,
+            MaxResponseContentBufferSize = MaxRdapResponseBytes,
             DefaultRequestHeaders = { { "Accept", "application/rdap+json" }, { "User-Agent", "InternetMonitor/2.0" } },
         };
 

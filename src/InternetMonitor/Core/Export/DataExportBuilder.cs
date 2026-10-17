@@ -115,7 +115,7 @@ public static class DataExportBuilder
         {
             sb.Append(point.Timestamp.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)).Append(',')
                 .Append(point.Value.ToString(CultureInfo.InvariantCulture)).Append(',')
-                .AppendLine(point.Metadata ?? string.Empty);
+                .AppendLine(Csv.Field(point.Metadata));
         }
 
         return sb.ToString();

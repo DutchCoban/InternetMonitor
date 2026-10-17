@@ -271,10 +271,11 @@ public sealed class AppHost : ApplicationContext
     /// </summary>
     private async Task HandleUpdateAvailableAsync(UpdateCheckResult result)
     {
-        if (_settings.AutoUpdateInstall && result.AssetDownloadUrl is { } assetUrl)
+        // Only a release with its signature asset is ever installed; one without is still reported.
+        if (_settings.AutoUpdateInstall && result is { AssetDownloadUrl: not null, SignatureDownloadUrl: not null })
         {
             string currentExePath = Environment.ProcessPath ?? Application.ExecutablePath;
-            bool applied = await _updateInstaller.DownloadAndApplyAsync(assetUrl, currentExePath, CancellationToken.None).ConfigureAwait(true);
+            bool applied = await _updateInstaller.DownloadAndApplyAsync(result, currentExePath, CancellationToken.None).ConfigureAwait(true);
             if (applied)
             {
                 ShowInstallingToastAndRestart(result);

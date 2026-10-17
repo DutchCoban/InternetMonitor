@@ -661,5 +661,7 @@
   "networkHealth.tcpRetransmissions.speedTest.cause": "{0} retransmissions in the last {1} minutes, while a speed test was running. A speed test fills the line on purpose, and TCP then has to resend packets - this is expected and not a fault.",
   "networkHealth.tcpRetransmissions.speedTest.todo": "Nothing, if it only happened during the test. If it also comes back without a speed test, check the Wi-Fi signal and cables.",
   "networkHealth.packetLoss.speedTest.cause": "{0}% packet loss on average over the last {1} minutes, while a speed test was running. With the line filled on purpose, pings queue behind the test's traffic and some are dropped - this is expected and not a fault.",
-  "networkHealth.packetLoss.speedTest.todo": "Nothing, if it only happened during the test. If it also comes back without a speed test, check the Wi-Fi signal and cables."
+  "networkHealth.packetLoss.speedTest.todo": "Nothing, if it only happened during the test. If it also comes back without a speed test, check the Wi-Fi signal and cables.",
+  "settings.endpoint.warn.httpHeaders": "This URL uses plain http://, so these header values (API keys, tokens) are sent unencrypted. Use https:// where you can.",
+  "settings.backup.note": "The export contains the Uptime Kuma URL and endpoint headers as they are, so keep the file to yourself."
 }

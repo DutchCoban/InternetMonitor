@@ -74,7 +74,7 @@ public sealed class UpdateToast : Form
             if (_releaseUrl is { Length: > 0 } url)
             {
                 // Nothing sensible to do if the shell can't open a browser - the toast just closes below regardless.
-                ShellOpen.Open(url);
+                ShellOpen.OpenUrl(url);
             }
 
             Close();

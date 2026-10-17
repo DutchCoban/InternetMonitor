@@ -288,6 +288,13 @@ link to the release page. A separate "Update automatically" toggle (off by defau
 when a newer release is found, it's downloaded in the background, and after a short countdown
 pop-up the app replaces itself and restarts on its own.
 
+An automatic install is only ever applied to a download that passes three checks: it is signed with
+the project's release key (every release ships `InternetMonitor.exe.sig` next to the executable; the
+public key is built into the app), it came from GitHub over HTTPS, and its version resource is the
+version the release claims. A release that fails any of these is reported with a link, never
+installed. While it waits for the swap, the download sits next to the running executable as
+`InternetMonitor.exe.new`.
+
 ## Diagnostic logging
 
 Optional, off by default. Configurable levels in Settings → Logging:
@@ -415,6 +422,20 @@ machine. This intentionally skips `PublishReadyToRun` (which roughly doubles fra
 sizes by embedding precompiled native code) to keep the download small - a slightly slower JIT
 cold start is an easy trade for a tray app that starts once and runs for days.
 
+### Signing a release
+
+The self-update refuses anything not signed with the release key, so a release needs its
+signature asset. `tools/ReleaseSigner` (plain .NET, no packages) makes it:
+
+```powershell
+dotnet run --project tools/ReleaseSigner -- sign <path-to-private-key.pem> ./publish/InternetMonitor.exe
+```
+
+That writes `publish/InternetMonitor.exe.sig`, which is uploaded next to the executable. The
+private key lives with the maintainer, outside the repository; `keygen` makes a new pair and prints
+the public half to put in `Core/Updates/ReleaseSignature.cs`. Anyone can check a download by hand
+with `verify <public-key-base64> <path-to-InternetMonitor.exe>` (the `.sig` is expected next to it).
+
 ## Settings and data locations
 
 - Settings: `%AppData%\InternetMonitor\settings.json` (the same file v1 used - an existing
@@ -451,9 +472,9 @@ None of these live inside the application directory, so the app itself can be re
   An adapter that has no DNS server at all is reported as exactly that.
 - Application endpoints are entirely user-configured with no target allowlist, by design (this
   is a local, single-user tool) - see [Security notes](#security-notes) below.
-- The self-update feature assumes the GitHub release it finds has exactly one asset named
-  `InternetMonitor.exe` (falling back to the first `.exe`-named asset otherwise) - the shape every
-  release has had so far.
+- The self-update only installs a release that carries both `InternetMonitor.exe` and
+  `InternetMonitor.exe.sig`, exactly so named. A release missing either is reported with a link
+  but never installed; so is one whose signature or version does not check out.
 - Traceroute does not fall back to a real TCP-based traceroute when ICMP is blocked. A genuine
   per-hop TCP traceroute needs a raw socket to catch the ICMP "Time Exceeded" replies a TCP probe
   provokes, and raw sockets need administrator rights on Windows - more than this app's deliberately
@@ -476,6 +497,14 @@ None of these live inside the application directory, so the app itself can be re
   off for such endpoints. The Uptime Kuma push URL is handled separately and is never logged.
 - **TLS validation is never bypassed.** Every HTTPS check uses .NET's default certificate
   validation with no custom callback.
+- **What comes back from the network is data, not instructions.** A DNS reply is accepted only
+  when it is a reply to the question that was asked, not merely one carrying the right transaction
+  id; answers from the lookup services are read up to a fixed size; a link from GitHub's release
+  feed is opened only when it is an HTTPS address on github.com; and CSV exports write a host name
+  or manufacturer that starts like a spreadsheet formula (`=`, `+`, `-`, `@`) as text.
+- **The Uptime Kuma push URL is only ever called over HTTPS.** It carries the monitor's token, so a
+  plain `http://` URL - even one placed in `settings.json` by hand or by import - is treated as "no
+  URL" rather than sent in the clear.
 - **Several features send third parties something about your network, each with its own
   off switch.** Traceroute's hop-ownership lookup sends hop IP addresses to Team Cymru and the
   regional internet registries (toggleable in Settings → Tools); the LAN scanner's manufacturer
@@ -491,6 +520,10 @@ None of these live inside the application directory, so the app itself can be re
 - The app runs unelevated (`asInvoker`, see `app.manifest`) and only ever talks outbound over
   the network - it opens no listening ports and requires no special permissions, except that the
   optional self-update feature replaces its own executable file on disk.
+- **The self-update installs only what the maintainer signed.** See [Checking for
+  updates](#checking-for-updates): signature, origin and version are all checked before the swap,
+  the swap helper is Windows PowerShell started by its full system path, and the download never
+  passes through the temp folder.
 
 ## License
 
