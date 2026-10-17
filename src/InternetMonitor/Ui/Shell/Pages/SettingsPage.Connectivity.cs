@@ -140,6 +140,10 @@ public sealed partial class SettingsPage
         _kumaAbout.Click += (_, _) => OpenUptimeKumaProjectPage();
         _integrationsCard.Controls.Add(_kumaAbout);
 
+        // A thin line between the two integrations, so each one's rows and status read as its own.
+        _integrationsDivider = new Panel { Height = 1, BackColor = Theme.Current.Border };
+        _integrationsCard.Controls.Add(_integrationsDivider);
+
         // The webhook: where an incident opening or closing is POSTed as JSON.
         _webhookUrl = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(200), Font = Theme.Font(FontRole.Body) };
         _webhookUrl.Leave += OnWebhookUrlChanged;

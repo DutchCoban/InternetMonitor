@@ -83,6 +83,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private Label _kumaError = null!;
     private Label _settingsBackupNote = null!;
     private AppButton _kumaAbout = null!;
+    private Panel _integrationsDivider = null!;
     private EndpointList _endpoints = null!;
     private AppButton _addEndpoint = null!;
     private AppButton _exportSettings = null!;
@@ -197,6 +198,63 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     }
 
     /// <summary>
+    /// The integrations card is two groups, each with its rows and its status lines together:
+    /// Uptime Kuma (URL, interval, last push, the project link), a divider, then the webhook (URL,
+    /// label, last delivery, the test button). The shared row layout would put all four rows first
+    /// and every status line after, which read as the webhook's lines belonging to Kuma.
+    /// </summary>
+    private void LayoutIntegrationsCard()
+    {
+        Rectangle content = _integrationsCard.DisplayRectangle;
+        int width = Math.Max(Dp(200), content.Width);
+        int y = content.Top;
+
+        y = PlaceRow(_kumaUrl, y, content, width);
+        y = PlaceRow(_kumaInterval, y, content, width);
+        _kumaError.Bounds = new Rectangle(content.Left, y, content.Width, Dp(16));
+        y += Dp(18);
+        if (IsShown(_kumaStatus))
+        {
+            _kumaStatus.Bounds = new Rectangle(content.Left, y, content.Width, Dp(16));
+            y += Dp(18);
+        }
+
+        _kumaAbout.Location = new Point(content.Left, y);
+        y += _kumaAbout.Height + Sp(2);
+
+        _integrationsDivider.Bounds = new Rectangle(content.Left, y, content.Width, 1);
+        y += Sp(3);
+
+        y = PlaceRow(_webhookUrl, y, content, width);
+        y = PlaceRow(_webhookLabel, y, content, width);
+        if (IsShown(_webhookStatus))
+        {
+            _webhookStatus.Bounds = new Rectangle(content.Left, y, content.Width, Dp(16));
+            y += Dp(18);
+            _webhookTest.Location = new Point(content.Left, y);
+            y += _webhookTest.Height;
+        }
+
+        CloseCard(_integrationsCard, y);
+    }
+
+    /// <summary>One label/field row at <paramref name="y"/>, the way <see cref="LayoutCardRows"/> places them; a hidden row takes no space.</summary>
+    private int PlaceRow(Control field, int y, Rectangle content, int width)
+    {
+        Label label = _rows.First(r => r.Field == field).Label;
+        bool shown = IsShown(field);
+        label.Visible = shown;
+        if (!shown)
+        {
+            return y;
+        }
+
+        label.Bounds = new Rectangle(content.Left, y, Math.Max(0, width - field.Width - Sp(3)), RowHeight);
+        field.Location = new Point(content.Left + width - field.Width, y + ((RowHeight - field.Height) / 2));
+        return y + RowHeight;
+    }
+
+    /// <summary>
     /// Shows a row only while the setting it depends on makes it matter - the chosen adapter only
     /// when the mode is not automatic, the speed-test interval only when automatic tests are on,
     /// the log options only at the level where they do something - and lays the cards out again.
@@ -303,7 +361,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         LayoutCardRows(_diagnosticsCard);
         LayoutCardRows(_networkHealthCard);
         LayoutConditionRows();
-        LayoutCardRows(_integrationsCard);
+        LayoutIntegrationsCard();
 
         // LayoutCardRows sized the card to its three label/field rows; the directory buttons sit
         // below those, in the space the row layout does not know about - same pattern as the Kuma
@@ -319,29 +377,6 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         }
 
         CloseCard(_diagnosticsCard, diagnosticsY);
-
-        // LayoutCardRows sized the card to its two label/field rows; the error label and the
-        // "about" link sit below those, in the space the row layout does not know about.
-        Rectangle integrationsContent = _integrationsCard.DisplayRectangle;
-        int integrationsY = BelowRows(_integrationsCard);
-        _kumaError.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
-        integrationsY += Dp(18);
-        if (IsShown(_kumaStatus))
-        {
-            _kumaStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
-            integrationsY += Dp(18);
-        }
-
-        if (IsShown(_webhookStatus))
-        {
-            _webhookStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
-            integrationsY += Dp(18);
-            _webhookTest.Location = new Point(integrationsContent.Left, integrationsY);
-            integrationsY += _webhookTest.Height + Sp(1);
-        }
-        _kumaAbout.Location = new Point(integrationsContent.Left, integrationsY);
-        integrationsY += _kumaAbout.Height;
-        CloseCard(_integrationsCard, integrationsY);
 
         // Same "rows, then an error line below them" shape as the integrations card above.
         LayoutCardRows(_publicIpCard);
@@ -753,6 +788,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _webhookUrl.ForeColor = p.TextPrimary;
         _webhookLabel.BackColor = p.SurfaceAlt;
         _webhookLabel.ForeColor = p.TextPrimary;
+        _integrationsDivider.BackColor = p.Border;
         _webhookStatus.BackColor = p.Surface;
         _webhookStatus.ForeColor = p.TextMuted;
         _settingsBackupNote.BackColor = p.Surface;
