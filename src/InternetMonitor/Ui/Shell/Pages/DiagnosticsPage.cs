@@ -35,6 +35,8 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     private Label _bannerMeta = null!;
 
     private Card _networkHealthSummaryCard = null!;
+    private Card _clockCard = null!;
+    private Label _clockLabel = null!;
     private Label _networkHealthDisabledLabel = null!;
     private Label _networkHealthUpdatedLabel = null!;
     private readonly List<SummaryRow> _networkHealthRows = [];
@@ -80,10 +82,64 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         // added, so the filled panel has to come first to get what the left panel leaves behind.
         // The summary card is added after both but before the banner, so among the Top-docked
         // controls it lands just below the banner rather than above it.
+        BuildClockCard();
+
         Controls.Add(_detailCard);
         Controls.Add(_tableCard);
+        Controls.Add(_clockCard);
         Controls.Add(_networkHealthSummaryCard);
         Controls.Add(_bannerCard);
+    }
+
+    /// <summary>One line: how far this computer's clock is from the time server, from the hourly check.</summary>
+    private void BuildClockCard()
+    {
+        _clockCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Refresh };
+        _clockLabel = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+        };
+        _clockCard.Controls.Add(_clockLabel);
+        _clockCard.Resize += (_, _) => LayoutClockCard();
+    }
+
+    private void LayoutClockCard()
+    {
+        Rectangle content = _clockCard.DisplayRectangle;
+        _clockLabel.Bounds = new Rectangle(content.Left, content.Top, content.Width, Dp(20));
+        CloseCard(_clockCard, content.Top + Dp(20));
+    }
+
+    private void OnClockChanged(Core.Monitors.ClockStatus status) => Post(() => RefreshClock(status));
+
+    private void RefreshClock(Core.Monitors.ClockStatus? status)
+    {
+        Palette p = Theme.Current;
+        _clockLabel.BackColor = p.Surface;
+
+        if (status is null)
+        {
+            _clockLabel.Text = Loc.Get("diagnostics.clock.pending");
+            _clockLabel.ForeColor = p.TextMuted;
+        }
+        else if (status.Offset is { } offset)
+        {
+            string checkedAt = status.CheckedUtc.ToLocalTime().ToString("HH:mm");
+            string seconds = Math.Round(Math.Abs(offset.TotalSeconds), 1).ToString("0.#");
+            _clockLabel.Text = status.Drifted
+                ? Loc.Format("diagnostics.clock.drift", status.Server, seconds, checkedAt)
+                : Loc.Format("diagnostics.clock.ok", status.Server, seconds, checkedAt);
+            _clockLabel.ForeColor = status.Drifted ? p.Error : p.TextMuted;
+        }
+        else
+        {
+            _clockLabel.Text = Loc.Format("diagnostics.clock.failed", status.Server, status.Error ?? "-", status.CheckedUtc.ToLocalTime().ToString("HH:mm"));
+            _clockLabel.ForeColor = p.Warn;
+        }
+
+        LayoutClockCard();
     }
 
     private void BuildNetworkHealthSummary()
@@ -340,6 +396,10 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _networkHealthDisabledLabel.Text = Loc.Get("diagnostics.networkHealth.disabled");
         RefreshNetworkHealthStatus(Services.NetworkHealth.CurrentStatus);
 
+        _clockCard.Title = Loc.Get("diagnostics.clock.title");
+        _clockCard.Subtitle = Loc.Get("diagnostics.clock.subtitle");
+        RefreshClock(Core.Monitors.ClockMonitor.Latest);
+
         _checkNow.Text = Loc.Get("menu.checkNow");
         _checkNow.SizeToContent();
         _copy.Text = Loc.Get("diagnostics.copy");
@@ -392,7 +452,9 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         Services.Pipeline.StepChanged += OnStepChanged;
         Services.Pipeline.CycleCompleted += OnCycleCompleted;
         Services.NetworkHealth.StatusChanged += OnNetworkHealthStatusChanged;
+        Services.Clock.Changed += OnClockChanged;
         RefreshNetworkHealthStatus(Services.NetworkHealth.CurrentStatus);
+        RefreshClock(Core.Monitors.ClockMonitor.Latest);
 
         StepSnapshot? snapshot = Services.Pipeline.LatestSnapshot;
         if (snapshot is not null)
@@ -418,6 +480,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         Services.Pipeline.StepChanged -= OnStepChanged;
         Services.Pipeline.CycleCompleted -= OnCycleCompleted;
         Services.NetworkHealth.StatusChanged -= OnNetworkHealthStatusChanged;
+        Services.Clock.Changed -= OnClockChanged;
     }
 
     private void OnTableSelectionChanged(StepId step) => _detail.Show(step, _table.ResultFor(step));

@@ -22,6 +22,9 @@ namespace InternetMonitor.Core.Steps.Checks;
 /// </summary>
 public sealed class LinkCheck : IStepCheck
 {
+    /// <summary>This many other access points on the same 2.4 GHz channel is where air time visibly runs short.</summary>
+    private const int CrowdedChannelNeighbours = 5;
+
     public StepId Id => StepId.Link;
 
     public bool IsLocal => true;
@@ -126,6 +129,12 @@ public sealed class LinkCheck : IStepCheck
                 detailKey = "step.link.weakSignal.detail";
                 detailArgs = [signal];
             }
+            else if (wifi is { NeighboursOnChannel: >= CrowdedChannelNeighbours } crowded && crowded.FrequencyMHz is < 2500 && crowded.Channel is { } channel)
+            {
+                // Not a warning - the link works - but the one fact that explains slow 2.4 GHz Wi-Fi.
+                detailKey = "step.link.crowdedChannel.detail";
+                detailArgs = [crowded.NeighboursOnChannel!.Value, channel];
+            }
         }
 
         // Windows only hides the network name and access point when location access is off, and the
@@ -184,6 +193,11 @@ public sealed class LinkCheck : IStepCheck
         if (wifi.Generation is { } generation)
         {
             measurements.Add(new Measurement(loc.Get("measure.wifiStandard"), generation));
+        }
+
+        if (wifi is { NeighboursOnChannel: { } onChannel, NeighboursInRange: { } inRange })
+        {
+            measurements.Add(new Measurement(loc.Get("measure.wifiNeighbours"), loc.Format("measure.wifiNeighbours.value", onChannel, inRange)));
         }
 
         if (wifi.RxMbps is { } rx && wifi.TxMbps is { } tx)

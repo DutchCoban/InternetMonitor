@@ -324,6 +324,9 @@ public sealed class AppSettings
     /// </summary>
     public List<string> CustomDnsServers { get; set; } = [];
 
+    /// <summary>The time server the hourly clock check asks (see <see cref="Core.Monitors.ClockMonitor"/>). A host name; the pool is the sensible default.</summary>
+    public string NtpServer { get; set; } = "pool.ntp.org";
+
     /// <summary><see cref="CustomDnsServers"/> as addresses: the valid IPv4 entries, at most <see cref="MaxCustomDnsServers"/>.</summary>
     public IReadOnlyList<IPAddress> ParsedCustomDnsServers() =>
         [.. ParseIPv4List(CustomDnsServers).Take(MaxCustomDnsServers)];

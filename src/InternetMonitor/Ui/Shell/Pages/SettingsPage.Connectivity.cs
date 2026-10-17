@@ -22,6 +22,27 @@ public sealed partial class SettingsPage
         _customDnsServers = MakeAddressField();
         AddRow(_publicIpCard, "settings.publicIp.customDns", _customDnsServers);
 
+        _ntpServer = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(260), Font = Theme.Font(FontRole.Body) };
+        _ntpServer.Leave += (_, _) =>
+        {
+            string server = _ntpServer.Text.Trim();
+            if (server.Length == 0)
+            {
+                server = "pool.ntp.org";
+                _ntpServer.Text = server;
+            }
+
+            if (server == Services.Settings.NtpServer)
+            {
+                return;
+            }
+
+            Services.Settings.NtpServer = server;
+            Services.Settings.Save();
+            Services.Clock.Reconfigure();
+        };
+        AddRow(_publicIpCard, "settings.ntpServer", _ntpServer);
+
         _publicIpError = new Label
         {
             AutoSize = false,

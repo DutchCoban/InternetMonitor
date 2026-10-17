@@ -108,10 +108,38 @@ public sealed class DnsCheck : IStepCheck
         measurements.AddRange(customAttempts.Select(a => new Measurement(
             $"{a.Server} ({loc.Get("measure.customDns")})", Describe(a, loc))));
 
-        var facts = new DnsFacts(hostname, [], result.ElapsedMs, servers, publicWinner is not null, portBlocked, customWorked);
-
         string serverList = servers.Count > 0 ? string.Join(", ", servers) : "-";
         string publicList = publicResolvers.Count > 0 ? string.Join(", ", publicResolvers) : "-";
+
+        // Nothing answered plain DNS. Before calling that a failure, ask Windows itself: a setup
+        // that only resolves through encrypted DNS (DNS over HTTPS) blocks port 53 yet browses
+        // fine, and that is a warning about what this step can see, not an outage.
+        if (publicWinner is null && customWinner is null)
+        {
+            DnsOutcome system = await DnsResolve.ResolveAsync(hostname, context.Targets.DnsTimeout, cancellationToken).ConfigureAwait(false);
+            if (system.Success)
+            {
+                measurements.Add(new Measurement(loc.Get("measure.dnsSystemResolver"), string.Join(", ", system.Addresses.Take(3))));
+                object[] systemArgs = [serverList, publicList, hostname];
+                return new StepResult(
+                    Id,
+                    StepState.Warning,
+                    loc.Get("step.dns.systemOnly"),
+                    loc.Format("step.dns.systemOnly.detail", systemArgs),
+                    system.ElapsedMs,
+                    watch.Elapsed,
+                    DateTimeOffset.UtcNow,
+                    measurements,
+                    new DnsFacts(hostname, system.Addresses, system.ElapsedMs, servers, false, portBlocked, customWorked, SystemResolverWorked: true))
+                {
+                    HeadlineKey = "step.dns.systemOnly",
+                    DetailKey = "step.dns.systemOnly.detail",
+                    DetailArgs = systemArgs,
+                };
+            }
+        }
+
+        var facts = new DnsFacts(hostname, [], result.ElapsedMs, servers, publicWinner is not null, portBlocked, customWorked);
 
         (string headlineKey, object[] headlineArgs, string detailKey, object[] detailArgs) =
             publicWinner is not null && servers.Count == 0

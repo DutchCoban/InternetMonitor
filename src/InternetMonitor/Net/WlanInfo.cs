@@ -23,7 +23,9 @@ public sealed record WifiInfo(
     string? Generation,
     double? RxMbps,
     double? TxMbps,
-    bool AccessDenied)
+    bool AccessDenied,
+    int? NeighboursOnChannel = null,
+    int? NeighboursInRange = null)
 {
     /// <summary>"2.4 GHz", "5 GHz" or "6 GHz", from the centre frequency; null when unknown.</summary>
     public string? Band => FrequencyMHz switch
@@ -132,7 +134,7 @@ public static class WlanInfo
 
             int? rssi = QueryInt(client, interfaceId, OpcodeRssi);
             int? channel = QueryInt(client, interfaceId, OpcodeChannelNumber);
-            int? frequency = bssid is null ? null : FrequencyOf(client, interfaceId, bssid);
+            (int? frequency, int? onChannel, int? inRange) = bssid is null ? (null, null, null) : ScanSummary(client, interfaceId, bssid);
 
             return new WifiInfo(
                 ssid,
@@ -144,7 +146,9 @@ public static class WlanInfo
                 GenerationOf(phyType),
                 rx > 0 ? rx : null,
                 tx > 0 ? tx : null,
-                AccessDenied: ssid is null && bssid is null);
+                AccessDenied: ssid is null && bssid is null,
+                NeighboursOnChannel: onChannel,
+                NeighboursInRange: inRange);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -214,32 +218,34 @@ public static class WlanInfo
     }
 
     /// <summary>
-    /// The connected access point's centre frequency, from the scan cache. The channel number alone
-    /// cannot tell the bands apart - channel 37 exists on both 5 GHz and 6 GHz - the frequency can.
+    /// From the scan cache: the connected access point's centre frequency, and how many other
+    /// access points share it (the neighbours that cost air time on a crowded channel) and are in
+    /// range at all. The channel number alone cannot tell the bands apart - channel 37 exists on
+    /// both 5 GHz and 6 GHz - the frequency can.
     /// </summary>
-    private static int? FrequencyOf(IntPtr client, Guid interfaceId, string bssid)
+    private static (int? FrequencyMHz, int? OnChannel, int? InRange) ScanSummary(IntPtr client, Guid interfaceId, string bssid)
     {
         if (WlanGetNetworkBssList(client, ref interfaceId, IntPtr.Zero, BssTypeAny, false, IntPtr.Zero, out IntPtr list) != ErrorSuccess)
         {
-            return null;
+            return (null, null, null);
         }
 
         try
         {
             int count = Marshal.ReadInt32(list, 4);
+            var frequencies = new List<(string Bssid, int MHz)>(count);
             for (int i = 0; i < count; i++)
             {
                 IntPtr entry = list + BssListHeader + (i * BssEntrySize);
                 var bytes = new byte[6];
                 Marshal.Copy(entry + BssEntryBssidOffset, bytes, 0, 6);
-                if (string.Join(":", bytes.Select(b => b.ToString("x2"))) == bssid)
-                {
-                    int kHz = Marshal.ReadInt32(entry, BssEntryFrequencyOffset);
-                    return kHz > 0 ? kHz / 1000 : null;
-                }
+                int kHz = Marshal.ReadInt32(entry, BssEntryFrequencyOffset);
+                frequencies.Add((string.Join(":", bytes.Select(b => b.ToString("x2"))), kHz > 0 ? kHz / 1000 : 0));
             }
 
-            return null;
+            int? own = frequencies.FirstOrDefault(f => f.Bssid == bssid).MHz is > 0 and var mhz ? mhz : null;
+            int? onChannel = own is { } f ? frequencies.Count(e => e.MHz == f && e.Bssid != bssid) : null;
+            return (own, onChannel, frequencies.Count - 1);
         }
         finally
         {

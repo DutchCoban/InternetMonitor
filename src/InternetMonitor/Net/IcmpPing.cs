@@ -108,6 +108,33 @@ public static class IcmpPing
     }
 
     /// <summary>
+    /// One echo with a payload of <paramref name="payloadBytes"/>, optionally marked don't-fragment -
+    /// for the path-MTU probe, which needs the router to say "too big" rather than fragment.
+    /// </summary>
+    public static async Task<PingOutcome> SendSizedAsync(IPAddress address, int payloadBytes, bool dontFragment, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var ping = new Ping();
+        var payload = new byte[Math.Max(0, payloadBytes)];
+        try
+        {
+            PingReply reply = await ping
+                .SendPingAsync(address, timeout, payload, new PingOptions(64, dontFragment))
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return new PingOutcome(reply.Status, reply.Status == IPStatus.Success ? reply.RoundtripTime : null, reply.Address);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is PingException or SocketException or ObjectDisposedException or OperationCanceledException)
+        {
+            return new PingOutcome(IPStatus.Unknown, null, null);
+        }
+    }
+
+    /// <summary>
     /// Pings several addresses at once and returns every outcome. Used by the public-IP step,
     /// where one unreachable resolver says nothing - only all of them failing does.
     /// </summary>

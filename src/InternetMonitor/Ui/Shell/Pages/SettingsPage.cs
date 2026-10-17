@@ -78,6 +78,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private TextBox _publicIpTargets = null!;
     private TextBox _customDnsServers = null!;
     private Label _publicIpError = null!;
+    private TextBox _ntpServer = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
     private Label _settingsBackupNote = null!;
@@ -390,6 +391,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _customDnsServers.Leave -= OnPublicAddressesChanged;
         _publicIpTargets.Text = string.Join(", ", settings.ParsedPublicIpTargets());
         _customDnsServers.Text = string.Join(", ", settings.ParsedCustomDnsServers());
+        _ntpServer.Text = settings.NtpServer;
         _publicIpError.Text = string.Empty;
         _publicIpTargets.Leave += OnPublicAddressesChanged;
         _customDnsServers.Leave += OnPublicAddressesChanged;
@@ -668,7 +670,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _settingsBackupNote.BackColor = p.Surface;
         _settingsBackupNote.ForeColor = p.TextMuted;
 
-        foreach (TextBox box in new[] { _publicIpTargets, _customDnsServers })
+        foreach (TextBox box in new[] { _publicIpTargets, _customDnsServers, _ntpServer })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;

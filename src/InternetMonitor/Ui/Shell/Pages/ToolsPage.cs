@@ -2,6 +2,8 @@ using InternetMonitor.App;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Core.Tools.LanScan;
+using InternetMonitor.Core.Tools.Mtu;
+using InternetMonitor.Net;
 using InternetMonitor.Core.Tools.SpeedTest;
 using InternetMonitor.Core.Tools.Traceroute;
 using InternetMonitor.Ui.Controls;
@@ -23,6 +25,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     private const string TracerouteChipId = "traceroute";
     private const string LanScanChipId = "lanScan";
     private const string SpeedTestChipId = "speedtest";
+    private const string MtuChipId = "mtu";
 
     private ChipGroup _toolSwitcher = null!;
 
@@ -50,6 +53,14 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
     private CancellationTokenSource? _speedTestRunning;
 
+    private Card _mtuCard = null!;
+    private MtuResultView _mtuView = null!;
+    private TextBox _mtuTarget = null!;
+    private AppButton _runMtu = null!;
+    private Panel _mtuBar = null!;
+
+    private CancellationTokenSource? _mtuRunning;
+
     public override string Id => "tools";
 
     protected override void Build()
@@ -58,10 +69,12 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         BuildTracerouteCard();
         BuildLanScanCard();
         BuildSpeedTestCard();
+        BuildMtuCard();
 
         // Fill before Top, matching DiagnosticsPage: WinForms docks siblings in the order they are
         // added, so the filled cards have to come first to get what the switcher leaves below it.
         // All three cards occupy the exact same area and ShowTool toggles which one is Visible.
+        Controls.Add(_mtuCard);
         Controls.Add(_speedTestCard);
         Controls.Add(_lanScanCard);
         Controls.Add(_tracerouteCard);
@@ -71,6 +84,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         LayoutBar();
         LayoutLanBar();
         LayoutSpeedTestBar();
+        LayoutMtuBar();
         ShowTool(TracerouteChipId);
     }
 
@@ -85,6 +99,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _tracerouteCard.Visible = id == TracerouteChipId;
         _lanScanCard.Visible = id == LanScanChipId;
         _speedTestCard.Visible = id == SpeedTestChipId;
+        _mtuCard.Visible = id == MtuChipId;
         if (id == SpeedTestChipId)
         {
             RefreshMeteredNote();
@@ -400,6 +415,118 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _speedTestCard.Controls.Add(_speedTestBar);
     }
 
+    // ---- Path MTU -------------------------------------------------------------------------------
+
+    private void BuildMtuCard()
+    {
+        _mtuView = new MtuResultView { Dock = DockStyle.Fill };
+
+        _mtuTarget = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(240), Text = DefaultTarget() };
+        _mtuTarget.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                StartOrCancelMtu();
+            }
+        };
+
+        _runMtu = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Diagnostics };
+        _runMtu.Click += (_, _) => StartOrCancelMtu();
+
+        _mtuBar = new Panel { Dock = DockStyle.Top, Height = Dp(40) };
+        _mtuBar.Controls.Add(_mtuTarget);
+        _mtuBar.Controls.Add(_runMtu);
+        _mtuBar.Resize += (_, _) => LayoutMtuBar();
+
+        _mtuCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Tools, Visible = false };
+        _mtuCard.Controls.Add(_mtuView);
+        _mtuCard.Controls.Add(_mtuBar);
+    }
+
+    private void LayoutMtuBar()
+    {
+        if (_mtuBar is null)
+        {
+            return;
+        }
+
+        _mtuTarget.Left = 0;
+        _mtuTarget.Top = (_mtuBar.Height - _mtuTarget.Height) / 2;
+        _runMtu.Left = _mtuTarget.Right + Sp(2);
+        _runMtu.Top = (_mtuBar.Height - _runMtu.Height) / 2;
+    }
+
+    private void StartOrCancelMtu()
+    {
+        if (_mtuRunning is not null)
+        {
+            _mtuRunning.Cancel();
+            return;
+        }
+
+        _ = RunMtuAsync();
+    }
+
+    private async Task RunMtuAsync()
+    {
+        string target = _mtuTarget.Text.Trim();
+        if (target.Length == 0)
+        {
+            _mtuView.Show(Loc.Get("mtu.invalidTarget"), []);
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _mtuRunning = cts;
+        _mtuView.Show(Loc.Get("mtu.running"), []);
+        _runMtu.Text = Loc.Get("mtu.stop");
+        _runMtu.SizeToContent();
+        LayoutMtuBar();
+
+        try
+        {
+            if (!System.Net.IPAddress.TryParse(target, out System.Net.IPAddress? address))
+            {
+                DnsOutcome dns = await DnsResolve.ResolveAsync(target, TimeSpan.FromSeconds(3), cts.Token).ConfigureAwait(true);
+                address = dns.Addresses.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+            }
+
+            if (address is null)
+            {
+                _mtuView.Show(Loc.Format("mtu.noAnswer", target), []);
+                return;
+            }
+
+            PathMtuResult result = await PathMtuProbe.MeasureAsync(address, TimeSpan.FromSeconds(2), cts.Token).ConfigureAwait(true);
+            if (result.PathMtu is not { } mtu)
+            {
+                _mtuView.Show(Loc.Format("mtu.noAnswer", target), []);
+                return;
+            }
+
+            string explanation = result.AtCeiling
+                ? Loc.Get("mtu.explain.max")
+                : mtu == 1492 ? Loc.Get("mtu.explain.pppoe") : Loc.Get("mtu.explain.tunnel");
+            _mtuView.Show(Loc.Format("mtu.result", target, mtu, result.LargestPayload), [explanation]);
+        }
+        catch (OperationCanceledException)
+        {
+            _mtuView.Show(Loc.Get("mtu.cancelled"), []);
+        }
+        finally
+        {
+            _mtuRunning = null;
+            cts.Dispose();
+            if (!IsDisposed)
+            {
+                _runMtu.Text = Loc.Get("mtu.run");
+                _runMtu.SizeToContent();
+                LayoutMtuBar();
+            }
+        }
+    }
+
     private void LayoutSpeedTestBar()
     {
         if (_speedTestBar is null)
@@ -506,6 +633,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
                 new ChipGroup.Chip(TracerouteChipId, Loc.Get("tools.chip.traceroute")),
                 new ChipGroup.Chip(LanScanChipId, Loc.Get("tools.chip.lanScan")),
                 new ChipGroup.Chip(SpeedTestChipId, Loc.Get("tools.chip.speedtest")),
+                new ChipGroup.Chip(MtuChipId, Loc.Get("tools.chip.mtu")),
             ],
             _toolSwitcher.SelectedId ?? TracerouteChipId);
 
@@ -531,6 +659,16 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _runSpeedTest.SizeToContent();
         LayoutSpeedTestBar();
         _speedTestView.Status = Loc.Get("speedtest.idle");
+
+        _mtuCard.Title = Loc.Get("mtu.title");
+        _mtuCard.Subtitle = Loc.Get("mtu.subtitle");
+        _runMtu.Text = Loc.Get(_mtuRunning is null ? "mtu.run" : "mtu.stop");
+        _runMtu.SizeToContent();
+        LayoutMtuBar();
+        if (_mtuRunning is null)
+        {
+            _mtuView.Show(Loc.Get("mtu.idle"), []);
+        }
     }
 
     protected override void OnActivated()
@@ -554,6 +692,9 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _target.ForeColor = Theme.Current.TextPrimary;
         _lanBar.BackColor = Theme.Current.Surface;
         _speedTestBar.BackColor = Theme.Current.Surface;
+        _mtuBar.BackColor = Theme.Current.Surface;
+        _mtuTarget.BackColor = Theme.Current.SurfaceAlt;
+        _mtuTarget.ForeColor = Theme.Current.TextPrimary;
     }
 
     protected override void OnDeactivated()
@@ -561,6 +702,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _running?.Cancel();
         _scanning?.Cancel();
         _speedTestRunning?.Cancel();
+        _mtuRunning?.Cancel();
     }
 
     protected override void Dispose(bool disposing)
@@ -570,6 +712,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
             _running?.Cancel();
             _scanning?.Cancel();
             _speedTestRunning?.Cancel();
+            _mtuRunning?.Cancel();
         }
 
         base.Dispose(disposing);

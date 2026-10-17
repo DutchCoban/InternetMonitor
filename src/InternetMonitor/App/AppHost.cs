@@ -44,6 +44,7 @@ public sealed class AppHost : ApplicationContext
     private readonly UpdateChecker _updateChecker;
     private readonly UpdateInstaller _updateInstaller;
     private readonly IncidentWebhook _webhook;
+    private readonly ClockMonitor _clock;
     private System.Windows.Forms.Timer? _updateRestartTimer;
     private readonly SpeedTestScheduler _speedTestScheduler;
 
@@ -141,13 +142,14 @@ public sealed class AppHost : ApplicationContext
 
         _webhook = new IncidentWebhook(AppVersion);
         _webhook.Reconfigure(_settings.WebhookUrl);
+        _clock = new ClockMonitor(() => _settings.NtpServer);
 
         _speedTestScheduler = new SpeedTestScheduler();
         _speedTestScheduler.RunCompleted += OnSpeedTestRunCompleted;
         _speedTestScheduler.SkipRun = () => !_settings.SpeedTestOnMetered && IsMetered();
         _speedTestScheduler.Reconfigure(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
 
-        var services = new AppServices(_settings, BuildTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler, _webhook);
+        var services = new AppServices(_settings, BuildTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler, _webhook, _clock);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -182,6 +184,7 @@ public sealed class AppHost : ApplicationContext
         _networkHealth.IncidentClosed += incident => _webhook.Notify(incident, opened: false);
         _cadence.Start();
         _lineQuality.Start();
+        _clock.Start();
 
         if (showWindowOnStart)
         {
@@ -671,7 +674,8 @@ public sealed class AppHost : ApplicationContext
                 _networkHealth.DisposeAsync().AsTask(),
                 _updateChecker.DisposeAsync().AsTask(),
                 _speedTestScheduler.DisposeAsync().AsTask(),
-                _webhook.DisposeAsync().AsTask())).GetAwaiter().GetResult();
+                _webhook.DisposeAsync().AsTask(),
+                _clock.DisposeAsync().AsTask())).GetAwaiter().GetResult();
 
             _updateRestartTimer?.Stop();
             _updateRestartTimer?.Dispose();

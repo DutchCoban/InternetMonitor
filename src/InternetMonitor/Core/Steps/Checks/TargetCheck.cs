@@ -131,11 +131,19 @@ public sealed class TargetCheck : IStepCheck
             object[] headlineArgs = results.Length == 1 ? [first.Name] : [results.Length];
             object[] detailArgs = [loc.Get(stageKey), first.Error ?? "-"];
 
+            // A TLS failure with the clock minutes off is the clock, not the line: certificates
+            // are only valid for a window of time, and a wrong clock falls outside every one.
+            string detail = loc.Format("step.target.failed.detail", detailArgs);
+            if (first.FailedStage == HttpStage.Tls && Monitors.ClockMonitor.Latest is { Drifted: true, Offset: { } drift })
+            {
+                detail += " " + loc.Format("step.target.clockDrift", Math.Round(Math.Abs(drift.TotalSeconds)));
+            }
+
             return new StepResult(
                 Id,
                 StepState.Failed,
                 loc.Format(headlineKey, headlineArgs),
-                loc.Format("step.target.failed.detail", detailArgs),
+                detail,
                 null,
                 watch.Elapsed,
                 DateTimeOffset.UtcNow,

@@ -107,7 +107,11 @@ public sealed record DnsFacts(
     bool DnsPortBlockedSuspected = false,
 
     // Null when the user configured no last-resort DNS servers, or they were never needed.
-    bool? CustomServersWorked = null) : StepFacts;
+    bool? CustomServersWorked = null,
+
+    // True when no server answered plain DNS but Windows' own resolver did resolve the name -
+    // encrypted DNS, most likely. Browsing works; the adapter's servers are not usable directly.
+    bool SystemResolverWorked = false) : StepFacts;
 
 public sealed record TargetEndpointResult(
     string Name,
