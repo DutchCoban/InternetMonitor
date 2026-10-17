@@ -779,7 +779,7 @@
   "settings.speedTestAutoRun.help": "Esegui il test di velocità da solo all'intervallo sotto. Ogni test sposta dati reali - da decine a centinaia di megabyte.",
   "settings.speedTestInterval.help": "Quanto spesso gira il test di velocità automatico. Le scelte sono volutamente poche, per mantenere il traffico contenuto.",
   "settings.speedTestOnMetered.help": "Esegui il test automatico anche su dati mobili o sull'hotspot di un telefono. Disattivato salta quelle esecuzioni, perché lì un test costa dati reali.",
-  "settings.diagnostics.level.help": "Quanto finisce in diagnostics.log: nulla, solo i cambiamenti, ogni passaggio non OK, oppure ogni passaggio a ogni ciclo. Per la risoluzione dei problemi; disattivato va bene nell'uso quotidiano.",
+  "settings.diagnostics.level.help": "Quanto finisce in diagnostics.log: nulla, solo i cambiamenti, ogni passaggio non OK, oppure ogni passaggio a ogni ciclo. Completo è Esteso con entrambi gli interruttori attivi, e il livello segue gli interruttori. Per la risoluzione dei problemi; disattivato va bene nell'uso quotidiano.",
   "settings.diagnostics.logSuccesses.help": "Al livello Esteso, registra anche i passaggi riusciti, non solo cambiamenti e problemi.",
   "settings.diagnostics.logDetails.help": "Al livello Esteso, scrivi anche ogni misurazione con ogni passaggio registrato. File più grandi, ma tutto ciò che una richiesta di supporto potrebbe richiedere. Il livello Completo le include sempre.",
   "settings.diagnostics.directory.help": "Dove viene scritto diagnostics.log. Vuoto significa la cartella dei log dell'app.",

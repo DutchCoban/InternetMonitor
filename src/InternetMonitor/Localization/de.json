@@ -779,7 +779,7 @@
   "settings.speedTestAutoRun.help": "Den Geschwindigkeitstest im Intervall unten selbst laufen lassen. Jeder Test überträgt echte Daten - Dutzende bis Hunderte Megabyte.",
   "settings.speedTestInterval.help": "Wie oft der automatische Geschwindigkeitstest läuft. Die Auswahl ist bewusst klein, um den Datenverkehr gering zu halten.",
   "settings.speedTestOnMetered.help": "Den automatischen Test auch über Mobilfunk oder einen Telefon-Hotspot laufen lassen. Aus überspringt diese Läufe, weil ein Test dort echte Daten kostet.",
-  "settings.diagnostics.level.help": "Wie viel in diagnostics.log landet: nichts, nur Änderungen, jeder nicht-OK-Schritt oder jeder Schritt jeden Zyklus. Zur Fehlersuche; aus reicht im Alltag.",
+  "settings.diagnostics.level.help": "Wie viel in diagnostics.log landet: nichts, nur Änderungen, jeder nicht-OK-Schritt oder jeder Schritt jeden Zyklus. Vollständig ist Erweitert mit beiden Schaltern an, und die Stufe folgt den Schaltern. Zur Fehlersuche; aus reicht im Alltag.",
   "settings.diagnostics.logSuccesses.help": "Auf der Stufe Erweitert auch bestandene Schritte protokollieren, nicht nur Änderungen und Probleme.",
   "settings.diagnostics.logDetails.help": "Auf der Stufe Erweitert auch jede Messung zu jedem protokollierten Schritt schreiben. Größere Dateien, aber alles, was eine Supportfrage brauchen könnte. Die Stufe Vollständig enthält sie immer.",
   "settings.diagnostics.directory.help": "Wohin diagnostics.log geschrieben wird. Leer bedeutet den eigenen Protokollordner der App.",

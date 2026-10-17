@@ -779,7 +779,7 @@
   "settings.speedTestAutoRun.help": "Uruchamiaj test prędkości samodzielnie z poniższym interwałem. Każdy test przesyła prawdziwe dane - dziesiątki do setek megabajtów.",
   "settings.speedTestInterval.help": "Jak często działa automatyczny test prędkości. Wybór jest celowo niewielki, aby ograniczyć ruch.",
   "settings.speedTestOnMetered.help": "Uruchamiaj automatyczny test także na danych mobilnych lub hotspocie telefonu. Wyłączone pomija te uruchomienia, bo test zużywa tam prawdziwe dane.",
-  "settings.diagnostics.level.help": "Ile trafia do diagnostics.log: nic, tylko zmiany, każdy krok inny niż OK, albo każdy krok w każdym cyklu. Do rozwiązywania problemów; na co dzień wyłączone wystarczy.",
+  "settings.diagnostics.level.help": "Ile trafia do diagnostics.log: nic, tylko zmiany, każdy krok inny niż OK, albo każdy krok w każdym cyklu. Pełny to Rozszerzony z oboma przełącznikami włączonymi, a poziom podąża za przełącznikami. Do rozwiązywania problemów; na co dzień wyłączone wystarczy.",
   "settings.diagnostics.logSuccesses.help": "Na poziomie Rozszerzony zapisuj też kroki zakończone pomyślnie, nie tylko zmiany i problemy.",
   "settings.diagnostics.logDetails.help": "Na poziomie Rozszerzony zapisuj też każdy pomiar przy każdym zapisanym kroku. Większe pliki, ale wszystko, czego może wymagać pytanie do wsparcia. Poziom Pełny zawsze je zawiera.",
   "settings.diagnostics.directory.help": "Gdzie zapisywany jest diagnostics.log. Puste oznacza własny folder dzienników aplikacji.",

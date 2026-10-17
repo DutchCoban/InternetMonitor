@@ -779,7 +779,7 @@
   "settings.speedTestAutoRun.help": "De snelheidstest zelf laten draaien met het interval hieronder. Elke test verplaatst echte data - tientallen tot honderden megabytes.",
   "settings.speedTestInterval.help": "Hoe vaak de automatische snelheidstest draait. De keuzes zijn bewust beperkt, om het verkeer bescheiden te houden.",
   "settings.speedTestOnMetered.help": "De automatische test ook draaien op mobiele data of een hotspot van je telefoon. Uit slaat die beurten over, want daar kost een test echte data.",
-  "settings.diagnostics.level.help": "Hoeveel er in diagnostics.log komt: niets, alleen wijzigingen, elke niet-OK stap, of elke stap elke cyclus. Voor probleemoplossing; uit is prima voor dagelijks gebruik.",
+  "settings.diagnostics.level.help": "Hoeveel er in diagnostics.log komt: niets, alleen wijzigingen, elke niet-OK stap, of elke stap elke cyclus. Volledig is Uitgebreid met beide schakelaars aan, en het niveau volgt de schakelaars. Voor probleemoplossing; uit is prima voor dagelijks gebruik.",
   "settings.diagnostics.logSuccesses.help": "Op het niveau Uitgebreid ook de geslaagde stappen loggen, niet alleen wijzigingen en problemen.",
   "settings.diagnostics.logDetails.help": "Op het niveau Uitgebreid ook elke meting meeschrijven bij elke gelogde stap. Grotere bestanden, maar alles wat een supportvraag nodig kan hebben. Het niveau Volledig neemt ze altijd mee.",
   "settings.diagnostics.directory.help": "Waar diagnostics.log wordt geschreven. Leeg betekent de eigen logmap van de app.",

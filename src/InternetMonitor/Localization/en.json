@@ -779,7 +779,7 @@
   "settings.speedTestAutoRun.help": "Run the speed test on its own at the interval below. Each test moves real data - tens to hundreds of megabytes.",
   "settings.speedTestInterval.help": "How often the automatic speed test runs. The choices are deliberately few, to keep the traffic modest.",
   "settings.speedTestOnMetered.help": "Also run the automatic test on mobile data or a phone's hotspot. Off skips those runs, since a test costs real data there.",
-  "settings.diagnostics.level.help": "How much goes into diagnostics.log: nothing, only changes, every non-OK step, or every step every cycle. For troubleshooting; off is fine day to day.",
+  "settings.diagnostics.level.help": "How much goes into diagnostics.log: nothing, only changes, every non-OK step, or every step every cycle. Full is Extended with both switches on, and the level follows the switches. For troubleshooting; off is fine day to day.",
   "settings.diagnostics.logSuccesses.help": "At the Extended level, also log steps that passed, not only changes and problems.",
   "settings.diagnostics.logDetails.help": "At the Extended level, also write every measurement with each logged step. Larger files, but everything a support question could need. The Full level always includes them.",
   "settings.diagnostics.directory.help": "Where diagnostics.log is written. Empty means the app's own logs folder.",

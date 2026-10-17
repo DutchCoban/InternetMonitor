@@ -779,7 +779,7 @@
   "settings.speedTestAutoRun.help": "Ejecutar el test de velocidad por sí solo con el intervalo de abajo. Cada test mueve datos reales - de decenas a cientos de megabytes.",
   "settings.speedTestInterval.help": "Con qué frecuencia se ejecuta el test de velocidad automático. Las opciones son pocas a propósito, para mantener el tráfico moderado.",
   "settings.speedTestOnMetered.help": "Ejecutar también el test automático con datos móviles o en el punto de acceso de un teléfono. Desactivado omite esas ejecuciones, ya que ahí un test cuesta datos reales.",
-  "settings.diagnostics.level.help": "Cuánto va a diagnostics.log: nada, solo cambios, cada paso no OK, o cada paso en cada ciclo. Para resolver problemas; desactivado está bien en el día a día.",
+  "settings.diagnostics.level.help": "Cuánto va a diagnostics.log: nada, solo cambios, cada paso no OK, o cada paso en cada ciclo. Completo es Ampliado con ambos interruptores activados, y el nivel sigue a los interruptores. Para resolver problemas; desactivado está bien en el día a día.",
   "settings.diagnostics.logSuccesses.help": "En el nivel Ampliado, registrar también los pasos que pasaron, no solo cambios y problemas.",
   "settings.diagnostics.logDetails.help": "En el nivel Ampliado, escribir también cada medición con cada paso registrado. Archivos más grandes, pero todo lo que una consulta de soporte podría necesitar. El nivel Completo siempre las incluye.",
   "settings.diagnostics.directory.help": "Dónde se escribe diagnostics.log. Vacío significa la carpeta de registros de la propia aplicación.",
