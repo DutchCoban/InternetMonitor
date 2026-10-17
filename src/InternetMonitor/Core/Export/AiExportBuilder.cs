@@ -218,7 +218,7 @@ public static class AiExportBuilder
                 ? I($"{settings.SubscribedDownloadMbps} Mbit/s down, {settings.SubscribedUploadMbps} Mbit/s up")
                 : "not entered")
             .Item("Automatic speed test", settings.SpeedTestAutoRunEnabled ? I($"every {settings.SpeedTestIntervalHours} h") : "off")
-            .Item("Network-health monitoring", settings.NetworkHealthMonitoringEnabled ? "on" : "off")
+            .Item("Network-health monitoring", settings.NetworkHealthMonitoringEnabled ? string.Join(", ", settings.EnabledNetworkHealthConditions) : "off")
             .Blank();
     }
 

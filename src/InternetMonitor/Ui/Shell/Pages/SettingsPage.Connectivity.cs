@@ -175,6 +175,7 @@ public sealed partial class SettingsPage
         Services.Settings.Save();
         Services.Webhook.Reconfigure(url);
         RefreshWebhookStatus(Services.Webhook.LastDelivery);
+        RefreshDependentRows();
     }
 
     private async Task SendWebhookTestAsync()
@@ -257,5 +258,6 @@ public sealed partial class SettingsPage
         Services.Settings.KumaIntervalSeconds = (int)_kumaInterval.Value;
         Services.Settings.Save();
         Services.Kuma.Reconfigure(Services.Settings.KumaPushUrl, Services.Settings.KumaIntervalSeconds);
+        RefreshDependentRows();
     }
 }

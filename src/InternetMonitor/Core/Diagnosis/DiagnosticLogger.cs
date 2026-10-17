@@ -139,11 +139,12 @@ public sealed class DiagnosticLogger
         });
     }
 
-    /// <summary>One step's part of a cycle line; the measurements only at Full, where size is not a concern.</summary>
-    private static object BuildStepEntry(StepResult result, DiagnosticLogLevel level)
+    /// <summary>One step's part of a cycle line; the measurements at Full always, and at Extended when <see cref="AppSettings.LogDetailedMeasurements"/> asks for them.</summary>
+    private object BuildStepEntry(StepResult result, DiagnosticLogLevel level)
     {
         Dictionary<string, string>? measurements = null;
-        if (level == DiagnosticLogLevel.Full && result.Measurements.Count > 0)
+        bool detailed = level == DiagnosticLogLevel.Full || (level == DiagnosticLogLevel.Extended && _settings.LogDetailedMeasurements);
+        if (detailed && result.Measurements.Count > 0)
         {
             measurements = result.Measurements.ToDictionary(m => m.Label, m => m.Value);
         }

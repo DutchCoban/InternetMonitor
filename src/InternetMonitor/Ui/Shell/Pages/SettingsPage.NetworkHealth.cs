@@ -16,15 +16,7 @@ public sealed partial class SettingsPage
 
     private void BuildNetworkHealthRows()
     {
-        _networkHealthEnabled = new Toggle();
-        _networkHealthEnabled.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.NetworkHealthMonitoringEnabled = _networkHealthEnabled.Checked;
-            Services.Settings.Save();
-            ReconfigureNetworkHealth();
-        };
-        AddRow(_networkHealthCard, "settings.networkHealth.enabled", _networkHealthEnabled);
-
+        // No master switch: monitoring runs as soon as one condition is on, and each row is one.
         MakeConditionRow("tcpRetransmissions", "settings.networkHealth.tcpRetransmissions", 0, 1_000_000, hasThreshold: true);
         MakeConditionRow("packetLoss", "settings.networkHealth.packetLoss", 0, 100, hasThreshold: true);
         MakeConditionRow("ttlExceeded", "settings.networkHealth.ttlExceeded", 0, 1_000_000, hasThreshold: true);

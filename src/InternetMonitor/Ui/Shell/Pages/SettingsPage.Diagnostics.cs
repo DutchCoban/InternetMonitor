@@ -75,6 +75,7 @@ public sealed partial class SettingsPage
 
         Services.Settings.DiagnosticLogLevel = level;
         Services.Settings.Save();
+        RefreshDependentRows();
     }
 
     private void OnBrowseLogDirectoryClicked(object? sender, EventArgs e)

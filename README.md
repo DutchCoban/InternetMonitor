@@ -231,7 +231,8 @@ mentions it. On an IPv4-only network step 3 just says IPv6 is not offered.
 
 ## Network health monitoring
 
-Off by default (Settings → Network health). When enabled, flags packet-level conditions that sit
+Every condition has its own switch under Settings → Network health, all off by default, and
+monitoring runs as soon as one is on. It flags packet-level conditions that sit
 below what the seven steps measure: TCP retransmissions, packet loss, TTL-exceeded responses, and
 an unexpected (rogue) DHCP server on the network - each with its own threshold and time window.
 

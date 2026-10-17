@@ -39,6 +39,7 @@ public sealed partial class SettingsPage
         {
             Services.Settings.ShowIncidentPopups = _showIncidentPopups.Checked;
             Services.Settings.Save();
+            RefreshDependentRows();
         };
         AddRow(_generalCard, "settings.showIncidentPopups", _showIncidentPopups);
 
@@ -101,7 +102,6 @@ public sealed partial class SettingsPage
         }
 
         SelectComboItem(_adapterChoice, settings.AdapterId);
-        _adapterChoice.Enabled = settings.AdapterMode != AdapterMode.Automatic;
 
         _adapterMode.SelectedIndexChanged += OnAdapterSettingsChanged;
         _adapterChoice.SelectedIndexChanged += OnAdapterSettingsChanged;
@@ -120,8 +120,8 @@ public sealed partial class SettingsPage
             Services.Settings.AdapterName = adapter.Key.Length > 0 ? adapter.Display : string.Empty;
         }
 
-        _adapterChoice.Enabled = Services.Settings.AdapterMode != AdapterMode.Automatic;
         Services.Settings.Save();
+        RefreshDependentRows();
 
         // Takes effect on the very next cycle; the pipeline reads its targets fresh each time.
         Services.Cadence.RunNow();
@@ -137,7 +137,7 @@ public sealed partial class SettingsPage
             Services.Settings.CheckForUpdates = _checkForUpdates.Checked;
             Services.Settings.Save();
             Services.UpdateChecker.Reconfigure(_checkForUpdates.Checked);
-            _autoUpdateInstall.Enabled = _checkForUpdates.Checked;
+            RefreshDependentRows();
         };
         AddRow(_updatesCard, "settings.checkForUpdates", _checkForUpdates);
 
@@ -292,8 +292,7 @@ public sealed partial class SettingsPage
             Services.Settings.SpeedTestAutoRunEnabled = _speedTestAutoRun.Checked;
             Services.Settings.Save();
             Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
-            _speedTestInterval.Enabled = _speedTestAutoRun.Checked;
-            _speedTestOnMetered.Enabled = _speedTestAutoRun.Checked;
+            RefreshDependentRows();
         };
         AddRow(_toolsCard, "settings.speedTestAutoRun", _speedTestAutoRun);
 

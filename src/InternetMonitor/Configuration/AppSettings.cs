@@ -393,8 +393,23 @@ public sealed class AppSettings
 
     // ---- Network health ------------------------------------------------------------------------
 
-    /// <summary>Off by default - packet-level monitoring is a deeper diagnostic than this app runs out of the box.</summary>
-    public bool NetworkHealthMonitoringEnabled { get; set; }
+    /// <summary>
+    /// Whether packet-level monitoring runs: as soon as one condition below is switched on. There is
+    /// no separate master switch any more - one that was on with every condition off tested nothing,
+    /// and one that was off with conditions on looked like it tested something.
+    /// </summary>
+    [JsonIgnore]
+    public bool NetworkHealthMonitoringEnabled =>
+        TcpRetransmissions.Enabled || PacketLoss.Enabled || TtlExceeded.Enabled || RogueDhcp.Enabled;
+
+    /// <summary>The keys of the conditions that are switched on, for the export's context section.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> EnabledNetworkHealthConditions =>
+    [
+        .. new[] { ("tcpRetransmissions", TcpRetransmissions), ("packetLoss", PacketLoss), ("ttlExceeded", TtlExceeded), ("rogueDhcp", RogueDhcp) }
+            .Where(c => c.Item2.Enabled)
+            .Select(c => c.Item1),
+    ];
 
     // The defaults below are deliberately uncalibrated - there is no measurement baseline in this
     // codebase to set them from - and every condition starts disabled regardless, so they only

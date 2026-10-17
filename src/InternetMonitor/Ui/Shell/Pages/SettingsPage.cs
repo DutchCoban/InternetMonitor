@@ -73,7 +73,6 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private AppButton _browseLogDirectory = null!;
     private AppButton _openLogFolder = null!;
     private AppButton _resetLogDirectory = null!;
-    private Toggle _networkHealthEnabled = null!;
     private readonly List<ConditionRow> _conditionRows = [];
     private TextBox _kumaUrl = null!;
     private TextBox _publicIpTargets = null!;
@@ -179,6 +178,16 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
 
         foreach ((Label label, Control field) in rows)
         {
+            // A row whose setting does not matter right now takes no space - see RefreshDependentRows.
+            // The page's own bookkeeping is asked, not Control.Visible: that getter answers false for
+            // every field while the page itself is not shown yet, which is when the first layout runs.
+            bool shown = !_hiddenFields.Contains(field);
+            label.Visible = shown;
+            if (!shown)
+            {
+                continue;
+            }
+
             label.Bounds = new Rectangle(content.Left, y, Math.Max(0, width - field.Width - Sp(3)), RowHeight);
             field.Location = new Point(content.Left + width - field.Width, y + ((RowHeight - field.Height) / 2));
             y += RowHeight;
@@ -186,6 +195,52 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
 
         CloseCard(card, y);
     }
+
+    /// <summary>
+    /// Shows a row only while the setting it depends on makes it matter - the chosen adapter only
+    /// when the mode is not automatic, the speed-test interval only when automatic tests are on,
+    /// the log options only at the level where they do something - and lays the cards out again.
+    /// A hidden row keeps its value; it is simply not asked about.
+    /// </summary>
+    private void RefreshDependentRows()
+    {
+        AppSettings s = Services.Settings;
+        Show(s.AdapterMode != AdapterMode.Automatic, _adapterChoice);
+        Show(s.ShowIncidentPopups, _notificationStyle);
+        Show(s.CheckForUpdates, _autoUpdateInstall);
+        Show(s.SpeedTestAutoRunEnabled, _speedTestInterval, _speedTestOnMetered);
+
+        bool logging = s.DiagnosticLogLevel != DiagnosticLogLevel.Off;
+        bool extended = s.DiagnosticLogLevel == DiagnosticLogLevel.Extended;
+        Show(extended, _logSuccessfulChecks, _logDetailedMeasurements);
+        Show(logging, _logDirectory, _browseLogDirectory, _openLogFolder, _resetLogDirectory);
+
+        Show(s.KumaPushUrl.Length > 0, _kumaInterval, _kumaStatus);
+        Show(s.WebhookUrl.Length > 0, _webhookTest, _webhookStatus);
+
+        LayoutCards();
+    }
+
+    /// <summary>The fields whose row is hidden right now; the layout asks this set rather than <see cref="Control.Visible"/>.</summary>
+    private readonly HashSet<Control> _hiddenFields = [];
+
+    private void Show(bool shown, params Control[] fields)
+    {
+        foreach (Control field in fields)
+        {
+            field.Visible = shown;
+            if (shown)
+            {
+                _hiddenFields.Remove(field);
+            }
+            else
+            {
+                _hiddenFields.Add(field);
+            }
+        }
+    }
+
+    private bool IsShown(Control field) => !_hiddenFields.Contains(field);
 
     /// <summary>
     /// Positions the four condition rows below the network-health card's one generic row (the
@@ -251,10 +306,14 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         // extras just below.
         Rectangle diagnosticsContent = _diagnosticsCard.DisplayRectangle;
         int diagnosticsY = BelowRows(_diagnosticsCard);
-        _browseLogDirectory.Location = new Point(diagnosticsContent.Right - _browseLogDirectory.Width, diagnosticsY);
-        _openLogFolder.Location = new Point(_browseLogDirectory.Left - Sp(2) - _openLogFolder.Width, diagnosticsY);
-        _resetLogDirectory.Location = new Point(_openLogFolder.Left - Sp(2) - _resetLogDirectory.Width, diagnosticsY);
-        diagnosticsY += Math.Max(_browseLogDirectory.Height, Math.Max(_openLogFolder.Height, _resetLogDirectory.Height));
+        if (IsShown(_browseLogDirectory))
+        {
+            _browseLogDirectory.Location = new Point(diagnosticsContent.Right - _browseLogDirectory.Width, diagnosticsY);
+            _openLogFolder.Location = new Point(_browseLogDirectory.Left - Sp(2) - _openLogFolder.Width, diagnosticsY);
+            _resetLogDirectory.Location = new Point(_openLogFolder.Left - Sp(2) - _resetLogDirectory.Width, diagnosticsY);
+            diagnosticsY += Math.Max(_browseLogDirectory.Height, Math.Max(_openLogFolder.Height, _resetLogDirectory.Height));
+        }
+
         CloseCard(_diagnosticsCard, diagnosticsY);
 
         // LayoutCardRows sized the card to its two label/field rows; the error label and the
@@ -263,12 +322,19 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         int integrationsY = BelowRows(_integrationsCard);
         _kumaError.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
         integrationsY += Dp(18);
-        _kumaStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
-        integrationsY += Dp(18);
-        _webhookStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
-        integrationsY += Dp(18);
-        _webhookTest.Location = new Point(integrationsContent.Left, integrationsY);
-        integrationsY += _webhookTest.Height + Sp(1);
+        if (IsShown(_kumaStatus))
+        {
+            _kumaStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
+            integrationsY += Dp(18);
+        }
+
+        if (IsShown(_webhookStatus))
+        {
+            _webhookStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
+            integrationsY += Dp(18);
+            _webhookTest.Location = new Point(integrationsContent.Left, integrationsY);
+            integrationsY += _webhookTest.Height + Sp(1);
+        }
         _kumaAbout.Location = new Point(integrationsContent.Left, integrationsY);
         integrationsY += _kumaAbout.Height;
         CloseCard(_integrationsCard, integrationsY);
@@ -337,7 +403,6 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
 
         _checkForUpdates.SetWithoutNotify(settings.CheckForUpdates);
         _autoUpdateInstall.SetWithoutNotify(settings.AutoUpdateInstall);
-        _autoUpdateInstall.Enabled = settings.CheckForUpdates;
 
         _foregroundInterval.Value = settings.ForegroundIntervalSeconds;
         _backgroundInterval.Value = settings.BackgroundIntervalSeconds;
@@ -359,9 +424,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _lanScanTcpFallback.SetWithoutNotify(settings.LanScanTcpFallback);
 
         _speedTestAutoRun.SetWithoutNotify(settings.SpeedTestAutoRunEnabled);
-        _speedTestInterval.Enabled = settings.SpeedTestAutoRunEnabled;
         _speedTestOnMetered.SetWithoutNotify(settings.SpeedTestOnMetered);
-        _speedTestOnMetered.Enabled = settings.SpeedTestAutoRunEnabled;
         _speedTestInterval.SelectedIndexChanged -= OnSpeedTestIntervalChanged;
         PopulateSpeedTestIntervalItems();
         SelectComboItem(_speedTestInterval, settings.SpeedTestIntervalHours.ToString());
@@ -376,7 +439,6 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _logDetailedMeasurements.SetWithoutNotify(settings.LogDetailedMeasurements);
         RefreshLogDirectoryText();
 
-        _networkHealthEnabled.SetWithoutNotify(settings.NetworkHealthMonitoringEnabled);
         foreach (ConditionRow row in _conditionRows)
         {
             NetworkHealthThreshold threshold = GetConditionThreshold(row.Key);
@@ -397,6 +459,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _publicIpError.Text = string.Empty;
         _publicIpTargets.Leave += OnPublicAddressesChanged;
         _customDnsServers.Leave += OnPublicAddressesChanged;
+
+        RefreshDependentRows();
 
         _kumaUrl.Leave -= OnKumaSettingsChanged;
         _kumaInterval.ValueChanged -= OnKumaSettingsChanged;

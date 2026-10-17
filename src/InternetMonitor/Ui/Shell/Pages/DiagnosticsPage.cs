@@ -231,12 +231,14 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
         foreach (SummaryRow row in _networkHealthRows)
         {
-            row.Pill.Visible = enabled;
-            row.Name.Visible = enabled;
-            row.Value.Visible = enabled;
-            row.Detail.Visible = enabled && row.Detail.Visible;
+            // A condition that is off is not shown at all - what is watched is what is listed.
+            bool rowEnabled = enabled && ConditionEnabled(row.Key);
+            row.Pill.Visible = rowEnabled;
+            row.Name.Visible = rowEnabled;
+            row.Value.Visible = rowEnabled;
+            row.Detail.Visible = rowEnabled && row.Detail.Visible;
 
-            if (!enabled)
+            if (!rowEnabled)
             {
                 continue;
             }
@@ -301,6 +303,15 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
 
         LayoutNetworkHealthSummary();
     }
+
+    private bool ConditionEnabled(string key) => key switch
+    {
+        "tcpRetransmissions" => Services.Settings.TcpRetransmissions.Enabled,
+        "packetLoss" => Services.Settings.PacketLoss.Enabled,
+        "ttlExceeded" => Services.Settings.TtlExceeded.Enabled,
+        "rogueDhcp" => Services.Settings.RogueDhcp.Enabled,
+        _ => false,
+    };
 
     private void SetSummaryRow(SummaryRow row, NetworkHealthConditionStatus status)
     {
