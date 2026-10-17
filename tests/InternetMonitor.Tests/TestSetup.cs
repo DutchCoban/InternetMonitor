@@ -28,6 +28,25 @@ public sealed class LocalizationCollection;
 /// </summary>
 internal static class TestSetup
 {
+    /// <summary>
+    /// Where every store writes during the test run: a fresh temporary directory, never the user's
+    /// own %AppData%\InternetMonitor. <c>AppPaths.Root</c> reads the variable once, on first use,
+    /// so it is set here before anything in the app assembly can run.
+    /// </summary>
+    internal static readonly string DataDirectory = Path.Combine(Path.GetTempPath(), $"im-tests-{Guid.NewGuid():N}");
+
     [ModuleInitializer]
-    internal static void Initialize() => LocalizationManager.Initialize("en");
+    internal static void Initialize()
+    {
+        Environment.SetEnvironmentVariable("INTERNETMONITOR_DATA_DIR", DataDirectory);
+        Directory.CreateDirectory(DataDirectory);
+        LocalizationManager.Initialize("en");
+    }
 }
+
+/// <summary>
+/// Groups every test that reads or writes the shared data directory's files (settings.json,
+/// incidents.json): one file per store, so these tests must not run side by side.
+/// </summary>
+[CollectionDefinition("DataDir")]
+public sealed class DataDirectoryCollection;
