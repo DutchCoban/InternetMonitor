@@ -11,7 +11,10 @@ public sealed class ThresholdAndLanguageTests
     [InlineData("de-AT", "de")]
     [InlineData("pl-PL", "pl")]
     [InlineData("en-GB", "en")]
-    [InlineData("fr-FR", "en")]
+    [InlineData("fr-FR", "fr")]
+    [InlineData("es-MX", "es")]
+    [InlineData("it-IT", "it")]
+    [InlineData("pt-BR", "pt")]
     [InlineData("ja-JP", "en")]
     public void A_first_start_speaks_the_windows_language_when_it_is_one_of_ours(string culture, string expected)
     {

@@ -31,6 +31,10 @@ public sealed class LocalizationManager
         ("en", "English"),
         ("de", "Deutsch"),
         ("pl", "Polski"),
+        ("fr", "Français"),
+        ("es", "Español"),
+        ("it", "Italiano"),
+        ("pt", "Português"),
     ];
 
     private const string FallbackLanguageCode = "en";

@@ -43,7 +43,7 @@ one `.exe`, nothing to install, free and open source.
 - **It respects your privacy.** No account, no telemetry; your data stays on your PC. The AI
   export replaces network names and hardware addresses with stand-ins.
 - **It stays out of your way.** A single `.exe` that runs without admin rights, follows Windows'
-  light or dark theme, speaks English, Dutch, German and Polish, and can keep itself up to date.
+  light or dark theme, speaks eight European languages, and can keep itself up to date.
 
 <p align="center">
   <img src="docs/screenshots/provider-report.png" alt="A report for your provider: availability, outages and where they originated" width="49%">
@@ -376,7 +376,7 @@ your report - and the Status page and the tray tooltip say so.
 
 Every setting and button shows a short explanation when the mouse rests on it for a second.
 
-- **Language** (General) - English, Dutch, German, or Polish. A new installation starts in the
+- **Language** (General) - English, Dutch, German, Polish, French, Spanish, Italian or Portuguese. A new installation starts in the
   Windows display language when it is one of these. Switching takes effect immediately across the
   whole app, including an already-open Settings window.
 - **Theme** (General) - follows Windows, or forced light/dark.
@@ -447,7 +447,7 @@ itself (`Core/Tools/SpeedTest/`) are the genuinely on-demand tools, triggered on
 page (the Speed Test's own client is also what the scheduler above calls headlessly).
 
 All user-facing text (including diagnosis headlines/explanations) goes through
-`Localization/LocalizationManager.cs`, loading `Localization/{en,nl,de,pl}.json` - four languages,
+`Localization/LocalizationManager.cs`, loading `Localization/{en,nl,de,pl,fr,es,it,pt}.json` - eight languages,
 switchable live from Settings; there is no hardcoded UI language anywhere in the check/diagnosis
 layer. Every colour, spacing step, corner radius and font comes from `Ui/Theming/Theme.cs` - no
 control names a color of its own.

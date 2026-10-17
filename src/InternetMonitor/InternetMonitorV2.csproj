@@ -36,7 +36,7 @@
     <!-- Only these are ever loaded (see LocalizationManager.SupportedLanguages) - this stops the
          self-contained runtime from also bundling framework satellite resource assemblies for
          every other language, which otherwise ship unused. -->
-    <SatelliteResourceLanguages>en;nl;de;pl</SatelliteResourceLanguages>
+    <SatelliteResourceLanguages>en;nl;de;pl;fr;es;it;pt</SatelliteResourceLanguages>
 
     <!-- Self-contained/single-file publish settings stay off here so a plain "dotnet build"
          remains framework-dependent and needs no win-x64 runtime packs restored. They are
@@ -53,6 +53,10 @@
     <EmbeddedResource Include="Localization\nl.json" LogicalName="InternetMonitor.Localization.nl.json" />
     <EmbeddedResource Include="Localization\de.json" LogicalName="InternetMonitor.Localization.de.json" />
     <EmbeddedResource Include="Localization\pl.json" LogicalName="InternetMonitor.Localization.pl.json" />
+    <EmbeddedResource Include="Localization\fr.json" LogicalName="InternetMonitor.Localization.fr.json" />
+    <EmbeddedResource Include="Localization\es.json" LogicalName="InternetMonitor.Localization.es.json" />
+    <EmbeddedResource Include="Localization\it.json" LogicalName="InternetMonitor.Localization.it.json" />
+    <EmbeddedResource Include="Localization\pt.json" LogicalName="InternetMonitor.Localization.pt.json" />
     <EmbeddedResource Include="..\..\Assets\app.ico" LogicalName="InternetMonitor.Assets.app.ico" />
   </ItemGroup>
 
