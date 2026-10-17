@@ -46,7 +46,6 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
     private Card _detailCard = null!;
     private StepDetailPanel _detail = null!;
 
-    private AppButton _checkNow = null!;
     private AppButton _copy = null!;
     private System.Windows.Forms.Timer? _copyResetTimer;
 
@@ -69,10 +68,6 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _detail = new StepDetailPanel { Dock = DockStyle.Fill };
         _detailCard = new Card { Dock = DockStyle.Fill, HeaderGlyph = Glyph.Search };
         _detailCard.Controls.Add(_detail);
-
-        _checkNow = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Refresh };
-        _checkNow.Click += (_, _) => Services.Cadence.RunNow();
-        Header.AddAction(_checkNow);
 
         _copy = new AppButton { Variant = ButtonVariant.Primary, Glyph = Glyph.Copy };
         _copy.Click += OnCopyClicked;
@@ -411,9 +406,6 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         _clockCard.Subtitle = Loc.Get("diagnostics.clock.subtitle");
         RefreshClock(Core.Monitors.ClockMonitor.Latest);
 
-        _checkNow.Text = Loc.Get("menu.checkNow");
-        Tip(_checkNow, "menu.checkNow");
-        _checkNow.SizeToContent();
         _copy.Text = Loc.Get("diagnostics.copy");
         _copy.SizeToContent();
         Tip(_copy, "diagnostics.copy");

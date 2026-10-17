@@ -45,7 +45,6 @@ public sealed class AppHost : ApplicationContext
     private readonly UpdateInstaller _updateInstaller;
     private readonly IncidentWebhook _webhook;
     private readonly ClockMonitor _clock;
-    private WidgetWindow? _widget;
     private System.Windows.Forms.Timer? _updateRestartTimer;
     private readonly SpeedTestScheduler _speedTestScheduler;
 
@@ -163,21 +162,13 @@ public sealed class AppHost : ApplicationContext
 
         _tray = new TrayController();
         _tray.OpenRequested += ShowWindow;
-        _tray.CheckNowRequested += _cadence.RunNow;
         _tray.PauseRequested += _cadence.Pause;
         _tray.ResumeRequested += _cadence.Resume;
         _tray.SettingsRequested += ShowSettings;
         _tray.CheckForUpdatesRequested += OnCheckForUpdatesRequested;
         _tray.BalloonClicked += ShowIncidents;
-        _tray.WidgetToggled += SetWidgetVisible;
         _tray.ExitRequested += Shutdown;
         _cadence.PauseChanged += OnPauseChanged;
-        _window.WidgetToggled += SetWidgetVisible;
-        if (_settings.WidgetEnabled)
-        {
-            SetWidgetVisible(true);
-        }
-
         _pipeline.CycleCompleted += OnCycleCompleted;
         _pipeline.StepChanged += _tracker.NoteStepChange;
         _incidents.Changed += OnIncidentsChanged;
@@ -370,32 +361,6 @@ public sealed class AppHost : ApplicationContext
     {
         ShowWindow();
         _window.ShowPage("incidents");
-    }
-
-    /// <summary>Shows or hides the compact widget - from the tray menu, Settings, or the widget's own menu - and remembers the choice.</summary>
-    private void SetWidgetVisible(bool visible)
-    {
-        _settings.WidgetEnabled = visible;
-        _settings.Save();
-        _tray.SetWidgetShown(visible);
-        _window.SetWidgetShown(visible);
-
-        if (visible)
-        {
-            if (_widget is null || _widget.IsDisposed)
-            {
-                var services = _window.Services;
-                _widget = new WidgetWindow(services, _ui);
-                _widget.OpenRequested += ShowWindow;
-                _widget.HideRequested += () => SetWidgetVisible(false);
-            }
-
-            _widget.Show();
-        }
-        else
-        {
-            _widget?.Hide();
-        }
     }
 
     /// <summary>
@@ -713,7 +678,6 @@ public sealed class AppHost : ApplicationContext
             _updateRestartTimer?.Stop();
             _updateRestartTimer?.Dispose();
 
-            _widget?.Dispose();
             _tray.Dispose();
             _themeWatcher.Dispose();
 

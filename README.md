@@ -384,8 +384,6 @@ Every setting and button shows a short explanation when the mouse rests on it fo
   back, as the app's own pop-up or as a Windows notification.
 - **Adapter to monitor** (General) - automatic (the adapter Windows routes over), a preferred
   adapter while it is connected, or always one fixed adapter.
-- **Compact widget** (General, or the tray menu) - a small window with the seven steps, the verdict
-  and the last fifteen minutes of latency; off by default, draggable, optionally kept on top.
 - **Thresholds** (Check interval) - from how many milliseconds latency counts as slow or severe,
   and below which signal quality Wi-Fi counts as weak.
 - **Time server** (Public internet) - the NTP server the hourly clock check asks; `pool.ntp.org`
@@ -407,8 +405,8 @@ report for your provider; configurable history retention (up to 90 days); networ
 traceroute hop ownership; LAN-scan manufacturer lookup with a TCP fallback; an AI-ready export;
 signed self-update; a webhook; notes on incidents and a route traced when an incident opens; named
 ping targets with their own charts; a report over any period with a comparison; adapter choice; a
-path-MTU tool; a clock check; a network scan that remembers; a command-line export; a portable mode;
-and a compact widget.
+path-MTU tool; a clock check; a network scan that remembers; a command-line export; and a portable
+mode.
 
 Everything v1 did is back. Quiet hours were dropped on purpose: a pop-up suppressed while you are at
 the keyboard and shown when you are not would defeat the point - pop-ups can simply be switched off.

@@ -25,7 +25,6 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
     private DateTimeOffset _uptimeRefreshedAt = DateTimeOffset.MinValue;
     private Card _stepsCard = null!;
     private StepList _steps = null!;
-    private AppButton _checkNow = null!;
     private bool _subscribed;
 
     public override string Id => "status";
@@ -58,10 +57,6 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         _hero = new StatusHero { Dock = DockStyle.Top };
         _hero.Height = _hero.PreferredHeight;
 
-        _checkNow = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Refresh };
-        _checkNow.Click += (_, _) => Services.Cadence.RunNow();
-        Header.AddAction(_checkNow);
-
         // Added in reverse visual order: DockStyle.Top stacks later siblings nearer the top edge,
         // and PageBase adds its header after this runs.
         Controls.Add(_stepsCard);
@@ -76,14 +71,11 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
     {
         base.ApplyLocalization();
 
-        if (_checkNow is null)
+        if (_stepsCard is null)
         {
             return;
         }
 
-        _checkNow.Text = Loc.Get("menu.checkNow");
-        Tip(_checkNow, "menu.checkNow");
-        _checkNow.SizeToContent();
         _stepsCard.Title = Loc.Get("status.steps.title");
         _stepsCard.Subtitle = Loc.Get("status.steps.subtitle");
         _uptimeCard.Title = Loc.Get("uptime.title");
