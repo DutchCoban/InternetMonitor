@@ -62,9 +62,15 @@ public sealed class MetricStore : IAsyncDisposable
     /// the files already read - a 90-day history would be cut to the default on every start.
     /// </summary>
     public MetricStore(TimeSpan retention)
+        : this(retention, AppPaths.HistoryDir)
+    {
+    }
+
+    /// <summary>A store over any directory - the tests' way to keep each one apart; the app always uses <see cref="AppPaths.HistoryDir"/>.</summary>
+    internal MetricStore(TimeSpan retention, string directory)
     {
         _retention = retention;
-        _directory = AppPaths.HistoryDir;
+        _directory = directory;
         _loadTask = Task.Run(LoadAllAsync);
         _flushLoop = RunFlushLoopAsync(_shutdown.Token);
     }

@@ -40,6 +40,9 @@ public static class Downsample
             int bucketStart = (int)Math.Floor((i + 1) * bucketSize) + 1;
             int bucketEnd = (int)Math.Floor((i + 2) * bucketSize) + 1;
             bucketEnd = Math.Min(bucketEnd, points.Count - 1);
+            // The last bucket can collapse onto the fixed last point; keep it one point wide so that
+            // point is not chosen here and then appended again below.
+            bucketStart = Math.Min(bucketStart, bucketEnd - 1);
 
             // The next bucket's average stands in for "where the line is heading", which is what
             // makes the triangle meaningful.
