@@ -588,6 +588,13 @@ shared tools folder. The `INTERNETMONITOR_DATA_DIR` environment variable, when s
 
 ## Security notes
 
+- **The release executable is checked on VirusTotal.** The v2.3.0 download scored 0 of 70 engines
+  ([file report](https://www.virustotal.com/gui/file/e8e0a78b00199ed3247a3efaa1507711d4aa25ba87e664394063a847a480e3e4)),
+  and its sandbox run shows only what the app does by design: the GitHub API for the update
+  check, a time server for the clock check and Microsoft's connectivity page. The report is tied
+  to the file's SHA-256, so it describes exactly the bytes you download. The executable carries
+  the project's own release signature (`InternetMonitor.exe.sig`, checked by the self-update)
+  but no Authenticode certificate, which is why SmartScreen may warn the first time.
 - **User-configured targets are trusted.** Application endpoints are entirely user-supplied and
   flow directly into raw TCP/UDP/HTTPS probes with no target allowlist. This is intended - it's a
   local, single-user monitoring tool, and you're only ever pointing it at hosts you choose. It
