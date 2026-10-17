@@ -298,8 +298,14 @@ public sealed class AppSettings
 
     public NetworkHealthThreshold TtlExceeded { get; set; } = new(false, 50, 5);
 
-    /// <summary>MaxOccurrences is unused for this condition - any server other than the known gateway is rogue. WindowMinutes is this condition's own poll interval instead.</summary>
-    public NetworkHealthThreshold RogueDhcp { get; set; } = new(false, 0, 5);
+    /// <summary>
+    /// MaxOccurrences is unused for this condition - any server other than the known gateway is
+    /// rogue. WindowMinutes is this condition's own poll interval instead. Every poll shares UDP
+    /// port 68 with Windows' DHCP client for a few seconds and has the real server reserve an offer
+    /// for a made-up client (see <see cref="Net.DhcpDiscoverProbe"/>), so the default is deliberately
+    /// a quarter of an hour, not the five minutes the other windows use.
+    /// </summary>
+    public NetworkHealthThreshold RogueDhcp { get; set; } = new(false, 0, 15);
 
     // ---- Persistence --------------------------------------------------------------------------
 

@@ -269,10 +269,15 @@ Reports → Export covers three kinds of export, and two more are available else
   incident with its timeline, the changes recorded just before it and each step's measurements;
   when outages start by hour and weekday; latency per day and by hour of day; Wi-Fi signal and
   access-point switches; this computer's traffic; and statistics for every recorded series.
-  Wi-Fi network names, access points and MAC addresses are replaced by stable stand-ins
-  ("Wi-Fi network A", "AP-1", "MAC-1"), so it can be pasted into any AI tool.
+  Wi-Fi network names, access points, MAC addresses and any public IPv4 address this computer
+  itself has (a line without NAT) are replaced by stable stand-ins ("Wi-Fi network A", "AP-1",
+  "MAC-1", "IP-1"), so it can be pasted into any AI tool. Private addresses, the app's own ping
+  targets and resolvers, and the adapter's DNS servers stay as they are - they identify nobody.
 - **Export plain data** - the same document without the AI-facing instructions.
 - **Per-incident export** - a Markdown report for a single incident, from the Incidents screen.
+  Unlike the two exports above this one is *not* pseudonymised, and neither is the zip: both show
+  network names, hardware addresses and local addresses as recorded. They are for your own eyes
+  or for someone you trust.
 - **Network scan → Export CSV** - the LAN scan's device table (IP, hostname, MAC, vendor, response time).
 
 ## Settings backup
@@ -502,6 +507,13 @@ None of these live inside the application directory, so the app itself can be re
   id; answers from the lookup services are read up to a fixed size; a link from GitHub's release
   feed is opened only when it is an HTTPS address on github.com; and CSV exports write a host name
   or manufacturer that starts like a spreadsheet formula (`=`, `+`, `-`, `@`) as text.
+- **The rogue-DHCP check shares a port with Windows.** When that network-health condition is on
+  (it is off by default), every poll binds UDP port 68 next to Windows' own DHCP client for about
+  three seconds and broadcasts a DHCP discover with a made-up hardware address. In that window a
+  reply meant for Windows can land in the app instead (the DHCP client then simply retries), the
+  real DHCP server briefly reserves an address for a device that does not exist, and a switch with
+  DHCP snooping may log the packet. The default interval is fifteen minutes; leave the condition
+  off unless you want to know about a second DHCP server.
 - **The Uptime Kuma push URL is only ever called over HTTPS.** It carries the monitor's token, so a
   plain `http://` URL - even one placed in `settings.json` by hand or by import - is treated as "no
   URL" rather than sent in the clear.

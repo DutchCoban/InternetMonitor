@@ -158,7 +158,9 @@ public static class AiExportBuilder
         DateTimeOffset from = to - TimeSpan.FromDays(settings.HistoryRetentionDays);
         IReadOnlyList<MetricPoint> Series(string id) => history.TryGetValue(id, out IReadOnlyList<MetricPoint>? points) ? points : [];
 
-        var names = new Pseudonymizer();
+        // The app's own public addresses stay readable in the export; see Pseudonymizer.
+        var targets = new CheckTargets();
+        var names = new Pseudonymizer([.. targets.PublicIpTargets, .. targets.PublicResolvers, .. settings.ParsedPublicIpTargets(), .. settings.ParsedCustomDnsServers()]);
         names.Learn(incidents, Series(SeriesNames.WifiSignal));
 
         ProviderReportData report = ProviderReportData.Compute(incidents, Series, from, to, zone);

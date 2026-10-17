@@ -253,26 +253,9 @@ public sealed class MetricStore : IAsyncDisposable
 
         foreach (string line in lines)
         {
-            int firstComma = line.IndexOf(',');
-            if (firstComma < 0 || !long.TryParse(line.AsSpan(0, firstComma), out long ticks))
+            if (TryParseLine(line, out MetricPoint point) && point.Timestamp >= cutoff)
             {
-                continue;
-            }
-
-            int secondComma = line.IndexOf(',', firstComma + 1);
-            ReadOnlySpan<char> valueSpan = secondComma < 0
-                ? line.AsSpan(firstComma + 1)
-                : line.AsSpan(firstComma + 1, secondComma - firstComma - 1);
-
-            if (!double.TryParse(valueSpan, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
-            {
-                continue;
-            }
-
-            var timestamp = new DateTimeOffset(ticks, TimeSpan.Zero);
-            if (timestamp >= cutoff)
-            {
-                points.Add(new MetricPoint(timestamp, value, secondComma < 0 ? null : line[(secondComma + 1)..]));
+                points.Add(point);
             }
         }
 
@@ -284,6 +267,38 @@ public sealed class MetricStore : IAsyncDisposable
         }
 
         return points;
+    }
+
+    /// <summary>
+    /// Reads one "ticks,value[,metadata]" line. False for anything that is not one - including a
+    /// tick count outside what a <see cref="DateTimeOffset"/> can hold, which would otherwise throw
+    /// and take the whole load down with it. A damaged line is simply not a point.
+    /// </summary>
+    public static bool TryParseLine(string line, out MetricPoint point)
+    {
+        point = default;
+
+        int firstComma = line.IndexOf(',');
+        if (firstComma < 0
+            || !long.TryParse(line.AsSpan(0, firstComma), out long ticks)
+            || ticks < DateTimeOffset.MinValue.Ticks
+            || ticks > DateTimeOffset.MaxValue.Ticks)
+        {
+            return false;
+        }
+
+        int secondComma = line.IndexOf(',', firstComma + 1);
+        ReadOnlySpan<char> valueSpan = secondComma < 0
+            ? line.AsSpan(firstComma + 1)
+            : line.AsSpan(firstComma + 1, secondComma - firstComma - 1);
+
+        if (!double.TryParse(valueSpan, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+        {
+            return false;
+        }
+
+        point = new MetricPoint(new DateTimeOffset(ticks, TimeSpan.Zero), value, secondComma < 0 ? null : line[(secondComma + 1)..]);
+        return true;
     }
 
     private async Task RunFlushLoopAsync(CancellationToken cancellationToken)
