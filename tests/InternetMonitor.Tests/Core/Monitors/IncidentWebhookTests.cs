@@ -65,6 +65,43 @@ public sealed class IncidentWebhookTests
     }
 
     [Theory]
+    [InlineData("http://192.168.1.20:8123/api/webhook/x")]
+    [InlineData("http://10.0.0.5/hook")]
+    [InlineData("http://172.20.3.4/hook")]
+    [InlineData("http://homeassistant.local:8123/api/webhook/x")]
+    [InlineData("http://nas/hook")]
+    [InlineData("http://localhost:8080/hook")]
+    [InlineData("http://[fd12::1]/hook")]
+    public void Plain_http_is_allowed_inside_the_local_network(string url) => Assert.True(IncidentWebhook.IsUsableUrl(url));
+
+    [Theory]
+    [InlineData("http://8.8.8.8/hook")]
+    [InlineData("http://172.32.0.1/hook")]
+    [InlineData("http://hooks.example.com/incident")]
+    public void Plain_http_to_the_internet_is_refused(string url) => Assert.False(IncidentWebhook.IsUsableUrl(url));
+
+    [Fact]
+    public async Task A_failed_delivery_waits_and_goes_in_order_once_the_endpoint_answers()
+    {
+        var handler = new FlakyHandler { Failing = true };
+        await using var webhook = new IncidentWebhook("2.3.0", handler);
+        webhook.Reconfigure("https://hooks.example/incident");
+
+        webhook.Notify(Outage(), opened: true);
+        await handler.WaitForAttemptsAsync(1);
+        Assert.Equal(1, webhook.PendingCount);
+        Assert.True(webhook.LastDelivery!.Failed);
+
+        handler.Failing = false;
+        webhook.Notify(Outage(), opened: false);
+        await handler.WaitForAttemptsAsync(3);
+        await Task.Delay(50);
+
+        Assert.Equal(0, webhook.PendingCount);
+        Assert.Equal(["opened", "resolved"], handler.DeliveredEvents);
+    }
+
+    [Theory]
     [InlineData("http://hooks.example/incident")]
     [InlineData("hooks.example")]
     [InlineData("")]
@@ -78,6 +115,42 @@ public sealed class IncidentWebhookTests
         Assert.False(webhook.IsActive);
         Assert.Null(await webhook.SendTestAsync(CancellationToken.None));
         Assert.Null(handler.Url);
+    }
+
+    /// <summary>Refuses every POST while <see cref="Failing"/>, and records the events it accepted.</summary>
+    private sealed class FlakyHandler : HttpMessageHandler
+    {
+        private int _attempts;
+
+        public bool Failing { get; set; }
+
+        public List<string> DeliveredEvents { get; } = [];
+
+        public async Task WaitForAttemptsAsync(int count)
+        {
+            for (int i = 0; i < 200 && Volatile.Read(ref _attempts) < count; i++)
+            {
+                await Task.Delay(10);
+            }
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _attempts);
+            if (Failing)
+            {
+                throw new HttpRequestException("no route to host");
+            }
+
+            string body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            using JsonDocument json = JsonDocument.Parse(body);
+            lock (DeliveredEvents)
+            {
+                DeliveredEvents.Add(json.RootElement.GetProperty("event").GetString()!);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
     }
 
     private sealed class CapturingHandler : HttpMessageHandler

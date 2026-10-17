@@ -689,8 +689,8 @@
   "incidents.note.placeholder": "La tua nota - un numero di ticket, cosa ha detto il provider. Salvata quando lasci il campo.",
   "incidents.route": "Percorso verso {0} all'apertura",
   "incidents.route.noAnswer": "nessuna risposta",
-  "settings.webhook.url": "URL del webhook (https)",
-  "settings.webhook.url.error": "Inserisci un URL https:// valido, oppure lascia il campo vuoto per disattivare il webhook.",
+  "settings.webhook.url": "URL del webhook",
+  "settings.webhook.url.error": "Inserisci un URL https:// valido - http:// solo per un indirizzo nella tua rete - oppure lascia il campo vuoto per disattivare il webhook.",
   "settings.webhook.test": "Invia un test",
   "settings.webhook.status": "Ultima consegna {0} - {1}",
   "settings.webhook.status.none": "Nulla consegnato ancora. L'apertura o la chiusura di un incidente viene inviata come JSON.",
@@ -796,7 +796,7 @@
   "settings.kuma.pushUrl.help": "L'URL push di un monitor Uptime Kuma. L'app lo chiama all'intervallo sotto per dire che è viva; vuoto significa disattivato. Viene usato solo https - l'URL contiene un token.",
   "settings.kuma.interval.help": "Secondi tra gli heartbeat. Impostalo un po' sotto l'intervallo del monitor in Kuma.",
   "settings.kuma.about.help": "Apri la pagina del progetto Uptime Kuma nel browser.",
-  "settings.webhook.url.help": "Un indirizzo https che riceve un POST JSON quando un incidente si apre e uno quando si chiude - per Home Assistant, ntfy, Discord, Slack e simili. Vuoto significa disattivato.",
+  "settings.webhook.url.help": "Un indirizzo che riceve un POST JSON quando un incidente si apre e uno quando si chiude - per Home Assistant, ntfy, Discord, Slack e simili. https ovunque; http semplice solo dentro la tua rete. Un messaggio che non può essere consegnato durante un'interruzione aspetta e parte appena internet torna. Vuoto significa disattivato.",
   "settings.webhook.test.help": "Invia ora un messaggio di esempio al webhook, per vederlo arrivare.",
   "settings.endpoint.add.help": "Aggiungi un tuo endpoint per il passaggio 7: un URL, una porta TCP o un host da pingare. Ciascuno ha il proprio grafico nella pagina Cronologia.",
   "settings.export.settings.help": "Salva tutte le impostazioni in un file, come backup o per copiarle su un altro computer. Il file contiene l'URL di Kuma e gli header degli endpoint così come sono.",
@@ -824,5 +824,6 @@
   "lanScan.export.help": "Salva la tabella dei dispositivi come file CSV, con i nomi che hai dato e quando ogni dispositivo è stato visto per la prima volta.",
   "speedtest.run.help": "Esegui il test di velocità ora. Sposta dati reali per circa dieci secondi; su dati mobili la barra indica all'incirca quanti.",
   "mtu.run.help": "Trova il pacchetto non frammentato più grande verso la destinazione con ping don't-fragment. Richiede qualche secondo.",
-  "mtu.target.help": "Un nome host o un indirizzo rispetto a cui misurare. Un indirizzo pubblico che risponde ai ping funziona meglio."
+  "mtu.target.help": "Un nome host o un indirizzo rispetto a cui misurare. Un indirizzo pubblico che risponde ai ping funziona meglio.",
+  "settings.webhook.status.pending": "{0} in attesa del ritorno di internet."
 }

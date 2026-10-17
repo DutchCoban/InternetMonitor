@@ -689,8 +689,8 @@
   "incidents.note.placeholder": "Je eigen notitie - een ticketnummer, wat de provider zei. Wordt bewaard zodra je het veld verlaat.",
   "incidents.route": "Route naar {0} toen het begon",
   "incidents.route.noAnswer": "geen antwoord",
-  "settings.webhook.url": "Webhook-URL (https)",
-  "settings.webhook.url.error": "Vul een geldige https://-URL in, of laat het veld leeg om de webhook uit te zetten.",
+  "settings.webhook.url": "Webhook-URL",
+  "settings.webhook.url.error": "Vul een geldige https://-URL in - http:// alleen voor een adres in je eigen netwerk - of laat het veld leeg om de webhook uit te zetten.",
   "settings.webhook.test": "Test versturen",
   "settings.webhook.status": "Laatste levering {0} - {1}",
   "settings.webhook.status.none": "Nog niets geleverd. Een incident dat opent of sluit wordt als JSON gepost.",
@@ -796,7 +796,7 @@
   "settings.kuma.pushUrl.help": "De push-URL van een Uptime Kuma-monitor. De app roept die met het interval hieronder aan om te zeggen dat hij leeft; leeg betekent uit. Alleen https wordt gebruikt - de URL bevat een token.",
   "settings.kuma.interval.help": "Seconden tussen heartbeats. Zet het iets onder het eigen interval van de monitor in Kuma.",
   "settings.kuma.about.help": "De projectpagina van Uptime Kuma in je browser openen.",
-  "settings.webhook.url.help": "Een https-adres dat één JSON-POST krijgt als een incident opent en één als het sluit - voor Home Assistant, ntfy, Discord, Slack en dergelijke. Leeg betekent uit.",
+  "settings.webhook.url.help": "Een adres dat één JSON-POST krijgt als een incident opent en één als het sluit - voor Home Assistant, ntfy, Discord, Slack en dergelijke. https overal; gewoon http alleen binnen je eigen netwerk. Een bericht dat tijdens een storing niet weg kan, wacht en gaat zodra het internet terug is. Leeg betekent uit.",
   "settings.webhook.test.help": "Nu een voorbeeldbericht naar de webhook sturen, om te zien dat het aankomt.",
   "settings.endpoint.add.help": "Een eigen endpoint voor stap 7 toevoegen: een URL, een TCP-poort of een host om te pingen. Elk krijgt een eigen grafiek op de Geschiedenis-pagina.",
   "settings.export.settings.help": "Alle instellingen in een bestand bewaren, als back-up of om naar een andere computer te kopiëren. Het bestand bevat de Kuma-URL en endpoint-headers onbewerkt.",
@@ -824,5 +824,6 @@
   "lanScan.export.help": "De apparatentabel als CSV-bestand bewaren, met de namen die je gaf en wanneer elk apparaat voor het eerst is gezien.",
   "speedtest.run.help": "De snelheidstest nu draaien. Hij verplaatst zo'n tien seconden echte data; op mobiele data zegt de balk ongeveer hoeveel.",
   "mtu.run.help": "Het grootste ongefragmenteerde pakket naar het doel vinden met don't-fragment-pings. Duurt een paar seconden.",
-  "mtu.target.help": "Een hostnaam of adres om tegen te meten. Een publiek adres dat pings beantwoordt werkt het best."
+  "mtu.target.help": "Een hostnaam of adres om tegen te meten. Een publiek adres dat pings beantwoordt werkt het best.",
+  "settings.webhook.status.pending": "{0} in de wacht tot het internet terug is."
 }

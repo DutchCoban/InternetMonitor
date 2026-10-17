@@ -689,8 +689,8 @@
   "incidents.note.placeholder": "Your own note - a ticket number, what the provider said. Saved when you leave the field.",
   "incidents.route": "Route to {0} when it opened",
   "incidents.route.noAnswer": "no answer",
-  "settings.webhook.url": "Webhook URL (https)",
-  "settings.webhook.url.error": "Enter a valid https:// URL, or leave the field empty to disable the webhook.",
+  "settings.webhook.url": "Webhook URL",
+  "settings.webhook.url.error": "Enter a valid https:// URL - http:// only for an address inside your own network - or leave the field empty to disable the webhook.",
   "settings.webhook.test": "Send a test",
   "settings.webhook.status": "Last delivery {0} - {1}",
   "settings.webhook.status.none": "Nothing delivered yet. An incident opening or closing is posted as JSON.",
@@ -796,7 +796,7 @@
   "settings.kuma.pushUrl.help": "The push URL of an Uptime Kuma monitor. The app calls it on the interval below to say it is alive; empty means off. Only https is used - the URL carries a token.",
   "settings.kuma.interval.help": "Seconds between heartbeats. Set it a little below the monitor's own interval in Kuma.",
   "settings.kuma.about.help": "Open the Uptime Kuma project page in your browser.",
-  "settings.webhook.url.help": "An https address that receives one JSON POST when an incident opens and one when it closes - for Home Assistant, ntfy, Discord, Slack and the like. Empty means off.",
+  "settings.webhook.url.help": "An address that receives one JSON POST when an incident opens and one when it closes - for Home Assistant, ntfy, Discord, Slack and the like. https anywhere; plain http only inside your own network. A message that cannot be delivered during an outage waits and goes as soon as the internet is back. Empty means off.",
   "settings.webhook.test.help": "Send a sample message to the webhook now, to see it arrive.",
   "settings.endpoint.add.help": "Add an endpoint of your own for step 7: a URL, a TCP port, or a host to ping. Each gets its own chart on the History page.",
   "settings.export.settings.help": "Save all settings to a file, as a backup or to copy to another computer. The file contains the Kuma URL and endpoint headers as they are.",
@@ -824,5 +824,6 @@
   "lanScan.export.help": "Save the device table as a CSV file, with the names you gave and when each device was first seen.",
   "speedtest.run.help": "Run the speed test now. It moves real data for about ten seconds; on mobile data the bar says roughly how much.",
   "mtu.run.help": "Find the largest unfragmented packet to the target with don't-fragment pings. Takes a few seconds.",
-  "mtu.target.help": "A host name or address to measure against. A public address that answers pings works best."
+  "mtu.target.help": "A host name or address to measure against. A public address that answers pings works best.",
+  "settings.webhook.status.pending": "{0} waiting until the internet is back."
 }

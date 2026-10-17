@@ -689,8 +689,8 @@
   "incidents.note.placeholder": "Twoja notatka - numer zgłoszenia, co powiedział dostawca. Zapisywana po opuszczeniu pola.",
   "incidents.route": "Trasa do {0} w chwili wystąpienia",
   "incidents.route.noAnswer": "brak odpowiedzi",
-  "settings.webhook.url": "Adres URL webhooka (https)",
-  "settings.webhook.url.error": "Wpisz prawidłowy adres https:// lub zostaw pole puste, aby wyłączyć webhook.",
+  "settings.webhook.url": "Adres URL webhooka",
+  "settings.webhook.url.error": "Wpisz prawidłowy adres https:// - http:// tylko dla adresu we własnej sieci - albo zostaw pole puste, aby wyłączyć webhook.",
   "settings.webhook.test": "Wyślij test",
   "settings.webhook.status": "Ostatnie dostarczenie {0} - {1}",
   "settings.webhook.status.none": "Jeszcze nic nie dostarczono. Rozpoczęcie lub zakończenie incydentu jest wysyłane jako JSON.",
@@ -796,7 +796,7 @@
   "settings.kuma.pushUrl.help": "Adres push monitora Uptime Kuma. Aplikacja wywołuje go w poniższym interwale, by zgłosić, że działa; puste oznacza wyłączone. Używany jest tylko https - adres zawiera token.",
   "settings.kuma.interval.help": "Sekundy między heartbeatami. Ustaw nieco poniżej własnego interwału monitora w Kuma.",
   "settings.kuma.about.help": "Otwórz stronę projektu Uptime Kuma w przeglądarce.",
-  "settings.webhook.url.help": "Adres https otrzymujący jeden POST z JSON przy rozpoczęciu incydentu i jeden przy zakończeniu - dla Home Assistant, ntfy, Discord, Slack i podobnych. Puste oznacza wyłączone.",
+  "settings.webhook.url.help": "Adres, który otrzymuje jeden POST JSON, gdy incydent się zaczyna, i jeden, gdy się kończy - dla Home Assistant, ntfy, Discord, Slack i podobnych. https wszędzie; zwykłe http tylko we własnej sieci. Wiadomość, której nie da się dostarczyć podczas awarii, czeka i wychodzi, gdy tylko internet wróci. Puste oznacza wyłączone.",
   "settings.webhook.test.help": "Wyślij teraz przykładową wiadomość do webhooka, aby sprawdzić, czy dociera.",
   "settings.endpoint.add.help": "Dodaj własny endpoint dla kroku 7: adres URL, port TCP lub host do pingowania. Każdy dostaje własny wykres na stronie Historia.",
   "settings.export.settings.help": "Zapisz wszystkie ustawienia do pliku, jako kopię zapasową lub do przeniesienia na inny komputer. Plik zawiera adres Kuma i nagłówki endpointów w oryginalnej postaci.",
@@ -824,5 +824,6 @@
   "lanScan.export.help": "Zapisz tabelę urządzeń jako plik CSV, z nadanymi nazwami i datą pierwszego wykrycia każdego urządzenia.",
   "speedtest.run.help": "Uruchom test prędkości teraz. Przez około dziesięć sekund przesyła prawdziwe dane; na danych mobilnych pasek podaje w przybliżeniu ile.",
   "mtu.run.help": "Znajdź największy niefragmentowany pakiet do celu za pomocą pingów don't-fragment. Trwa kilka sekund.",
-  "mtu.target.help": "Nazwa hosta lub adres do pomiaru. Najlepiej działa adres publiczny odpowiadający na ping."
+  "mtu.target.help": "Nazwa hosta lub adres do pomiaru. Najlepiej działa adres publiczny odpowiadający na ping.",
+  "settings.webhook.status.pending": "{0} czeka, aż internet wróci."
 }

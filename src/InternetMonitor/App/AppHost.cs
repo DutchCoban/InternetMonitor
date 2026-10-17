@@ -247,6 +247,13 @@ public sealed class AppHost : ApplicationContext
         RecordOutageState(snapshot.TakenUtc);
         _diagnosticLog.LogCycle(snapshot, diagnosis, _tracker.ActiveIncident?.Id);
 
+        // A webhook message that could not leave the house during an outage goes as soon as the
+        // public internet answers again - which this cycle just found out.
+        if (snapshot.All.Any(r => r.Step == StepId.PublicIp && r.State == StepState.Ok))
+        {
+            _webhook.RetryPending();
+        }
+
         UpdateTray(snapshot, diagnosis);
     }
 

@@ -206,12 +206,20 @@ public sealed partial class SettingsPage
             return;
         }
 
-        _webhookStatus.Text = status is null
+        string text = status is null
             ? Services.Settings.WebhookUrl.Length > 0 ? Loc.Get("settings.webhook.status.none") : string.Empty
             : Loc.Format(
                 "settings.webhook.status",
                 status.AtUtc.ToLocalTime().ToString("HH:mm:ss"),
                 status.Failed ? Loc.Format("settings.kuma.status.failed", status.Detail) : Loc.Get("settings.kuma.status.ok"));
+
+        int pending = Services.Webhook.PendingCount;
+        if (pending > 0)
+        {
+            text += " " + Loc.Format("settings.webhook.status.pending", pending);
+        }
+
+        _webhookStatus.Text = text;
     }
 
     private static void OpenUptimeKumaProjectPage() => ShellOpen.OpenUrl("https://github.com/louislam/uptime-kuma");
