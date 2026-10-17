@@ -177,16 +177,17 @@ location settings.
 With location access on, step 2 also counts the access points that share your channel and says so
 when a 2.4 GHz channel is crowded - the usual reason a Wi-Fi with a fine signal is still slow.
 
-## Login pages
+## Captive portals
 
 On hotel, train and guest Wi-Fi the network intercepts traffic until you log in. The HTTPS
 reachability check then just fails, which says nothing useful. So when it fails, the app requests
 `http://www.msftconnecttest.com/connecttest.txt` - the page Windows itself uses for its "action
-needed" notice - and if a redirect or a different page comes back, the cause becomes **Login
-page**: the Status page says "Login required" (in the warning colour, since nothing is broken) with
-an **Open login page** button, and the tray and incident pop-up follow suit. The button opens
-Windows' own redirect address, never a link the network supplied. Only a redirect, a 511, or a 200
-with the wrong page count as a login page; an interrupted probe is never mistaken for one.
+needed" notice - and if a redirect or a different page comes back, the cause becomes **Captive
+portal**: the Status page says "Captive portal: log in" (in the warning colour, since nothing is
+broken) with an **Open captive portal** button, and the tray and incident pop-up follow suit. The
+button opens Windows' own redirect address, never a link the network supplied. Only a redirect, a
+511, or a 200 with the wrong page count as a captive portal; an interrupted probe is never mistaken
+for one.
 
 ## Latency under load
 
@@ -256,7 +257,7 @@ and opens it in your browser (print it to PDF to send it on), or saves it. It sh
 - how much of the period was actually measured - time the computer was off or the app not running
   is left out, not counted as up or down;
 - availability, counting only outages on the provider's side (the internet beyond the router, the
-  provider's DNS); outages in this computer, the home network or a login page are listed
+  provider's DNS); outages in this computer, the home network or a captive portal are listed
   separately, so the report can't be dismissed over a local problem;
 - every outage, and a summary per cause;
 - latency per day (average and 95th percentile), and packet loss and jitter per day;
@@ -333,7 +334,7 @@ technical data (addresses, timings, status codes, error text).
 
 ## Configuring application endpoints
 
-Settings → Targets lets you add, edit, enable/disable, and remove any number of application
+Settings → Endpoints lets you add, edit, enable/disable, and remove any number of application
 endpoints, of two kinds:
 
 - **HTTPS** - a full DNS → TCP → TLS → HTTP check against a URL, same as the built-in

@@ -127,7 +127,39 @@ public sealed class LocalizationManager
     /// time - without caring which language that was.
     /// </summary>
     public static IReadOnlyList<string> TranslationsOf(string key) =>
-        [.. AllLanguages.Value.Select(d => d.GetValueOrDefault(key)).OfType<string>().Distinct()];
+        [.. AllLanguages.Value.Select(d => d.GetValueOrDefault(key)).OfType<string>().Concat(RetiredTranslations.Where(r => r.Key == key).Select(r => r.Text)).Distinct()];
+
+    /// <summary>
+    /// Texts earlier versions showed for a fixed-string key, so a measurement recorded under one of
+    /// them still reads back after the wording changed. The 2.3.0 wording pass kept networking terms
+    /// in English in every language (round trip, packet loss, probe, resolved, captive portal...),
+    /// which renamed these labels; incidents from before carry the old ones.
+    /// </summary>
+    private static readonly (string Text, string Key)[] RetiredTranslations =
+    [
+        ("Login page", "measure.captivePortal"),
+        ("Gemeten verbinding", "measure.connectionCost.metered"),
+        ("Gemeten (mobiel internet)", "measure.connectionCost.mobile"),
+        ("Opgelost naar", "measure.resolved"),
+        ("Opgezocht", "measure.dnsTry.resolved"),
+        ("Opgezocht door Windows", "measure.dnsSystemResolver"),
+        ("Inlogpagina", "measure.captivePortal"),
+        ("Aufgelöst zu", "measure.resolved"),
+        ("Aufgelöst", "measure.dnsTry.resolved"),
+        ("Aufgelöst durch Windows", "measure.dnsSystemResolver"),
+        ("Anmeldeseite", "measure.captivePortal"),
+        ("Latenz", "measure.latency"),
+        ("Verbindungsgeschwindigkeit", "measure.linkSpeed"),
+        ("Verbindungsstatus", "measure.linkState"),
+        ("Rozwiązano na", "measure.resolved"),
+        ("Rozwiązano", "measure.dnsTry.resolved"),
+        ("Rozwiązane przez Windows", "measure.dnsSystemResolver"),
+        ("Strona logowania", "measure.captivePortal"),
+        ("Opóźnienie", "measure.latency"),
+        ("Brama", "measure.gateway"),
+        ("Prędkość łącza", "measure.linkSpeed"),
+        ("Stan łącza", "measure.linkState"),
+    ];
 
     private static readonly Lazy<Dictionary<string, string>> BackToEnglish = new(() =>
     {
@@ -138,22 +170,20 @@ public sealed class LocalizationManager
         static bool Measurement(string key) => key.StartsWith("measure.", StringComparison.Ordinal) || key.StartsWith("linkState.", StringComparison.Ordinal);
 
         var candidates = new Dictionary<string, List<(string English, bool Measurement)>>(StringComparer.Ordinal);
-        foreach (Dictionary<string, string> language in AllLanguages.Value)
+        IEnumerable<(string Key, string Text)> current = AllLanguages.Value.SelectMany(language => language.Select(pair => (pair.Key, pair.Value)));
+        foreach ((string key, string text) in current.Concat(RetiredTranslations.Select(r => (r.Key, r.Text))))
         {
-            foreach ((string key, string text) in language)
+            if (text.Contains('{') || !FallbackStrings.Value.TryGetValue(key, out string? english) || text == english)
             {
-                if (text.Contains('{') || !FallbackStrings.Value.TryGetValue(key, out string? english) || text == english)
-                {
-                    continue;
-                }
-
-                if (!candidates.TryGetValue(text, out List<(string, bool)>? list))
-                {
-                    candidates[text] = list = [];
-                }
-
-                list.Add((english, Measurement(key)));
+                continue;
             }
+
+            if (!candidates.TryGetValue(text, out List<(string, bool)>? list))
+            {
+                candidates[text] = list = [];
+            }
+
+            list.Add((english, Measurement(key)));
         }
 
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
