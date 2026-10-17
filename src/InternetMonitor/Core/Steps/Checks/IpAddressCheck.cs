@@ -70,7 +70,7 @@ public sealed class IpAddressCheck : IStepCheck
         context.DnsServers = dnsServers;
 
         bool dhcpEnabled = TryGetDhcpEnabled(properties);
-        VpnInfo? vpn = VpnDetector.Detect();
+        VpnInfo? vpn = VpnDetector.Detect(context.AllAdapters ?? InterfaceSelector.GetAll());
         context.Vpn = vpn;
 
         IPAddress? ipv6 = PickGlobalIpv6(properties.UnicastAddresses.Select(a => (a.Address, a.SuffixOrigin, a.DuplicateAddressDetectionState)));

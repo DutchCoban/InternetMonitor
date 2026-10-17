@@ -48,7 +48,9 @@ public sealed class StepTable : ThemedControl
         if (result.State.IsResolved() || !_results.TryGetValue(result.Step, out StepResult? shown) || !shown.State.IsResolved())
         {
             _results[result.Step] = result;
-            Invalidate();
+
+            // Only this step's row changed; the rows are a fixed height, so it is easy to find.
+            Invalidate(new Rectangle(0, Array.IndexOf(Order, result.Step) * RowHeight, Width, RowHeight));
         }
     }
 

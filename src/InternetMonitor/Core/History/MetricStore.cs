@@ -36,6 +36,13 @@ public sealed class MetricStore : IAsyncDisposable
     private readonly string _directory;
     private readonly object _lock = new();
     private readonly Dictionary<string, List<MetricPoint>> _series = [];
+
+    /// <summary>
+    /// The last copy <see cref="Get(string)"/> handed out per series, reused until the series
+    /// changes. A chart or an export asks for a whole series at a time; copying six figures of
+    /// points for every such call, when nothing has been added since the last one, is what this saves.
+    /// </summary>
+    private readonly Dictionary<string, MetricPoint[]> _snapshots = [];
     private readonly Dictionary<string, DateTimeOffset> _lastFlushed = [];
     private readonly Dictionary<string, DateTimeOffset> _lastSampled = [];
     private readonly Task _loadTask;
@@ -112,6 +119,7 @@ public sealed class MetricStore : IAsyncDisposable
             }
 
             points.Add(new MetricPoint(timestamp, value, metadata));
+            _snapshots.Remove(seriesId);
         }
     }
 
@@ -127,27 +135,32 @@ public sealed class MetricStore : IAsyncDisposable
         }
     }
 
-    public IReadOnlyList<MetricPoint> Get(string seriesId)
-    {
-        lock (_lock)
-        {
-            return _series.TryGetValue(seriesId, out List<MetricPoint>? points) ? [.. points] : [];
-        }
-    }
+    /// <summary>A series as it is now. The list is shared between callers and never changes; a new one is made after the next change.</summary>
+    public IReadOnlyList<MetricPoint> Get(string seriesId) => Snapshot(seriesId);
 
+    /// <summary>The points at or after <paramref name="from"/>, as a view over the current snapshot - no copy.</summary>
     public IReadOnlyList<MetricPoint> Get(string seriesId, DateTimeOffset from)
     {
+        MetricPoint[] snapshot = Snapshot(seriesId);
+
+        // Points are in time order, so the window is a tail slice found by binary search rather
+        // than by filtering a six-figure list.
+        int start = LowerBound(snapshot, from);
+        return new ArraySegment<MetricPoint>(snapshot, start, snapshot.Length - start);
+    }
+
+    private MetricPoint[] Snapshot(string seriesId)
+    {
         lock (_lock)
         {
-            if (!_series.TryGetValue(seriesId, out List<MetricPoint>? points))
+            if (_snapshots.TryGetValue(seriesId, out MetricPoint[]? snapshot))
             {
-                return [];
+                return snapshot;
             }
 
-            // Points are appended in time order, so the window is a tail slice - found by binary
-            // search rather than by filtering a six-figure list on every chart repaint.
-            int start = LowerBound(points, from);
-            return points.GetRange(start, points.Count - start);
+            snapshot = _series.TryGetValue(seriesId, out List<MetricPoint>? points) ? [.. points] : [];
+            _snapshots[seriesId] = snapshot;
+            return snapshot;
         }
     }
 
@@ -156,6 +169,7 @@ public sealed class MetricStore : IAsyncDisposable
         lock (_lock)
         {
             _series.Remove(seriesId);
+            _snapshots.Remove(seriesId);
             _lastFlushed.Remove(seriesId);
             _lastSampled.Remove(seriesId);
         }
@@ -171,8 +185,29 @@ public sealed class MetricStore : IAsyncDisposable
         }
     }
 
+    /// <summary>Binary search for the first point after <paramref name="until"/>; the list is in time order.</summary>
+    public static int UpperBound(IReadOnlyList<MetricPoint> points, DateTimeOffset until)
+    {
+        int low = 0;
+        int high = points.Count;
+        while (low < high)
+        {
+            int mid = (low + high) / 2;
+            if (points[mid].Timestamp <= until)
+            {
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid;
+            }
+        }
+
+        return low;
+    }
+
     /// <summary>Binary search for the first point at or after <paramref name="from"/>; the list is in time order.</summary>
-    private static int LowerBound(List<MetricPoint> points, DateTimeOffset from)
+    public static int LowerBound(IReadOnlyList<MetricPoint> points, DateTimeOffset from)
     {
         int low = 0;
         int high = points.Count;
@@ -235,6 +270,8 @@ public sealed class MetricStore : IAsyncDisposable
                     _series[seriesId] = points;
                 }
 
+                _snapshots.Remove(seriesId);
+
                 _lastFlushed[seriesId] = points.Count > 0 ? points[^1].Timestamp : DateTimeOffset.MinValue;
             }
         }
@@ -247,12 +284,16 @@ public sealed class MetricStore : IAsyncDisposable
     /// </summary>
     private async Task<List<MetricPoint>> ReadAndCompactAsync(string path)
     {
-        string[] lines = await File.ReadAllLinesAsync(path).ConfigureAwait(false);
         DateTimeOffset cutoff = DateTimeOffset.UtcNow - _retention;
-        var points = new List<MetricPoint>(lines.Length);
+        var points = new List<MetricPoint>();
+        int lines = 0;
 
-        foreach (string line in lines)
+        // Streamed rather than read into one string array first: a 90-day series is half a
+        // million lines, and holding every line as a string next to the points it becomes would
+        // double the memory the load needs at its peak.
+        await foreach (string line in File.ReadLinesAsync(path).ConfigureAwait(false))
         {
+            lines++;
             if (TryParseLine(line, out MetricPoint point) && point.Timestamp >= cutoff)
             {
                 points.Add(point);
@@ -261,11 +302,14 @@ public sealed class MetricStore : IAsyncDisposable
 
         points.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
 
-        if (points.Count != lines.Length)
+        if (points.Count != lines)
         {
             await WriteAllAsync(path, points).ConfigureAwait(false);
         }
 
+        // The list grew by doubling while reading; give the slack back, since this series will now
+        // only ever grow by a point every few seconds.
+        points.TrimExcess();
         return points;
     }
 
@@ -308,13 +352,9 @@ public sealed class MetricStore : IAsyncDisposable
         // flush" slice for it.
         await _loadTask.ConfigureAwait(false);
 
-        using var timer = new PeriodicTimer(FlushInterval);
         try
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                await FlushAsync().ConfigureAwait(false);
-            }
+            await Monitors.BackgroundLoop.EveryAsync(FlushInterval, _ => FlushAsync(), cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -338,7 +378,14 @@ public sealed class MetricStore : IAsyncDisposable
                     pending.Add((seriesId, points.GetRange(firstNew, points.Count - firstNew)));
                 }
 
-                points.RemoveAll(p => p.Timestamp < cutoff);
+                // Expired points are a prefix of a time-ordered list: find where it ends and drop
+                // it in one move, rather than testing every point in the series once a minute.
+                int expired = LowerBound(points, cutoff);
+                if (expired > 0)
+                {
+                    points.RemoveRange(0, expired);
+                    _snapshots.Remove(seriesId);
+                }
             }
         }
 

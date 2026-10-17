@@ -34,8 +34,7 @@ public sealed class LineQualitySampler : IAsyncDisposable
 
     private readonly Func<IPAddress?> _target;
     private readonly Func<IPAddress?> _source;
-    private readonly CancellationTokenSource _shutdown = new();
-    private Task? _loop;
+    private readonly BackgroundLoop _loop = new();
 
     /// <param name="target">The address to ping - the first of the public addresses step 5 uses.</param>
     /// <param name="source">The monitored adapter's address, so the burst leaves through the same adapter as the checks; null when there is none.</param>
@@ -47,26 +46,21 @@ public sealed class LineQualitySampler : IAsyncDisposable
 
     public event Action<LineQualitySample>? Sampled;
 
-    public void Start() => _loop ??= RunAsync(_shutdown.Token);
+    public void Start() => _loop.Start(RunAsync);
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
-        try
+        // The first burst waits for the pipeline to have found an adapter and an address to ping
+        // from; after that, one burst a minute.
+        await Task.Delay(FirstBurstDelay, cancellationToken).ConfigureAwait(false);
+        await BackgroundLoop.EveryAsync(Interval, BurstAsync, cancellationToken, firstTickNow: true).ConfigureAwait(false);
+    }
+
+    private async Task BurstAsync(CancellationToken cancellationToken)
+    {
+        if (await MeasureAsync(cancellationToken).ConfigureAwait(false) is { } sample)
         {
-            await Task.Delay(FirstBurstDelay, cancellationToken).ConfigureAwait(false);
-            using var timer = new PeriodicTimer(Interval);
-            do
-            {
-                if (await MeasureAsync(cancellationToken).ConfigureAwait(false) is { } sample)
-                {
-                    Sampled?.Invoke(sample);
-                }
-            }
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal shutdown.
+            Sampled?.Invoke(sample);
         }
     }
 
@@ -132,14 +126,5 @@ public sealed class LineQualitySampler : IAsyncDisposable
         return new LineQualitySample(at, loss, jitter, median);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await _shutdown.CancelAsync().ConfigureAwait(false);
-        if (_loop is not null)
-        {
-            await _loop.ConfigureAwait(false);
-        }
-
-        _shutdown.Dispose();
-    }
+    public ValueTask DisposeAsync() => _loop.DisposeAsync();
 }

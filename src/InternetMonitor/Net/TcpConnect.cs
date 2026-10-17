@@ -84,38 +84,11 @@ public static class TcpConnect
         CancellationToken cancellationToken,
         IPAddress? source = null)
     {
-        using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Func<CancellationToken, Task<(int Port, TcpOutcome Outcome)>> Connect(int port) =>
+            async token => (port, await TryConnectAsync(address, port, timeout, token, source).ConfigureAwait(false));
 
-        List<Task<(int Port, TcpOutcome Outcome)>> pending = ports
-            .Select(async port => (port, await TryConnectAsync(address, port, timeout, raceCts.Token, source).ConfigureAwait(false)))
-            .ToList();
-
-        try
-        {
-            while (pending.Count > 0)
-            {
-                Task<(int Port, TcpOutcome Outcome)> finished = await Task.WhenAny(pending).ConfigureAwait(false);
-                pending.Remove(finished);
-
-                (int port, TcpOutcome outcome) = await finished.ConfigureAwait(false);
-                if (outcome.Answered)
-                {
-                    return (port, outcome);
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        finally
-        {
-            // Stop the losers rather than leaving sockets dangling until their own timeout; the
-            // answer is already known.
-            raceCts.Cancel();
-        }
-
-        return null;
+        RaceOutcome<(int Port, TcpOutcome Outcome)> race = await Race.FirstAsync([.. ports.Select(Connect)], r => r.Outcome.Answered, cancellationToken).ConfigureAwait(false);
+        return race.HasWinner ? race.Winner : null;
     }
 
     /// <summary>

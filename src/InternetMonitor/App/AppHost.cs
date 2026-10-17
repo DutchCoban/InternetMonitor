@@ -527,15 +527,18 @@ public sealed class AppHost : ApplicationContext
             _pipeline.Dispose();
 
             _lineQuality.Sampled -= RecordLineQuality;
-            _lineQuality.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
-            // Blocking on shutdown is acceptable and necessary: this is the final flush, and
-            // letting the process exit without it loses up to two minutes of recorded history.
-            _history.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _kuma.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _networkHealth.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _updateChecker.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _speedTestScheduler.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            // Blocking on shutdown is acceptable and necessary: this includes the history's final
+            // flush, and letting the process exit without it loses up to two minutes of recorded
+            // history. The six wind down at once, on the thread pool rather than inline, so none
+            // of their continuations can ever need the UI thread this call is holding.
+            Task.Run(() => Task.WhenAll(
+                _lineQuality.DisposeAsync().AsTask(),
+                _history.DisposeAsync().AsTask(),
+                _kuma.DisposeAsync().AsTask(),
+                _networkHealth.DisposeAsync().AsTask(),
+                _updateChecker.DisposeAsync().AsTask(),
+                _speedTestScheduler.DisposeAsync().AsTask())).GetAwaiter().GetResult();
 
             _updateRestartTimer?.Stop();
             _updateRestartTimer?.Dispose();

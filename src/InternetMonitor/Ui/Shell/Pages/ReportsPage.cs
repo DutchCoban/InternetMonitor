@@ -40,9 +40,9 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         BuildReportSection();
 
         _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
-        _exportAll = AddButton(_exportCard, _exportButtons, () => _ = ExportAllDataAsync());
-        _exportAi = AddButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: true));
-        _exportPlain = AddButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: false));
+        _exportAll = AddActionButton(_exportCard, _exportButtons, () => _ = ExportAllDataAsync());
+        _exportAi = AddActionButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: true));
+        _exportPlain = AddActionButton(_exportCard, _exportButtons, () => _ = ExportMarkdownAsync(forAi: false));
 
         // Reverse visual order: DockStyle.Top stacks later siblings nearer the top edge.
         Controls.Add(_exportCard);
@@ -82,10 +82,10 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         };
         AddRow(_reportCard, "reports.provider.upload", _subscribedUp);
 
-        _createReport = AddButton(_reportCard, _reportButtons, () => _ = CreateReportAsync(open: true));
+        _createReport = AddActionButton(_reportCard, _reportButtons, () => _ = CreateReportAsync(open: true));
         _createReport.Variant = ButtonVariant.Primary;
         _createReport.Glyph = Glyph.Report;
-        _saveReport = AddButton(_reportCard, _reportButtons, () => _ = CreateReportAsync(open: false));
+        _saveReport = AddActionButton(_reportCard, _reportButtons, () => _ = CreateReportAsync(open: false));
     }
 
     private NumericUpDown MakeSpeedField(int value) => new()
@@ -174,15 +174,6 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         public override string ToString() => Display;
     }
 
-    private static AppButton AddButton(Card card, List<AppButton> buttons, Action onClick)
-    {
-        var button = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
-        button.Click += (_, _) => onClick();
-        card.Controls.Add(button);
-        buttons.Add(button);
-        return button;
-    }
-
     // ---- Data exports ---------------------------------------------------------------------------
 
     /// <summary>
@@ -267,31 +258,6 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
     // ---- Layout ---------------------------------------------------------------------------------
 
     /// <summary>
-    /// Wraps a card's buttons left-to-right onto as many lines as the width needs - the labels vary
-    /// a lot in length by language, so a fixed side-by-side row would overflow a narrower window.
-    /// </summary>
-    private void LayoutButtons(Card card, List<AppButton> buttons)
-    {
-        Rectangle content = card.DisplayRectangle;
-        int rowHeight = Dp(32);
-        int x = content.Left;
-        int y = content.Top;
-
-        foreach (AppButton button in buttons)
-        {
-            if (x > content.Left && x + button.Width > content.Right)
-            {
-                x = content.Left;
-                y += rowHeight + Sp(1);
-            }
-
-            button.Location = new Point(x, y);
-            x += button.Width + Sp(2);
-        }
-
-        card.Height = y + rowHeight + card.Inset;
-    }
-
     private void LayoutCards()
     {
         // The report card: label/field rows first, then its two buttons on a line below them.
@@ -316,7 +282,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
         _reportCard.Height = y + Dp(32) + _reportCard.Inset;
 
-        LayoutButtons(_exportCard, _exportButtons);
+        LayoutButtonRow(_exportCard, _exportButtons);
     }
 
     protected override void OnResize(EventArgs e)

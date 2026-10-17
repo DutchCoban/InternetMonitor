@@ -25,7 +25,7 @@ namespace InternetMonitor.Ui.Shell.Pages;
 /// by whatever uses them on their very next cycle; language and theme propagate through the
 /// existing LocalizationManager/Theme change events the rest of the app already listens for.
 /// </summary>
-public sealed class SettingsPage(AppServices services) : PageBase(services)
+public sealed partial class SettingsPage(AppServices services) : PageBase(services)
 {
     private Card _generalCard = null!;
     private Card _updatesCard = null!;
@@ -133,697 +133,6 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         LayoutCards();
     }
 
-    // ---- General ------------------------------------------------------------------------------
-
-    private void BuildGeneralRows()
-    {
-        _language = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
-        foreach ((string code, string displayName) in LocalizationManager.SupportedLanguages)
-        {
-            _language.Items.Add(new ComboItem(code, displayName));
-        }
-
-        _language.SelectedIndexChanged += OnLanguageChanged;
-        AddRow(_generalCard, "settings.language", _language);
-
-        _theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
-        _theme.SelectedIndexChanged += OnThemeSelectionChanged;
-        AddRow(_generalCard, "settings.theme", _theme);
-
-        _autoStart = new Toggle();
-        _autoStart.CheckedChanged += OnAutoStartChanged;
-        AddRow(_generalCard, "settings.autoStart", _autoStart);
-
-        _showIncidentPopups = new Toggle();
-        _showIncidentPopups.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.ShowIncidentPopups = _showIncidentPopups.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_generalCard, "settings.showIncidentPopups", _showIncidentPopups);
-    }
-
-    // ---- Updates ------------------------------------------------------------------------------
-
-    private void BuildUpdatesRows()
-    {
-        _checkForUpdates = new Toggle();
-        _checkForUpdates.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.CheckForUpdates = _checkForUpdates.Checked;
-            Services.Settings.Save();
-            Services.UpdateChecker.Reconfigure(_checkForUpdates.Checked);
-            _autoUpdateInstall.Enabled = _checkForUpdates.Checked;
-        };
-        AddRow(_updatesCard, "settings.checkForUpdates", _checkForUpdates);
-
-        _autoUpdateInstall = new Toggle();
-        _autoUpdateInstall.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.AutoUpdateInstall = _autoUpdateInstall.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_updatesCard, "settings.autoUpdateInstall", _autoUpdateInstall);
-
-        _currentVersion = new Label
-        {
-            AutoSize = false,
-            TextAlign = ContentAlignment.MiddleRight,
-            Width = Dp(160),
-            Font = Theme.Font(FontRole.Body),
-            Text = (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3),
-        };
-        AddRow(_updatesCard, "settings.currentVersion", _currentVersion);
-    }
-
-    // ---- Cadence ------------------------------------------------------------------------------
-
-    private void BuildCadenceRows()
-    {
-        _foregroundInterval = MakeIntervalField(1, 10);
-        _foregroundInterval.ValueChanged += (_, _) =>
-        {
-            Services.Settings.ForegroundIntervalSeconds = (int)_foregroundInterval.Value;
-            Services.Settings.Save();
-        };
-        AddRow(_cadenceCard, "settings.foregroundInterval", _foregroundInterval);
-
-        _backgroundInterval = MakeIntervalField(5, 300);
-        _backgroundInterval.ValueChanged += (_, _) =>
-        {
-            int seconds = (int)_backgroundInterval.Value;
-            Services.Settings.BackgroundIntervalSeconds = seconds;
-            Services.Settings.Save();
-
-            // History is deliberately sampled at the background rate regardless of how fast the
-            // pipeline is actually running (see MetricStore's own comment on why) - changing this
-            // setting is the one place that rate itself should also change, live.
-            Services.History.MinimumSampleInterval = TimeSpan.FromSeconds(seconds);
-        };
-        AddRow(_cadenceCard, "settings.backgroundInterval", _backgroundInterval);
-
-        _historyRetention = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
-        _historyRetention.SelectedIndexChanged += OnHistoryRetentionChanged;
-        AddRow(_cadenceCard, "settings.historyRetention", _historyRetention);
-    }
-
-    private void OnHistoryRetentionChanged(object? sender, EventArgs e)
-    {
-        if (_historyRetention.SelectedItem is not ComboItem item || !int.TryParse(item.Key, out int days))
-        {
-            return;
-        }
-
-        Services.Settings.HistoryRetentionDays = days;
-        Services.Settings.Save();
-
-        // Takes effect at the next background prune; a shorter period drops the oldest points
-        // there and from the files on the next start.
-        Services.History.SetRetention(TimeSpan.FromDays(days));
-    }
-
-    private void PopulateHistoryRetentionItems()
-    {
-        LocalizationManager loc = LocalizationManager.Instance;
-        _historyRetention.Items.Clear();
-        foreach (int days in AppSettings.AllowedHistoryRetentionDays)
-        {
-            _historyRetention.Items.Add(new ComboItem(days.ToString(), loc.Format("settings.historyRetention.option", days)));
-        }
-    }
-
-    private NumericUpDown MakeIntervalField(int min, int max) => new()
-    {
-        Minimum = min,
-        Maximum = max,
-        Width = Dp(70),
-        TextAlign = HorizontalAlignment.Right,
-    };
-
-    // ---- Tools --------------------------------------------------------------------------------
-
-    private void BuildToolsRows()
-    {
-        _tracerouteLookup = new Toggle();
-        _tracerouteLookup.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.TracerouteOwnerLookup = _tracerouteLookup.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_toolsCard, "settings.tracerouteLookup", _tracerouteLookup);
-
-        _lanScanVendorLookup = new Toggle();
-        _lanScanVendorLookup.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.LanScanVendorLookup = _lanScanVendorLookup.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_toolsCard, "settings.lanScanVendorLookup", _lanScanVendorLookup);
-
-        _lanScanTcpFallback = new Toggle();
-        _lanScanTcpFallback.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.LanScanTcpFallback = _lanScanTcpFallback.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_toolsCard, "settings.lanScanTcpFallback", _lanScanTcpFallback);
-
-        _speedTestAutoRun = new Toggle();
-        _speedTestAutoRun.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.SpeedTestAutoRunEnabled = _speedTestAutoRun.Checked;
-            Services.Settings.Save();
-            Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
-            _speedTestInterval.Enabled = _speedTestAutoRun.Checked;
-            _speedTestOnMetered.Enabled = _speedTestAutoRun.Checked;
-        };
-        AddRow(_toolsCard, "settings.speedTestAutoRun", _speedTestAutoRun);
-
-        _speedTestInterval = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
-        _speedTestInterval.SelectedIndexChanged += OnSpeedTestIntervalChanged;
-        AddRow(_toolsCard, "settings.speedTestInterval", _speedTestInterval);
-
-        _speedTestOnMetered = new Toggle();
-        _speedTestOnMetered.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.SpeedTestOnMetered = _speedTestOnMetered.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_toolsCard, "settings.speedTestOnMetered", _speedTestOnMetered);
-    }
-
-    private void OnSpeedTestIntervalChanged(object? sender, EventArgs e)
-    {
-        if (_speedTestInterval.SelectedItem is not ComboItem item || !int.TryParse(item.Key, out int hours))
-        {
-            return;
-        }
-
-        Services.Settings.SpeedTestIntervalHours = hours;
-        Services.Settings.Save();
-        Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
-    }
-
-    // ---- Diagnostics --------------------------------------------------------------------------
-
-    private void BuildDiagnosticsRows()
-    {
-        _logLevel = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
-        _logLevel.SelectedIndexChanged += OnLogLevelChanged;
-        AddRow(_diagnosticsCard, "settings.diagnostics.level", _logLevel);
-
-        _logSuccessfulChecks = new Toggle();
-        _logSuccessfulChecks.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.LogSuccessfulChecks = _logSuccessfulChecks.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_diagnosticsCard, "settings.diagnostics.logSuccesses", _logSuccessfulChecks);
-
-        _logDetailedMeasurements = new Toggle();
-        _logDetailedMeasurements.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.LogDetailedMeasurements = _logDetailedMeasurements.Checked;
-            Services.Settings.Save();
-        };
-        AddRow(_diagnosticsCard, "settings.diagnostics.logDetails", _logDetailedMeasurements);
-
-        _logDirectory = new TextBox
-        {
-            BorderStyle = BorderStyle.FixedSingle,
-            Width = Dp(200),
-            Font = Theme.Font(FontRole.Body),
-            ReadOnly = true,
-        };
-        AddRow(_diagnosticsCard, "settings.diagnostics.directory", _logDirectory);
-
-        _browseLogDirectory = new AppButton { Variant = ButtonVariant.Secondary, Text = Loc.Get("settings.diagnostics.browse") };
-        _browseLogDirectory.SizeToContent();
-        _browseLogDirectory.Click += OnBrowseLogDirectoryClicked;
-        _diagnosticsCard.Controls.Add(_browseLogDirectory);
-
-        _openLogFolder = new AppButton { Variant = ButtonVariant.Ghost, Text = Loc.Get("settings.diagnostics.openFolder") };
-        _openLogFolder.SizeToContent();
-        _openLogFolder.Click += (_, _) => OpenLogFolder();
-        _diagnosticsCard.Controls.Add(_openLogFolder);
-
-        _resetLogDirectory = new AppButton { Variant = ButtonVariant.Ghost, Text = Loc.Get("settings.diagnostics.resetDirectory") };
-        _resetLogDirectory.SizeToContent();
-        _resetLogDirectory.Click += (_, _) =>
-        {
-            Services.Settings.DiagnosticLogDirectory = string.Empty;
-            Services.Settings.Save();
-            RefreshLogDirectoryText();
-        };
-        _diagnosticsCard.Controls.Add(_resetLogDirectory);
-    }
-
-    private void OnLogLevelChanged(object? sender, EventArgs e)
-    {
-        if (_logLevel.SelectedItem is not ComboItem item || !Enum.TryParse(item.Key, out DiagnosticLogLevel level))
-        {
-            return;
-        }
-
-        Services.Settings.DiagnosticLogLevel = level;
-        Services.Settings.Save();
-    }
-
-    private void OnBrowseLogDirectoryClicked(object? sender, EventArgs e)
-    {
-        using var dialog = new FolderBrowserDialog
-        {
-            SelectedPath = Services.DiagnosticLog.ResolvedDirectory(),
-            Description = Loc.Get("settings.diagnostics.browse"),
-        };
-
-        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-        {
-            return;
-        }
-
-        Services.Settings.DiagnosticLogDirectory = dialog.SelectedPath;
-        Services.Settings.Save();
-        RefreshLogDirectoryText();
-    }
-
-    // The folder may not exist yet (nothing has logged there) - not worth surfacing for a
-    // convenience shortcut the user can open themselves via Explorer.
-    private void OpenLogFolder() => ShellOpen.OpenPath(Services.DiagnosticLog.ResolvedDirectory());
-
-    private void RefreshLogDirectoryText() => _logDirectory.Text = Services.DiagnosticLog.ResolvedDirectory();
-
-    // ---- Network health -------------------------------------------------------------------------
-
-    private void BuildNetworkHealthRows()
-    {
-        _networkHealthEnabled = new Toggle();
-        _networkHealthEnabled.CheckedChanged += (_, _) =>
-        {
-            Services.Settings.NetworkHealthMonitoringEnabled = _networkHealthEnabled.Checked;
-            Services.Settings.Save();
-            ReconfigureNetworkHealth();
-        };
-        AddRow(_networkHealthCard, "settings.networkHealth.enabled", _networkHealthEnabled);
-
-        MakeConditionRow("tcpRetransmissions", "settings.networkHealth.tcpRetransmissions", 0, 1_000_000, hasThreshold: true);
-        MakeConditionRow("packetLoss", "settings.networkHealth.packetLoss", 0, 100, hasThreshold: true);
-        MakeConditionRow("ttlExceeded", "settings.networkHealth.ttlExceeded", 0, 1_000_000, hasThreshold: true);
-
-        // Rogue-DHCP has no occurrence threshold - any server that is not the known gateway is
-        // rogue - so this row skips the threshold field and "more than"/"in" wording entirely and
-        // reads as "[toggle] Rogue DHCP server, check every [window] minutes" instead.
-        MakeConditionRow("rogueDhcp", "settings.networkHealth.rogueDhcp", 0, 0, hasThreshold: false);
-    }
-
-    /// <summary>
-    /// One condition's own row: [toggle] [name] "more than" [threshold] "in" [window] "minutes",
-    /// or (for rogue-DHCP, see <see cref="BuildNetworkHealthRows"/>) [toggle] [name] "every"
-    /// [window] "minutes". Four conditions, each with its own enable flag and numbers that do not
-    /// all mean the same thing, do not fit the generic single-label/single-field
-    /// <see cref="AddRow"/> shape, so these are laid out by hand in <see cref="LayoutCards"/>
-    /// instead - same reasoning as the diagnostics directory buttons just above, which already sit
-    /// below their card's generic rows for the same kind of reason.
-    /// </summary>
-    private void MakeConditionRow(string key, string nameKey, int minThreshold, int maxThreshold, bool hasThreshold)
-    {
-        var toggle = new Toggle();
-        var name = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body), Tag = nameKey };
-        NumericUpDown? threshold = hasThreshold ? MakeIntervalField(minThreshold, Math.Max(minThreshold, maxThreshold)) : null;
-        var intervalLabel = new Label
-        {
-            AutoSize = false,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = Theme.Font(FontRole.Body),
-            Tag = hasThreshold ? "settings.networkHealth.in" : "settings.networkHealth.every",
-        };
-        NumericUpDown window = MakeIntervalField(1, 1440);
-        var minutesLabel = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body), Tag = "settings.networkHealth.minutes" };
-
-        var row = new ConditionRow(key, toggle, name, threshold, intervalLabel, window, minutesLabel);
-        _conditionRows.Add(row);
-
-        void Apply(object? sender, EventArgs e)
-        {
-            int thresholdValue = threshold is null ? 0 : (int)threshold.Value;
-            SetConditionThreshold(key, new NetworkHealthThreshold(toggle.Checked, thresholdValue, (int)window.Value));
-            Services.Settings.Save();
-            ReconfigureNetworkHealth();
-        }
-
-        toggle.CheckedChanged += Apply;
-        if (threshold is not null)
-        {
-            threshold.ValueChanged += Apply;
-        }
-
-        window.ValueChanged += Apply;
-
-        _networkHealthCard.Controls.Add(toggle);
-        _networkHealthCard.Controls.Add(name);
-        if (threshold is not null)
-        {
-            _networkHealthCard.Controls.Add(threshold);
-        }
-
-        _networkHealthCard.Controls.Add(intervalLabel);
-        _networkHealthCard.Controls.Add(window);
-        _networkHealthCard.Controls.Add(minutesLabel);
-    }
-
-    private void SetConditionThreshold(string key, NetworkHealthThreshold value)
-    {
-        switch (key)
-        {
-            case "tcpRetransmissions":
-                Services.Settings.TcpRetransmissions = value;
-                break;
-            case "packetLoss":
-                Services.Settings.PacketLoss = value;
-                break;
-            case "ttlExceeded":
-                Services.Settings.TtlExceeded = value;
-                break;
-            case "rogueDhcp":
-                Services.Settings.RogueDhcp = value;
-                break;
-        }
-    }
-
-    private NetworkHealthThreshold GetConditionThreshold(string key) => key switch
-    {
-        "tcpRetransmissions" => Services.Settings.TcpRetransmissions,
-        "packetLoss" => Services.Settings.PacketLoss,
-        "ttlExceeded" => Services.Settings.TtlExceeded,
-        "rogueDhcp" => Services.Settings.RogueDhcp,
-        _ => new NetworkHealthThreshold(false, 0, 5),
-    };
-
-    private void ReconfigureNetworkHealth() => Services.NetworkHealth.Reconfigure(
-        Services.Settings.NetworkHealthMonitoringEnabled,
-        Services.Settings.TcpRetransmissions,
-        Services.Settings.PacketLoss,
-        Services.Settings.TtlExceeded,
-        Services.Settings.RogueDhcp);
-
-    // ---- Public internet (steps 5 and 6) --------------------------------------------------------
-
-    private void BuildPublicIpRows()
-    {
-        _publicIpTargets = MakeAddressField();
-        AddRow(_publicIpCard, "settings.publicIp.targets", _publicIpTargets);
-
-        _customDnsServers = MakeAddressField();
-        AddRow(_publicIpCard, "settings.publicIp.customDns", _customDnsServers);
-
-        _publicIpError = new Label
-        {
-            AutoSize = false,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Font = Theme.Font(FontRole.Small),
-            Text = string.Empty,
-        };
-        _publicIpCard.Controls.Add(_publicIpError);
-    }
-
-    private TextBox MakeAddressField()
-    {
-        var box = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(260), Font = Theme.Font(FontRole.Body) };
-        box.Leave += OnPublicAddressesChanged;
-        return box;
-    }
-
-    /// <summary>
-    /// Validates both address fields together, saves whichever is valid, and shows the first
-    /// error - checking both on every edit keeps the one error line honest about a field that is
-    /// still wrong after the other one was fixed.
-    /// </summary>
-    private void OnPublicAddressesChanged(object? sender, EventArgs e)
-    {
-        string? targetsError = ApplyAddressField(_publicIpTargets, list => Services.Settings.PublicIpTargets = list, allowEmpty: false, maxCount: null);
-        string? customError = ApplyAddressField(_customDnsServers, list => Services.Settings.CustomDnsServers = list, allowEmpty: true, maxCount: AppSettings.MaxCustomDnsServers);
-        _publicIpError.Text = targetsError ?? customError ?? string.Empty;
-        Services.Settings.Save();
-    }
-
-    /// <summary>
-    /// Accepts a comma-, semicolon- or space-separated list of IPv4 addresses. Any entry that is
-    /// not one rejects the field as a whole rather than being silently dropped, so what is saved
-    /// is always exactly what the field shows. Returns the error to show, or null once stored.
-    /// </summary>
-    private string? ApplyAddressField(TextBox box, Action<List<string>> store, bool allowEmpty, int? maxCount)
-    {
-        string[] entries = box.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (entries.Length == 0 && !allowEmpty)
-        {
-            return Loc.Get("settings.publicIp.error.empty");
-        }
-
-        if (entries.FirstOrDefault(entry => AppSettings.ParseIPv4List([entry]).Count == 0) is { } invalid)
-        {
-            return Loc.Format("settings.publicIp.error.invalid", invalid);
-        }
-
-        List<string> normalized = [.. AppSettings.ParseIPv4List(entries).Select(a => a.ToString())];
-        if (maxCount is { } max && normalized.Count > max)
-        {
-            return Loc.Format("settings.publicIp.error.tooMany", max);
-        }
-
-        store(normalized);
-        box.Text = string.Join(", ", normalized);
-        return null;
-    }
-
-    // ---- Integrations ---------------------------------------------------------------------------
-
-    private void BuildIntegrationsRows()
-    {
-        _kumaUrl = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(200), Font = Theme.Font(FontRole.Body) };
-        _kumaUrl.Leave += OnKumaSettingsChanged;
-        AddRow(_integrationsCard, "settings.kuma.pushUrl", _kumaUrl);
-
-        _kumaInterval = MakeIntervalField(KumaPusher.MinimumIntervalSeconds, 86400);
-        _kumaInterval.ValueChanged += OnKumaSettingsChanged;
-        AddRow(_integrationsCard, "settings.kuma.interval", _kumaInterval);
-
-        _kumaError = new Label
-        {
-            AutoSize = false,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Font = Theme.Font(FontRole.Small),
-            Text = string.Empty,
-        };
-        _integrationsCard.Controls.Add(_kumaError);
-
-        _kumaAbout = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Globe, Text = Loc.Get("settings.kuma.about") };
-        _kumaAbout.SizeToContent();
-        _kumaAbout.Click += (_, _) => OpenUptimeKumaProjectPage();
-        _integrationsCard.Controls.Add(_kumaAbout);
-    }
-
-    private static void OpenUptimeKumaProjectPage() => ShellOpen.OpenUrl("https://github.com/louislam/uptime-kuma");
-
-    private void OnKumaSettingsChanged(object? sender, EventArgs e)
-    {
-        string url = _kumaUrl.Text.Trim();
-
-        // Empty is valid - it means the integration is off. Otherwise require a well-formed https
-        // URL, the same standard endpoint targets enforce, so a typo or plaintext http:// URL
-        // doesn't silently reach KumaPusher.
-        if (url.Length > 0 && (!Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed) || parsed.Scheme != Uri.UriSchemeHttps))
-        {
-            _kumaError.Text = Loc.Get("settings.kuma.url.error");
-            return;
-        }
-
-        _kumaError.Text = string.Empty;
-        Services.Settings.KumaPushUrl = url;
-        Services.Settings.KumaIntervalSeconds = (int)_kumaInterval.Value;
-        Services.Settings.Save();
-        Services.Kuma.Reconfigure(Services.Settings.KumaPushUrl, Services.Settings.KumaIntervalSeconds);
-    }
-
-    // ---- Endpoints ----------------------------------------------------------------------------
-
-    private void BuildEndpointsSection()
-    {
-        _endpoints = new EndpointList { Dock = DockStyle.Top };
-        _endpoints.EditRequested += OnEndpointEditRequested;
-        _endpoints.ToggleChanged += OnEndpointToggled;
-        _endpoints.RemoveRequested += OnEndpointRemoved;
-
-        _addEndpoint = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Target, Dock = DockStyle.Top };
-        _addEndpoint.Click += (_, _) => OpenEndpointEditor(null);
-
-        // Fill before Top within this card: the button sits above a list whose height tracks the
-        // number of endpoints, so the button is added last to land above it.
-        _endpointsCard.Controls.Add(_endpoints);
-        _endpointsCard.Controls.Add(_addEndpoint);
-    }
-
-    private void OnEndpointEditRequested(EndpointConfig endpoint) => OpenEndpointEditor(endpoint);
-
-    /// <summary>
-    /// Adds or edits one endpoint (matched by id) and saves. The checks pick it up on the next cycle,
-    /// since the pipeline rebuilds its targets from the settings every cycle.
-    /// </summary>
-    private void OpenEndpointEditor(EndpointConfig? existing)
-    {
-        using EndpointEditWindow window = existing is null ? EndpointEditWindow.ForNew() : EndpointEditWindow.ForEdit(existing);
-        if (window.ShowDialog(FindForm()) != DialogResult.OK || window.Result is not { } result)
-        {
-            return;
-        }
-
-        List<EndpointConfig> endpoints = Services.Settings.ApplicationEndpoints;
-        int index = endpoints.FindIndex(e => e.Id == result.Id);
-        if (index >= 0)
-        {
-            endpoints[index] = result;
-        }
-        else
-        {
-            endpoints.Add(result);
-        }
-
-        Services.Settings.Save();
-        RefreshEndpoints();
-    }
-
-    private void OnEndpointToggled(EndpointConfig updated)
-    {
-        List<EndpointConfig> endpoints = Services.Settings.ApplicationEndpoints;
-        int index = endpoints.FindIndex(e => e.Id == updated.Id);
-        if (index < 0)
-        {
-            return;
-        }
-
-        endpoints[index] = updated;
-        Services.Settings.Save();
-    }
-
-    private void OnEndpointRemoved(EndpointConfig endpoint)
-    {
-        Services.Settings.ApplicationEndpoints.RemoveAll(e => e.Id == endpoint.Id);
-        Services.Settings.Save();
-        RefreshEndpoints();
-    }
-
-    private void RefreshEndpoints()
-    {
-        _endpoints.SetEndpoints(Services.Settings.ApplicationEndpoints);
-        ResizeEndpointsList();
-    }
-
-    private void ResizeEndpointsList()
-    {
-        _endpoints.Height = _endpoints.GetPreferredSize(Size.Empty).Height;
-        LayoutCards();
-    }
-
-    // ---- Configuration backup -------------------------------------------------------------------
-
-    /// <summary>
-    /// The configuration backup/restore pair. Data exports live on the Reports page - see the
-    /// comment on <see cref="Build"/>.
-    /// </summary>
-    private void BuildSettingsBackupSection()
-    {
-        _exportSettings = AddExportButton(_settingsBackupCard, _settingsBackupButtons, ExportSettings);
-        _importSettings = AddExportButton(_settingsBackupCard, _settingsBackupButtons, ImportSettings);
-
-        // The export is deliberately unredacted (see ExportSettings), which is worth one line of
-        // warning next to the button rather than a dialog in the way of every export.
-        _settingsBackupNote = new Label
-        {
-            AutoSize = false,
-            TextAlign = ContentAlignment.TopLeft,
-            Font = Theme.Font(FontRole.Small),
-        };
-        _settingsBackupCard.Controls.Add(_settingsBackupNote);
-    }
-
-    private static AppButton AddExportButton(Card card, List<AppButton> buttons, Action onClick)
-    {
-        var button = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
-        button.Click += (_, _) => onClick();
-        card.Controls.Add(button);
-        buttons.Add(button);
-        return button;
-    }
-
-    /// <summary>
-    /// Unlike the data exports on the Reports page, this one is deliberately unredacted - confirmed
-    /// with the user to match v1's own settings export exactly. It is a literal backup/restore
-    /// mechanism, not something meant to be shared, and a Kuma push URL or endpoint header with
-    /// its secret blanked out would not actually restore anything on import.
-    /// </summary>
-    private void ExportSettings()
-    {
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "JSON (*.json)|*.json",
-            FileName = $"internetmonitor-settings-{DateTime.Now:yyyy-MM-dd}.json",
-        };
-
-        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-        {
-            return;
-        }
-
-        try
-        {
-            Services.Settings.ExportTo(dialog.FileName);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Not worth surfacing further for a manual export the user can just retry.
-        }
-    }
-
-    private void ImportSettings()
-    {
-        using var dialog = new OpenFileDialog { Filter = "JSON (*.json)|*.json" };
-        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-        {
-            return;
-        }
-
-        AppSettings? imported;
-        try
-        {
-            imported = AppSettings.ImportFrom(dialog.FileName);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
-        {
-            // Not worth surfacing further for a manual import the user can just retry with a
-            // known-good file.
-            return;
-        }
-
-        if (imported is null)
-        {
-            return;
-        }
-
-        // ApplyFrom only copies properties - every setting that also has a live side effect
-        // (autostart's registry key, the active language/theme, Kuma's running pusher, the
-        // network-health monitor) needs that side effect re-applied explicitly, the same way each
-        // one's own change handler already does when the user edits it directly.
-        Services.Settings.ApplyFrom(imported);
-        Services.Settings.Save();
-
-        App.AutoStart.SetEnabled(Services.Settings.AutoStartWithWindows);
-        LocalizationManager.Instance.SetLanguage(Services.Settings.Language);
-        Theme.Mode = Services.Settings.Theme;
-        Services.Kuma.Reconfigure(Services.Settings.KumaPushUrl, Services.Settings.KumaIntervalSeconds);
-        ReconfigureNetworkHealth();
-
-        LoadFromSettings();
-    }
-
     // ---- Shared row layout ----------------------------------------------------------------------
 
     /// <summary>
@@ -862,7 +171,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             y += RowHeight;
         }
 
-        card.Height = y + card.Inset;
+        CloseCard(card, y);
     }
 
     /// <summary>
@@ -874,7 +183,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
     private void LayoutConditionRows()
     {
         Rectangle content = _networkHealthCard.DisplayRectangle;
-        int y = _networkHealthCard.Height - _networkHealthCard.Inset;
+        int y = BelowRows(_networkHealthCard);
 
         int toggleWidth = Dp(44);
         int nameWidth = Dp(170);
@@ -910,34 +219,7 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
             y += RowHeight;
         }
 
-        _networkHealthCard.Height = y + _networkHealthCard.Inset;
-    }
-
-    /// <summary>
-    /// Wraps a card's export/import buttons left-to-right, same wrap-on-overflow approach as
-    /// <see cref="ChipGroup"/> - labels long enough to vary a lot by language, a fixed side-by-side
-    /// row would overflow a narrower window.
-    /// </summary>
-    private void LayoutExportButtons(Card card, List<AppButton> buttons)
-    {
-        Rectangle content = card.DisplayRectangle;
-        int rowHeight = Dp(32);
-        int x = content.Left;
-        int y = content.Top;
-
-        foreach (AppButton button in buttons)
-        {
-            if (x > content.Left && x + button.Width > content.Right)
-            {
-                x = content.Left;
-                y += rowHeight + Sp(1);
-            }
-
-            button.Location = new Point(x, y);
-            x += button.Width + Sp(2);
-        }
-
-        card.Height = y + rowHeight + card.Inset;
+        CloseCard(_networkHealthCard, y);
     }
 
     private void LayoutCards()
@@ -955,29 +237,29 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         // below those, in the space the row layout does not know about - same pattern as the Kuma
         // extras just below.
         Rectangle diagnosticsContent = _diagnosticsCard.DisplayRectangle;
-        int diagnosticsY = _diagnosticsCard.Height - _diagnosticsCard.Inset;
+        int diagnosticsY = BelowRows(_diagnosticsCard);
         _browseLogDirectory.Location = new Point(diagnosticsContent.Right - _browseLogDirectory.Width, diagnosticsY);
         _openLogFolder.Location = new Point(_browseLogDirectory.Left - Sp(2) - _openLogFolder.Width, diagnosticsY);
         _resetLogDirectory.Location = new Point(_openLogFolder.Left - Sp(2) - _resetLogDirectory.Width, diagnosticsY);
         diagnosticsY += Math.Max(_browseLogDirectory.Height, Math.Max(_openLogFolder.Height, _resetLogDirectory.Height));
-        _diagnosticsCard.Height = diagnosticsY + _diagnosticsCard.Inset;
+        CloseCard(_diagnosticsCard, diagnosticsY);
 
         // LayoutCardRows sized the card to its two label/field rows; the error label and the
         // "about" link sit below those, in the space the row layout does not know about.
         Rectangle integrationsContent = _integrationsCard.DisplayRectangle;
-        int integrationsY = _integrationsCard.Height - _integrationsCard.Inset;
+        int integrationsY = BelowRows(_integrationsCard);
         _kumaError.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
         integrationsY += Dp(18);
         _kumaAbout.Location = new Point(integrationsContent.Left, integrationsY);
         integrationsY += _kumaAbout.Height;
-        _integrationsCard.Height = integrationsY + _integrationsCard.Inset;
+        CloseCard(_integrationsCard, integrationsY);
 
         // Same "rows, then an error line below them" shape as the integrations card above.
         LayoutCardRows(_publicIpCard);
         Rectangle publicIpContent = _publicIpCard.DisplayRectangle;
-        int publicIpY = _publicIpCard.Height - _publicIpCard.Inset;
+        int publicIpY = BelowRows(_publicIpCard);
         _publicIpError.Bounds = new Rectangle(publicIpContent.Left, publicIpY, publicIpContent.Width, Dp(16));
-        _publicIpCard.Height = publicIpY + Dp(18) + _publicIpCard.Inset;
+        CloseCard(_publicIpCard, publicIpY + Dp(18));
 
         Rectangle content = _endpointsCard.DisplayRectangle;
         _addEndpoint.Width = content.Width;
@@ -986,13 +268,13 @@ public sealed class SettingsPage(AppServices services) : PageBase(services)
         int contentHeight = _addEndpoint.Height + Sp(2) + _endpoints.Height;
         _endpointsCard.Height = content.Top + contentHeight + _endpointsCard.Inset;
 
-        LayoutExportButtons(_settingsBackupCard, _settingsBackupButtons);
+        LayoutButtonRow(_settingsBackupCard, _settingsBackupButtons);
 
         // The note goes under the buttons the row layout just placed, same shape as the Kuma extras.
         Rectangle backupContent = _settingsBackupCard.DisplayRectangle;
-        int backupY = _settingsBackupCard.Height - _settingsBackupCard.Inset + Sp(1);
+        int backupY = BelowRows(_settingsBackupCard) + Sp(1);
         _settingsBackupNote.Bounds = new Rectangle(backupContent.Left, backupY, backupContent.Width, Dp(32));
-        _settingsBackupCard.Height = backupY + Dp(32) + _settingsBackupCard.Inset;
+        CloseCard(_settingsBackupCard, backupY + Dp(32));
     }
 
     protected override void OnResize(EventArgs e)

@@ -17,9 +17,8 @@ namespace InternetMonitor.Core.Monitors;
 public sealed class SpeedTestScheduler : IAsyncDisposable
 {
     private readonly SpeedTestClient _client = new();
+    private readonly BackgroundLoop _loop = new();
 
-    private CancellationTokenSource? _loopCts;
-    private Task? _loopTask;
     private bool _enabled;
     private TimeSpan _interval = TimeSpan.FromHours(4);
 
@@ -45,89 +44,45 @@ public sealed class SpeedTestScheduler : IAsyncDisposable
 
         if (!_enabled)
         {
-            Stop();
+            _loop.Stop();
             return;
         }
 
-        if (_loopTask is null)
+        if (!_loop.IsRunning)
         {
-            Start();
+            _loop.Start(Body(_interval));
         }
         else if (changed)
         {
-            Stop();
-            Start();
+            _loop.Restart(Body(_interval));
         }
     }
 
-    private void Start()
+    private Func<CancellationToken, Task> Body(TimeSpan interval) =>
+        cancellationToken => BackgroundLoop.EveryAsync(interval, RunOnceAsync, cancellationToken);
+
+    private async Task RunOnceAsync(CancellationToken cancellationToken)
     {
-        if (!_enabled || _loopTask is not null)
+        if (SkipRun?.Invoke() == true)
         {
             return;
         }
 
-        _loopCts = new CancellationTokenSource();
-        _loopTask = RunLoopAsync(_interval, _loopCts.Token);
-    }
-
-    private void Stop()
-    {
-        _loopCts?.Cancel();
-        _loopCts?.Dispose();
-        _loopCts = null;
-        _loopTask = null;
-    }
-
-    private async Task RunLoopAsync(TimeSpan interval, CancellationToken cancellationToken)
-    {
-        // Scoped locally (not a shared field), same reasoning as KumaPusher's own loop timer: a
-        // live Reconfigure() cancels this loop and starts a fresh one without awaiting the old
-        // one's shutdown, so a shared timer field touched by both would race.
-        using var timer = new PeriodicTimer(interval);
         try
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                if (SkipRun?.Invoke() == true)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    SpeedTestResult result = await _client.RunAsync(null, cancellationToken).ConfigureAwait(false);
-                    RunCompleted?.Invoke(this, result);
-                }
-                catch (Exception ex) when (ex is HttpRequestException or IOException)
-                {
-                    // Best-effort background job - a failed automatic run shouldn't stop future
-                    // ones; just skip this cycle and try again next interval.
-                }
-            }
+            SpeedTestResult result = await _client.RunAsync(null, cancellationToken).ConfigureAwait(false);
+            RunCompleted?.Invoke(this, result);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
         {
-            // Normal shutdown/reconfigure path.
+            // Best-effort background job - a failed automatic run shouldn't stop future ones; just
+            // skip this cycle and try again next interval.
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _loopCts?.Cancel();
-        if (_loopTask is not null)
-        {
-            try
-            {
-                await _loopTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected on shutdown.
-            }
-        }
-
+        await _loop.DisposeAsync().ConfigureAwait(false);
         _client.Dispose();
-        _loopCts?.Dispose();
     }
 }

@@ -34,6 +34,9 @@ public sealed class MetricChart : ThemedControl
     private double? _errorThreshold;
     private bool _stateSeries;
     private Func<string?, string?>? _metadataChangeKey;
+
+    /// <summary>Where the metadata key changes, found once per series rather than by walking every point on every paint.</summary>
+    private IReadOnlyList<DateTimeOffset> _changeMarkers = [];
     private int _stateBucketCount = 1;
     private bool _compact;
 
@@ -101,6 +104,7 @@ public sealed class MetricChart : ThemedControl
         _unit = unit;
         _stateSeries = stateSeries;
         _metadataChangeKey = metadataChangeKey;
+        _changeMarkers = metadataChangeKey is null ? [] : FindChangeMarkers(points, metadataChangeKey);
         _warnThreshold = warnThreshold;
         _errorThreshold = errorThreshold;
 
@@ -152,13 +156,14 @@ public sealed class MetricChart : ThemedControl
             return;
         }
 
-        var window = new List<MetricPoint>();
-        foreach (MetricPoint point in _points)
+        // The points are in time order, so the window is a slice found by binary search, not by
+        // testing every one of a six-figure list on each zoom or pan.
+        int first = MetricStore.LowerBound(_points, _viewStart);
+        int end = MetricStore.UpperBound(_points, _viewEnd);
+        var window = new List<MetricPoint>(Math.Max(0, end - first));
+        for (int i = first; i < end; i++)
         {
-            if (point.Timestamp >= _viewStart && point.Timestamp <= _viewEnd)
-            {
-                window.Add(point);
-            }
+            window.Add(_points[i]);
         }
 
         if (_stateSeries)
@@ -453,9 +458,9 @@ public sealed class MetricChart : ThemedControl
             DrawSeries(g, p, plot, max);
         }
 
-        if (_metadataChangeKey is { } key && !Compact)
+        if (_changeMarkers.Count > 0 && !Compact)
         {
-            DrawMetadataChanges(g, p, plot, key);
+            DrawMetadataChanges(g, p, plot);
         }
 
         if (!Compact)
@@ -597,30 +602,23 @@ public sealed class MetricChart : ThemedControl
     /// A thin dotted line with a small diamond on top wherever a point's metadata key differs from
     /// the previous point's - for the Wi-Fi signal series, a switch to another access point. Read from
     /// the full point list, not the downsampled visible one: a downsample keeps the shape of the
-    /// line, not every point where the metadata happened to change.
+    /// line, not every point where the metadata happened to change - but found once, when the
+    /// series is set (<see cref="FindChangeMarkers"/>), not by walking every point on every paint.
     /// </summary>
-    private void DrawMetadataChanges(Graphics g, Palette p, Rectangle plot, Func<string?, string?> keyOf)
+    private void DrawMetadataChanges(Graphics g, Palette p, Rectangle plot)
     {
         using var pen = new Pen(p.TextMuted.WithAlpha(150), 1f) { DashStyle = DashStyle.Dot };
-        using var brush = new SolidBrush(p.TextSecondary);
+        SolidBrush brush = GdiExtensions.BrushFor(p.TextSecondary);
         float size = DpF(4f);
 
-        string? previous = null;
-        foreach (MetricPoint point in _points)
+        foreach (DateTimeOffset at in _changeMarkers)
         {
-            if (keyOf(point.Metadata) is not { } metadata)
+            if (at < _viewStart || at > _viewEnd)
             {
                 continue;
             }
 
-            bool changed = previous is not null && metadata != previous;
-            previous = metadata;
-            if (!changed || point.Timestamp < _viewStart || point.Timestamp > _viewEnd)
-            {
-                continue;
-            }
-
-            float x = ToX(point.Timestamp);
+            float x = ToX(at);
             g.DrawLine(pen, x, plot.Top + size, x, plot.Bottom);
             g.FillPolygon(brush, new[]
             {
@@ -628,6 +626,29 @@ public sealed class MetricChart : ThemedControl
                 new PointF(x, plot.Top + (size * 2)), new PointF(x - size, plot.Top + size),
             });
         }
+    }
+
+    /// <summary>The timestamps at which the metadata key differs from the previous point's.</summary>
+    private static List<DateTimeOffset> FindChangeMarkers(IReadOnlyList<MetricPoint> points, Func<string?, string?> keyOf)
+    {
+        var markers = new List<DateTimeOffset>();
+        string? previous = null;
+        foreach (MetricPoint point in points)
+        {
+            if (keyOf(point.Metadata) is not { } metadata)
+            {
+                continue;
+            }
+
+            if (previous is not null && metadata != previous)
+            {
+                markers.Add(point.Timestamp);
+            }
+
+            previous = metadata;
+        }
+
+        return markers;
     }
 
     /// <summary>

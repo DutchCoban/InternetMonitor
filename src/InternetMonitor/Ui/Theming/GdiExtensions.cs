@@ -9,12 +9,73 @@ namespace InternetMonitor.Ui.Theming;
 /// controls themselves short - a card, a button and a chart all draw their background through the
 /// same two calls.
 ///
-/// Every helper that allocates a GDI+ object disposes it; none of them change the
-/// <see cref="Graphics"/> state without restoring it, so callers can mix them freely in one
-/// OnPaint.
+/// A solid brush or a plain pen is looked up by colour (<see cref="BrushFor"/>, <see cref="PenFor"/>)
+/// and kept: every card, button and row paints with the same few palette colours, and a paint used
+/// to create and destroy a handful of GDI+ objects per shape. Paths are still per call - they
+/// depend on the bounds. None of the helpers change the <see cref="Graphics"/> state without
+/// restoring it, so callers can mix them freely in one OnPaint.
 /// </summary>
 internal static class GdiExtensions
 {
+    private const int MaxCachedObjects = 512;
+    private static readonly Dictionary<int, SolidBrush> CachedBrushes = [];
+    private static readonly Dictionary<(int Argb, float Width), Pen> CachedPens = [];
+    private static readonly object CacheLock = new();
+
+    /// <summary>A shared brush for <paramref name="color"/>. Not to be disposed or modified by the caller.</summary>
+    public static SolidBrush BrushFor(Color color)
+    {
+        lock (CacheLock)
+        {
+            if (!CachedBrushes.TryGetValue(color.ToArgb(), out SolidBrush? brush))
+            {
+                TrimCaches();
+                brush = new SolidBrush(color);
+                CachedBrushes[color.ToArgb()] = brush;
+            }
+
+            return brush;
+        }
+    }
+
+    /// <summary>A shared solid pen for <paramref name="color"/> and <paramref name="width"/>. Not to be disposed or modified by the caller.</summary>
+    public static Pen PenFor(Color color, float width = 1f)
+    {
+        lock (CacheLock)
+        {
+            if (!CachedPens.TryGetValue((color.ToArgb(), width), out Pen? pen))
+            {
+                TrimCaches();
+                pen = new Pen(color, width);
+                CachedPens[(color.ToArgb(), width)] = pen;
+            }
+
+            return pen;
+        }
+    }
+
+    /// <summary>A palette has a few dozen colours; the shadow rings add alphas. Far past that something is generating colours, and the cache starts over rather than growing.</summary>
+    private static void TrimCaches()
+    {
+        if (CachedBrushes.Count + CachedPens.Count < MaxCachedObjects)
+        {
+            return;
+        }
+
+        foreach (SolidBrush brush in CachedBrushes.Values)
+        {
+            brush.Dispose();
+        }
+
+        foreach (Pen pen in CachedPens.Values)
+        {
+            pen.Dispose();
+        }
+
+        CachedBrushes.Clear();
+        CachedPens.Clear();
+    }
+
     /// <summary>
     /// The render-quality setup every control's OnPaint starts with. <see cref="PixelOffsetMode"/>
     /// matters as much as antialiasing here: without HighQuality, antialiased 1px borders land
@@ -61,8 +122,7 @@ internal static class GdiExtensions
         }
 
         using GraphicsPath path = RoundedPath(bounds, radius);
-        using var brush = new SolidBrush(color);
-        g.FillPath(brush, path);
+        g.FillPath(BrushFor(color), path);
     }
 
     /// <summary>
@@ -79,8 +139,7 @@ internal static class GdiExtensions
 
         RectangleF inset = RectangleF.Inflate(bounds, -width / 2f, -width / 2f);
         using GraphicsPath path = RoundedPath(inset, radius - (width / 2f));
-        using var pen = new Pen(color, width);
-        g.DrawPath(pen, path);
+        g.DrawPath(PenFor(color, width), path);
     }
 
     public static void FillRoundedGradient(this Graphics g, RectangleF bounds, float radius, Color top, Color bottom)
@@ -123,8 +182,7 @@ internal static class GdiExtensions
             RectangleF ring = RectangleF.Inflate(bounds, i, i);
             ring.Offset(0, i * 0.5f);
             using GraphicsPath path = RoundedPath(ring, radius + i);
-            using var pen = new Pen(Color.FromArgb(alpha, shadow), 1.6f);
-            g.DrawPath(pen, path);
+            g.DrawPath(PenFor(Color.FromArgb(alpha, shadow), 1.6f), path);
         }
     }
 

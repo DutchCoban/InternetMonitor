@@ -17,6 +17,9 @@ public sealed class StepContext(CheckTargets targets)
 
     public NetworkInterface? Adapter { get; set; }
 
+    /// <summary>Every adapter Windows listed at the start of this cycle - enumerated once, by step 1, for whoever needs the list.</summary>
+    public IReadOnlyList<NetworkInterface>? AllAdapters { get; set; }
+
     public IPInterfaceProperties? IpProperties { get; set; }
 
     public IPAddress? LocalAddress { get; set; }

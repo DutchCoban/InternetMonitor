@@ -16,9 +16,8 @@ public sealed class KumaPusher : IAsyncDisposable
     public const int MinimumIntervalSeconds = 60;
 
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private readonly BackgroundLoop _loop = new();
 
-    private CancellationTokenSource? _loopCts;
-    private Task? _loopTask;
     private string _url = string.Empty;
     private TimeSpan _interval = TimeSpan.FromSeconds(MinimumIntervalSeconds);
 
@@ -26,7 +25,7 @@ public sealed class KumaPusher : IAsyncDisposable
     public bool LastPushFailed { get; private set; }
 
     /// <summary>Whether a push loop is running - that is, whether a usable URL is configured.</summary>
-    public bool IsActive => _loopTask is not null;
+    public bool IsActive => _loop.IsRunning;
 
     /// <summary>The only URLs the pusher will call: absolute, and https so the token in them stays encrypted.</summary>
     public static bool IsUsableUrl(string url) =>
@@ -52,64 +51,28 @@ public sealed class KumaPusher : IAsyncDisposable
 
         if (string.IsNullOrEmpty(_url))
         {
-            Stop();
+            _loop.Stop();
             return;
         }
 
-        if (_loopTask is null)
+        if (!_loop.IsRunning)
         {
-            Start();
+            _loop.Start(Body(_url, _interval));
         }
         else if (changed)
         {
-            Stop();
-            Start();
+            _loop.Restart(Body(_url, _interval));
         }
     }
 
-    private void Start()
-    {
-        if (string.IsNullOrEmpty(_url) || _loopTask is not null)
-        {
-            return;
-        }
-
-        _loopCts = new CancellationTokenSource();
-        _loopTask = RunLoopAsync(_url, _interval, _loopCts.Token);
-    }
-
-    private void Stop()
-    {
-        _loopCts?.Cancel();
-        _loopCts?.Dispose();
-        _loopCts = null;
-        _loopTask = null;
-    }
-
-    private async Task RunLoopAsync(string url, TimeSpan interval, CancellationToken cancellationToken)
-    {
-        // Push immediately, then wait - matches the push-then-sleep semantics of every Uptime Kuma
-        // client rather than PeriodicTimer's default wait-then-tick, so a fresh push URL shows up
-        // in Kuma right away instead of after a full interval.
-        await PushOnceAsync(url, cancellationToken).ConfigureAwait(false);
-
-        // Scoped locally (not a shared field): a live Reconfigure() cancels this loop and starts a
-        // fresh one without awaiting the old one's shutdown, so a shared timer field touched by
-        // both the old and new loop would race. Cancelling the token alone is enough to unblock
-        // WaitForNextTickAsync, so this loop cleans up its own timer.
-        using var timer = new PeriodicTimer(interval);
-        try
-        {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                await PushOnceAsync(url, cancellationToken).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal shutdown/reconfigure path.
-        }
-    }
+    /// <summary>
+    /// Push immediately, then wait - the push-then-sleep semantics of every Uptime Kuma client
+    /// rather than wait-then-tick, so a fresh push URL shows up in Kuma right away instead of after
+    /// a full interval. The URL and interval are captured here: a live reconfigure starts a new
+    /// body without waiting for the old one, and the old one must keep pushing to what it was given.
+    /// </summary>
+    private Func<CancellationToken, Task> Body(string url, TimeSpan interval) =>
+        cancellationToken => BackgroundLoop.EveryAsync(interval, token => PushOnceAsync(url, token), cancellationToken, firstTickNow: true);
 
     private async Task PushOnceAsync(string url, CancellationToken cancellationToken)
     {
@@ -129,20 +92,7 @@ public sealed class KumaPusher : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _loopCts?.Cancel();
-        if (_loopTask is not null)
-        {
-            try
-            {
-                await _loopTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected on shutdown.
-            }
-        }
-
+        await _loop.DisposeAsync().ConfigureAwait(false);
         _httpClient.Dispose();
-        _loopCts?.Dispose();
     }
 }

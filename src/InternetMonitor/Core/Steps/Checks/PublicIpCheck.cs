@@ -119,45 +119,13 @@ public sealed class PublicIpCheck : IStepCheck
         StepContext context,
         CancellationToken cancellationToken)
     {
-        using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        List<Task<(IPAddress Address, PingOutcome Outcome)>> pending = context.Targets.PublicIpTargets
-            .Select(async target => (target, await IcmpPing
-                .SendAsync(target, context.Targets.PublicIpTimeout, race.Token, context.LocalAddress)
-                .ConfigureAwait(false)))
-            .ToList();
+        Func<CancellationToken, Task<(IPAddress Address, PingOutcome Outcome)>> Ping(IPAddress target) =>
+            async token => (target, await IcmpPing.SendAsync(target, context.Targets.PublicIpTimeout, token, context.LocalAddress).ConfigureAwait(false));
 
-        var finished = new List<PublicIpEndpointResult>();
-        try
-        {
-            while (pending.Count > 0)
-            {
-                Task<(IPAddress Address, PingOutcome Outcome)> done = await Task.WhenAny(pending).ConfigureAwait(false);
-                pending.Remove(done);
+        RaceOutcome<(IPAddress Address, PingOutcome Outcome)> race = await Race
+            .FirstAsync([.. context.Targets.PublicIpTargets.Select(Ping)], r => r.Outcome.Success, cancellationToken)
+            .ConfigureAwait(false);
 
-                (IPAddress address, PingOutcome outcome) = await done.ConfigureAwait(false);
-                finished.Add(new PublicIpEndpointResult(address, outcome.Success, outcome.RoundtripMs, outcome.Status));
-                if (outcome.Success)
-                {
-                    break;
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        finally
-        {
-            race.Cancel();
-
-            // The losers end in a cancellation once the race is over; observe them so it never
-            // surfaces as an unobserved task exception.
-            foreach (Task task in pending)
-            {
-                _ = task.ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
-            }
-        }
-
-        return finished;
+        return [.. race.Finished.Select(r => new PublicIpEndpointResult(r.Address, r.Outcome.Success, r.Outcome.RoundtripMs, r.Outcome.Status))];
     }
 }

@@ -19,6 +19,11 @@ namespace InternetMonitor.Net;
 /// report. So the fallback deliberately considers adapters that are *down*, ranking by how likely
 /// each is to be the user's real network card, rather than returning nothing and letting the
 /// pipeline claim there is no adapter at all.
+///
+/// Enumerating the adapters (<see cref="GetAll"/>) is the one expensive call here - a trip through
+/// GetAdaptersAddresses that builds a fresh object per adapter - so every method takes the list a
+/// caller already has rather than enumerating again. A pipeline cycle enumerates once and hands
+/// that list to everything that needs it.
 /// </summary>
 public static class InterfaceSelector
 {
@@ -37,17 +42,32 @@ public static class InterfaceSelector
         "loopback", "tap-", "tun", "wintun", "wireguard", "openvpn", "pseudo",
     ];
 
+    private const int RouteLookupAttempts = 3;
+
+    private static readonly TimeSpan RouteLookupRetryDelay = TimeSpan.FromMilliseconds(30);
+
+    /// <summary>Every adapter Windows knows, or none when the enumeration itself fails.</summary>
+    public static IReadOnlyList<NetworkInterface> GetAll()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces();
+        }
+        catch (NetworkInformationException)
+        {
+            return [];
+        }
+    }
+
     /// <summary>Every adapter that could plausibly carry real traffic: physical ones, in no particular order.</summary>
-    public static IReadOnlyList<NetworkInterface> GetCandidates() =>
+    public static IReadOnlyList<NetworkInterface> Candidates(IReadOnlyList<NetworkInterface> all) =>
     [
-        .. SafeGetAll().Where(nic =>
+        .. all.Where(nic =>
             nic.NetworkInterfaceType != NetworkInterfaceType.Loopback
             && nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel),
     ];
 
-    private const int RouteLookupAttempts = 3;
-
-    private static readonly TimeSpan RouteLookupRetryDelay = TimeSpan.FromMilliseconds(30);
+    public static IReadOnlyList<NetworkInterface> GetCandidates() => Candidates(GetAll());
 
     /// <summary>
     /// The adapter Windows would route internet traffic over, or null when there is no route -
@@ -58,13 +78,14 @@ public static class InterfaceSelector
     /// (GetIPv4Properties throws mid-DHCP-renewal). Falling straight through to the heuristic
     /// on that one bad moment let a secondary adapter - a USB NIC plugged into a switch for
     /// configuration, with link but no internet - be described as the connection, which showed
-    /// up as a false DNS failure.
+    /// up as a false DNS failure. The first attempt uses the list the caller has; a retry
+    /// enumerates afresh, since a stale snapshot is exactly what the retry is for.
     /// </summary>
-    public static NetworkInterface? GetRouted()
+    public static NetworkInterface? GetRouted(IReadOnlyList<NetworkInterface> all)
     {
         for (int attempt = 1; attempt <= RouteLookupAttempts; attempt++)
         {
-            if (TryGetRoutedOnce() is { } routed)
+            if (TryGetRoutedOnce(attempt == 1 ? all : GetAll()) is { } routed)
             {
                 return routed;
             }
@@ -77,6 +98,8 @@ public static class InterfaceSelector
 
         return null;
     }
+
+    public static NetworkInterface? GetRouted() => GetRouted(GetAll());
 
     /// <summary>The interface index Windows would route internet traffic over, or null when there is no route.</summary>
     public static uint? GetRoutedIndex()
@@ -91,20 +114,11 @@ public static class InterfaceSelector
         }
     }
 
-    private static NetworkInterface? TryGetRoutedOnce()
+    private static NetworkInterface? TryGetRoutedOnce(IReadOnlyList<NetworkInterface> all)
     {
-        IReadOnlyList<NetworkInterface> all = GetCandidates();
-
-        try
+        if (GetRoutedIndex() is { } bestIndex)
         {
-            if (GetBestInterface(RouteLookupDestination, out uint bestIndex) == 0)
-            {
-                return all.FirstOrDefault(nic => IndexMatches(nic, bestIndex));
-            }
-        }
-        catch (Exception ex) when (ex is EntryPointNotFoundException or DllNotFoundException)
-        {
-            // Fall through to the heuristic below.
+            return Candidates(all).FirstOrDefault(nic => IndexMatches(nic, bestIndex));
         }
 
         return null;
@@ -115,10 +129,12 @@ public static class InterfaceSelector
     /// otherwise the most plausible physical adapter even if it is down, so steps 1 and 2 can say
     /// *which* adapter has no link.
     /// </summary>
-    public static NetworkInterface? GetPrimary() => GetRouted() ?? GuessPhysical();
+    public static NetworkInterface? GetPrimary(IReadOnlyList<NetworkInterface> all) => GetRouted(all) ?? GuessPhysical(all);
 
-    private static NetworkInterface? GuessPhysical() =>
-        GetCandidates()
+    public static NetworkInterface? GetPrimary() => GetPrimary(GetAll());
+
+    private static NetworkInterface? GuessPhysical(IReadOnlyList<NetworkInterface> all) =>
+        Candidates(all)
             .OrderByDescending(nic => nic.OperationalStatus == OperationalStatus.Up)
             .ThenByDescending(HasIPv4Gateway)
             .ThenBy(IsLikelyVirtual)
@@ -162,18 +178,6 @@ public static class InterfaceSelector
         {
             // No IPv4 bound, so it cannot have been the IPv4 best-route match.
             return false;
-        }
-    }
-
-    private static NetworkInterface[] SafeGetAll()
-    {
-        try
-        {
-            return NetworkInterface.GetAllNetworkInterfaces();
-        }
-        catch (NetworkInformationException)
-        {
-            return [];
         }
     }
 

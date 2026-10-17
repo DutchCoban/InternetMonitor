@@ -69,6 +69,49 @@ public abstract class PageBase : Panel
 
     protected int Sp(int step) => Theme.Space(step, DeviceDpi);
 
+    /// <summary>A secondary action button inside a card, collected for <see cref="LayoutButtonRow"/>.</summary>
+    protected static AppButton AddActionButton(Card card, List<AppButton> buttons, Action onClick)
+    {
+        var button = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Copy };
+        button.Click += (_, _) => onClick();
+        card.Controls.Add(button);
+        buttons.Add(button);
+        return button;
+    }
+
+    /// <summary>
+    /// Wraps a card's buttons left-to-right onto as many lines as the width needs - the labels vary
+    /// a lot in length by language, so a fixed side-by-side row would overflow a narrower window.
+    /// Sizes the card to fit; extras placed below start at <see cref="BelowRows"/>.
+    /// </summary>
+    protected void LayoutButtonRow(Card card, List<AppButton> buttons)
+    {
+        Rectangle content = card.DisplayRectangle;
+        int rowHeight = Dp(32);
+        int x = content.Left;
+        int y = content.Top;
+
+        foreach (AppButton button in buttons)
+        {
+            if (x > content.Left && x + button.Width > content.Right)
+            {
+                x = content.Left;
+                y += rowHeight + Sp(1);
+            }
+
+            button.Location = new Point(x, y);
+            x += button.Width + Sp(2);
+        }
+
+        CloseCard(card, y + rowHeight);
+    }
+
+    /// <summary>Where hand-placed extras start, under whatever a card's row layout already sized it for.</summary>
+    protected static int BelowRows(Card card) => card.Height - card.Inset;
+
+    /// <summary>Sizes a card so its content ends at <paramref name="bottom"/>.</summary>
+    protected static void CloseCard(Card card, int bottom) => card.Height = bottom + card.Inset;
+
     /// <summary>
     /// Builds the page's controls. Called once, the first time the page is shown, so start-up does
     /// not pay for pages the user may never open.

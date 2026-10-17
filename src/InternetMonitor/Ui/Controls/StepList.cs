@@ -111,6 +111,7 @@ public sealed class StepList : ThemedControl
     /// </summary>
     public void Apply(StepResult result)
     {
+        int expandedBefore = ExpandedHeight(result.Step);
         _liveState[result.Step] = result.State;
 
         if (result.State.IsResolved() || !_results.TryGetValue(result.Step, out StepResult? shown) || !shown.State.IsResolved())
@@ -119,7 +120,35 @@ public sealed class StepList : ThemedControl
         }
 
         UpdateAnimationState();
-        Invalidate();
+
+        // Fourteen of these arrive per cycle (Running, then the result, for each of seven steps).
+        // Only this step's row changed - unless its expanded detail grew or shrank, which moves
+        // every row below it.
+        if (ExpandedHeight(result.Step) != expandedBefore)
+        {
+            Invalidate();
+        }
+        else
+        {
+            Invalidate(RowBounds(result.Step));
+        }
+    }
+
+    private Rectangle RowBounds(StepId step)
+    {
+        int top = Sp(1);
+        foreach (StepId current in Order)
+        {
+            int height = RowHeight + ExpandedHeight(current);
+            if (current == step)
+            {
+                return new Rectangle(0, top, Width, height);
+            }
+
+            top += height;
+        }
+
+        return ClientRectangle;
     }
 
     public void Reset()

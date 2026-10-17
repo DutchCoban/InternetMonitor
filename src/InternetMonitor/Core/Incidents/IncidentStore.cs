@@ -31,6 +31,7 @@ public sealed class IncidentStore
 
     private readonly object _lock = new();
     private readonly List<Incident> _incidents;
+    private IReadOnlyList<Incident>? _sorted;
 
     public IncidentStore()
     {
@@ -50,7 +51,9 @@ public sealed class IncidentStore
         {
             lock (_lock)
             {
-                return [.. _incidents.OrderByDescending(i => i.StartUtc)];
+                // Sorted once per change, not once per read: the Status page asks for this every
+                // cycle, and the list only changes when an incident opens or closes.
+                return _sorted ??= [.. _incidents.OrderByDescending(i => i.StartUtc)];
             }
         }
     }
@@ -96,6 +99,7 @@ public sealed class IncidentStore
         lock (_lock)
         {
             _incidents.Add(incident);
+            _sorted = null;
         }
 
         Save();
@@ -110,6 +114,7 @@ public sealed class IncidentStore
             if (index >= 0)
             {
                 _incidents[index] = incident;
+                _sorted = null;
             }
         }
 
@@ -122,6 +127,7 @@ public sealed class IncidentStore
         lock (_lock)
         {
             _incidents.Clear();
+            _sorted = null;
         }
 
         Save();

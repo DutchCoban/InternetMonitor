@@ -52,8 +52,7 @@ public sealed class UpdateChecker : IAsyncDisposable
 
     private readonly HttpClient _httpClient;
     private readonly Version _currentVersion;
-    private CancellationTokenSource? _loopCts;
-    private Task? _loopTask;
+    private readonly Monitors.BackgroundLoop _loop = new();
 
     public event EventHandler<UpdateCheckResult>? CheckCompleted;
 
@@ -74,51 +73,12 @@ public sealed class UpdateChecker : IAsyncDisposable
     {
         if (!enabled)
         {
-            Stop();
+            _loop.Stop();
             return;
         }
 
-        if (_loopTask is null)
-        {
-            Start();
-        }
-    }
-
-    private void Start()
-    {
-        if (_loopTask is not null)
-        {
-            return;
-        }
-
-        _loopCts = new CancellationTokenSource();
-        _loopTask = RunLoopAsync(_loopCts.Token);
-    }
-
-    private void Stop()
-    {
-        _loopCts?.Cancel();
-        _loopCts?.Dispose();
-        _loopCts = null;
-        _loopTask = null;
-    }
-
-    private async Task RunLoopAsync(CancellationToken cancellationToken)
-    {
-        await CheckOnceAsync(cancellationToken).ConfigureAwait(false);
-
-        using var timer = new PeriodicTimer(CheckInterval);
-        try
-        {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                await CheckOnceAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal shutdown path.
-        }
+        // Once straight away, then daily.
+        _loop.Start(token => Monitors.BackgroundLoop.EveryAsync(CheckInterval, CheckOnceAsync, token, firstTickNow: true));
     }
 
     /// <summary>
@@ -229,20 +189,7 @@ public sealed class UpdateChecker : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _loopCts?.Cancel();
-        if (_loopTask is not null)
-        {
-            try
-            {
-                await _loopTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected on shutdown.
-            }
-        }
-
+        await _loop.DisposeAsync().ConfigureAwait(false);
         _httpClient.Dispose();
-        _loopCts?.Dispose();
     }
 }

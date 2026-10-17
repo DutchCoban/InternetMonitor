@@ -27,8 +27,12 @@ public sealed class AdapterCheck : IStepCheck
         var watch = Stopwatch.StartNew();
         LocalizationManager loc = LocalizationManager.Instance;
 
-        IReadOnlyList<NetworkInterface> candidates = InterfaceSelector.GetCandidates();
-        NetworkInterface? adapter = InterfaceSelector.GetPrimary();
+        // One enumeration for the whole cycle: the candidates, the routed adapter and - in step 3 -
+        // the VPN detection all read this list rather than asking Windows again.
+        IReadOnlyList<NetworkInterface> all = InterfaceSelector.GetAll();
+        context.AllAdapters = all;
+        IReadOnlyList<NetworkInterface> candidates = InterfaceSelector.Candidates(all);
+        NetworkInterface? adapter = InterfaceSelector.GetPrimary(all);
 
         if (adapter is null)
         {

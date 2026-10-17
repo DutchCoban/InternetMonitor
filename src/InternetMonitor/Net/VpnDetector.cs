@@ -37,18 +37,11 @@ public static class VpnDetector
     /// The active VPN, if any. A full tunnel wins over a split one when several are up, because it
     /// is the one that changes what every check measures.
     /// </summary>
-    public static VpnInfo? Detect()
-    {
-        NetworkInterface[] all;
-        try
-        {
-            all = NetworkInterface.GetAllNetworkInterfaces();
-        }
-        catch (NetworkInformationException)
-        {
-            return null;
-        }
+    public static VpnInfo? Detect() => Detect(InterfaceSelector.GetAll());
 
+    /// <summary>The same, over an adapter list the caller already has - the pipeline enumerates once per cycle.</summary>
+    public static VpnInfo? Detect(IReadOnlyList<NetworkInterface> all)
+    {
         uint? routedIndex = InterfaceSelector.GetRoutedIndex();
         VpnInfo? found = null;
         foreach (NetworkInterface nic in all)

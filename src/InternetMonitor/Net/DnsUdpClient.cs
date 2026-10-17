@@ -156,43 +156,20 @@ public static class DnsUdpClient
         CancellationToken cancellationToken,
         IPAddress? source = null)
     {
-        DnsQueryResult last = new(false, -1, [], [], 0, "No servers");
-        if (servers.Count == 0)
+        Func<CancellationToken, Task<(IPAddress Server, DnsQueryResult Result)>> Ask(IPAddress server) =>
+            async token => (server, await QueryAsync(server, name, type, timeout, token, source).ConfigureAwait(false));
+
+        RaceOutcome<(IPAddress Server, DnsQueryResult Result)> race = await Race.FirstAsync(
+            [.. servers.Select(Ask)],
+            r => r.Result.Success && (type is not (DnsRecordType.A or DnsRecordType.Aaaa) || r.Result.Addresses.Count > 0),
+            cancellationToken).ConfigureAwait(false);
+
+        if (race.HasWinner)
         {
-            return (null, last);
+            return race.Winner;
         }
 
-        using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        List<Task<(IPAddress Server, DnsQueryResult Result)>> pending = servers
-            .Select(async server => (server, await QueryAsync(server, name, type, timeout, race.Token, source).ConfigureAwait(false)))
-            .ToList();
-
-        try
-        {
-            while (pending.Count > 0)
-            {
-                Task<(IPAddress Server, DnsQueryResult Result)> finished = await Task.WhenAny(pending).ConfigureAwait(false);
-                pending.Remove(finished);
-
-                (IPAddress server, DnsQueryResult result) = await finished.ConfigureAwait(false);
-                if (result.Success && (type is not (DnsRecordType.A or DnsRecordType.Aaaa) || result.Addresses.Count > 0))
-                {
-                    return (server, result);
-                }
-
-                last = result;
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        finally
-        {
-            race.Cancel();
-        }
-
-        return (null, last);
+        return (null, race.Finished.Count > 0 ? race.Finished[^1].Result : new DnsQueryResult(false, -1, [], [], 0, "No servers"));
     }
 
     private static AddressFamily FamilyOf(DnsRecordType type) =>

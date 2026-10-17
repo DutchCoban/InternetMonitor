@@ -71,10 +71,8 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     private DateTimeOffset? _lastUpdatedUtc;
     private bool _enabled;
 
-    private CancellationTokenSource? _counterLoopCts;
-    private Task? _counterLoopTask;
-    private CancellationTokenSource? _dhcpLoopCts;
-    private Task? _dhcpLoopTask;
+    private readonly BackgroundLoop _counterLoop = new();
+    private readonly BackgroundLoop _dhcpLoop = new();
 
     public NetworkHealthMonitor(IncidentStore incidents, Func<IReadOnlyList<IPAddress>> pingTargets, Func<IPAddress?> gatewayProvider)
     {
@@ -137,23 +135,22 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
                 CloseIncidentIfOpen(tracker, now);
             }
 
-            StopCounterLoop();
-            StopDhcpLoop();
+            _counterLoop.Stop();
+            _dhcpLoop.Stop();
             PublishStatus();
             return;
         }
 
-        StartCounterLoop();
+        _counterLoop.Start(RunCounterLoopAsync);
 
         var dhcpInterval = TimeSpan.FromMinutes(Math.Max(1, rogueDhcp.WindowMinutes));
-        if (_dhcpLoopTask is null)
+        if (!_dhcpLoop.IsRunning)
         {
-            StartDhcpLoop(dhcpInterval);
+            _dhcpLoop.Start(token => RunDhcpLoopAsync(dhcpInterval, token));
         }
         else if (rogueDhcp.WindowMinutes != previousDhcpWindowMinutes)
         {
-            StopDhcpLoop();
-            StartDhcpLoop(dhcpInterval);
+            _dhcpLoop.Restart(token => RunDhcpLoopAsync(dhcpInterval, token));
         }
 
         PublishStatus();
@@ -174,59 +171,8 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         }
     }
 
-    private void StartCounterLoop()
-    {
-        if (_counterLoopTask is not null)
-        {
-            return;
-        }
-
-        _counterLoopCts = new CancellationTokenSource();
-        _counterLoopTask = RunCounterLoopAsync(_counterLoopCts.Token);
-    }
-
-    private void StopCounterLoop()
-    {
-        _counterLoopCts?.Cancel();
-        _counterLoopCts?.Dispose();
-        _counterLoopCts = null;
-        _counterLoopTask = null;
-    }
-
-    private void StartDhcpLoop(TimeSpan interval)
-    {
-        if (_dhcpLoopTask is not null)
-        {
-            return;
-        }
-
-        _dhcpLoopCts = new CancellationTokenSource();
-        _dhcpLoopTask = RunDhcpLoopAsync(interval, _dhcpLoopCts.Token);
-    }
-
-    private void StopDhcpLoop()
-    {
-        _dhcpLoopCts?.Cancel();
-        _dhcpLoopCts?.Dispose();
-        _dhcpLoopCts = null;
-        _dhcpLoopTask = null;
-    }
-
-    private async Task RunCounterLoopAsync(CancellationToken cancellationToken)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(CounterPollIntervalSeconds));
-        try
-        {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                await PollCountersOnceAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal shutdown/reconfigure path.
-        }
-    }
+    private Task RunCounterLoopAsync(CancellationToken cancellationToken) =>
+        BackgroundLoop.EveryAsync(TimeSpan.FromSeconds(CounterPollIntervalSeconds), PollCountersOnceAsync, cancellationToken);
 
     /// <summary>
     /// One tick of the counter loop. The Windows counters only ever grow, so each sample is the
@@ -274,25 +220,9 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         PublishStatus();
     }
 
-    private async Task RunDhcpLoopAsync(TimeSpan interval, CancellationToken cancellationToken)
-    {
-        // Probe immediately, then wait - a freshly enabled condition shows a reading right away
-        // rather than after a full interval, matching KumaPusher.RunLoopAsync's reasoning.
-        await PollDhcpOnceAsync(cancellationToken).ConfigureAwait(false);
-
-        using var timer = new PeriodicTimer(interval);
-        try
-        {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                await PollDhcpOnceAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal shutdown/reconfigure path.
-        }
-    }
+    /// <summary>Probe immediately, then wait: a freshly enabled condition shows a reading right away rather than after a full interval.</summary>
+    private Task RunDhcpLoopAsync(TimeSpan interval, CancellationToken cancellationToken) =>
+        BackgroundLoop.EveryAsync(interval, PollDhcpOnceAsync, cancellationToken, firstTickNow: true);
 
     private async Task PollDhcpOnceAsync(CancellationToken cancellationToken)
     {
@@ -500,28 +430,8 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _counterLoopCts?.Cancel();
-        _dhcpLoopCts?.Cancel();
-
-        foreach (Task? task in new[] { _counterLoopTask, _dhcpLoopTask })
-        {
-            if (task is null)
-            {
-                continue;
-            }
-
-            try
-            {
-                await task.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected on shutdown.
-            }
-        }
-
-        _counterLoopCts?.Dispose();
-        _dhcpLoopCts?.Dispose();
+        await _counterLoop.DisposeAsync().ConfigureAwait(false);
+        await _dhcpLoop.DisposeAsync().ConfigureAwait(false);
     }
 
     private enum AggregationMode
