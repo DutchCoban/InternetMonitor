@@ -830,7 +830,7 @@
   "settings.webhook.label.help": "Come i messaggi chiamano questo computer, così un ricevitore alimentato da molti computer sa quale parla: un nome host, un indirizzo, una postazione - scegli tu. Vuoto lo omette; nient'altro nel messaggio identifica il computer.",
   "settings.export.detail": "Dettaglio dell'esportazione per IA",
   "settings.export.detail.compact": "Compatto - entra in qualsiasi finestra di chat",
-  "settings.export.detail.standard": "Standard - i 20 incidenti più recenti per intero",
+  "settings.export.detail.standard": "Standard - 20 incidenti recenti per intero",
   "settings.export.detail.full": "Completo - può diventare molto grande",
   "settings.export.detail.help": "Quanto finisce nell'esportazione per IA. Compatto tiene i 10 incidenti più recenti per intero e il resto su una riga, accorcia le cronologie lunghe ed elenca gli ultimi 30 test di velocità - circa 15.000 token al massimo. Standard consente 20 incidenti e 60 test, circa 30.000 token. Completo non tralascia nulla e può superare ciò che un'IA accetta. L'esportazione zip contiene sempre tutto."
 }

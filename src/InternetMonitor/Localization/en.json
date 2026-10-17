@@ -830,7 +830,7 @@
   "settings.webhook.label.help": "What the messages call this machine, so a receiver fed by many machines knows which one is speaking: a hostname, an address, a desk - your choice. Empty leaves it out; nothing else in the message identifies the machine.",
   "settings.export.detail": "Detail in the AI export",
   "settings.export.detail.compact": "Compact - fits any chat window",
-  "settings.export.detail.standard": "Standard - the newest 20 incidents in full",
+  "settings.export.detail.standard": "Standard - newest 20 incidents in full",
   "settings.export.detail.full": "Full - everything, can be very large",
   "settings.export.detail.help": "How much goes into the AI export. Compact keeps the newest 10 incidents in full and the rest as one line each, shortens long timelines and lists the last 30 speed tests - about 15,000 tokens at most. Standard allows 20 incidents and 60 tests, about 30,000 tokens. Full leaves nothing out and can exceed what an AI accepts. The zip export always has everything."
 }

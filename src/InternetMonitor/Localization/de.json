@@ -830,7 +830,7 @@
   "settings.webhook.label.help": "Wie die Nachrichten diesen Rechner nennen, damit ein Empfänger mit vielen Rechnern weiß, welcher spricht: ein Hostname, eine Adresse, ein Arbeitsplatz - Ihre Wahl. Leer lässt es weg; nichts anderes in der Nachricht identifiziert den Rechner.",
   "settings.export.detail": "Detailgrad des KI-Exports",
   "settings.export.detail.compact": "Kompakt - passt in jedes Chatfenster",
-  "settings.export.detail.standard": "Standard - die neuesten 20 Vorfälle vollständig",
+  "settings.export.detail.standard": "Standard - neueste 20 Vorfälle vollständig",
   "settings.export.detail.full": "Vollständig - kann sehr groß werden",
   "settings.export.detail.help": "Wie viel in den KI-Export kommt. Kompakt behält die neuesten 10 Vorfälle vollständig und den Rest als je eine Zeile, kürzt lange Zeitleisten und listet die letzten 30 Geschwindigkeitstests - höchstens etwa 15.000 Tokens. Standard erlaubt 20 Vorfälle und 60 Tests, etwa 30.000 Tokens. Vollständig lässt nichts weg und kann mehr sein, als eine KI annimmt. Der Zip-Export enthält immer alles."
 }

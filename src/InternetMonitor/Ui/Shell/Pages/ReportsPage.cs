@@ -45,7 +45,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         _exportCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Copy };
 
         // How much the AI export carries; the zip is always complete.
-        _exportDetail = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(260) };
+        _exportDetail = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(360) };
         _exportDetail.SelectedIndexChanged += (_, _) =>
         {
             if (_exportDetail.SelectedItem is DetailItem item)
