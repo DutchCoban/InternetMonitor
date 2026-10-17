@@ -825,5 +825,7 @@
   "speedtest.run.help": "De snelheidstest nu draaien. Hij verplaatst zo'n tien seconden echte data; op mobiele data zegt de balk ongeveer hoeveel.",
   "mtu.run.help": "Het grootste ongefragmenteerde pakket naar het doel vinden met don't-fragment-pings. Duurt een paar seconden.",
   "mtu.target.help": "Een hostnaam of adres om tegen te meten. Een publiek adres dat pings beantwoordt werkt het best.",
-  "settings.webhook.status.pending": "{0} in de wacht tot het internet terug is."
+  "settings.webhook.status.pending": "{0} in de wacht tot het internet terug is.",
+  "settings.webhook.label": "Label voor deze machine",
+  "settings.webhook.label.help": "Hoe de berichten deze machine noemen, zodat een ontvanger met veel machines weet welke er spreekt: een hostnaam, een adres, een werkplek - jouw keuze. Leeg laat het weg; niets anders in het bericht identificeert de machine."
 }

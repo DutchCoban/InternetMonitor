@@ -29,6 +29,7 @@ public sealed class IncidentWebhookTests
         Assert.Equal("outage", payload.Kind);
         Assert.Equal("INC-20261017-0003", payload.Id);
         Assert.True(Guid.TryParseExact(payload.Uuid, "D", out Guid uuid) && uuid != Guid.Empty);
+        Assert.Null(payload.Label);
         Assert.Equal("Internet", payload.Cause);
         Assert.Equal("Provider", payload.Side);
         Assert.Equal(270, payload.DurationSeconds);
@@ -63,6 +64,21 @@ public sealed class IncidentWebhookTests
         Assert.Equal("test", body.RootElement.GetProperty("event").GetString());
         Assert.Equal("2.3.0", body.RootElement.GetProperty("appVersion").GetString());
         Assert.False(body.RootElement.TryGetProperty("endUtc", out _));
+        Assert.False(body.RootElement.TryGetProperty("label", out _));
+    }
+
+    [Fact]
+    public async Task The_label_the_user_chose_names_the_machine_and_nothing_else_does()
+    {
+        var handler = new CapturingHandler();
+        await using var webhook = new IncidentWebhook("2.3.0", handler);
+        webhook.Reconfigure("https://hooks.example/incident", "  Balie Utrecht ");
+
+        await webhook.SendTestAsync(CancellationToken.None);
+
+        using JsonDocument body = JsonDocument.Parse(handler.Body!);
+        Assert.Equal("Balie Utrecht", body.RootElement.GetProperty("label").GetString());
+        Assert.DoesNotContain(Environment.MachineName, handler.Body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

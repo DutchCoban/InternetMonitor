@@ -825,5 +825,7 @@
   "speedtest.run.help": "Esegui il test di velocità ora. Sposta dati reali per circa dieci secondi; su dati mobili la barra indica all'incirca quanti.",
   "mtu.run.help": "Trova il pacchetto non frammentato più grande verso la destinazione con ping don't-fragment. Richiede qualche secondo.",
   "mtu.target.help": "Un nome host o un indirizzo rispetto a cui misurare. Un indirizzo pubblico che risponde ai ping funziona meglio.",
-  "settings.webhook.status.pending": "{0} in attesa del ritorno di internet."
+  "settings.webhook.status.pending": "{0} in attesa del ritorno di internet.",
+  "settings.webhook.label": "Etichetta di questo computer",
+  "settings.webhook.label.help": "Come i messaggi chiamano questo computer, così un ricevitore alimentato da molti computer sa quale parla: un nome host, un indirizzo, una postazione - scegli tu. Vuoto lo omette; nient'altro nel messaggio identifica il computer."
 }

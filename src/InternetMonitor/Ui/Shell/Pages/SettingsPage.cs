@@ -50,6 +50,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private NumericUpDown _weakWifi = null!;
     private Label _kumaStatus = null!;
     private TextBox _webhookUrl = null!;
+    private TextBox _webhookLabel = null!;
     private AppButton _webhookTest = null!;
     private Label _webhookStatus = null!;
     private Toggle _tracerouteOnIncident = null!;
@@ -215,7 +216,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         Show(logging, _logDirectory, _browseLogDirectory, _openLogFolder, _resetLogDirectory);
 
         Show(s.KumaPushUrl.Length > 0, _kumaInterval, _kumaStatus);
-        Show(s.WebhookUrl.Length > 0, _webhookTest, _webhookStatus);
+        Show(s.WebhookUrl.Length > 0, _webhookLabel, _webhookTest, _webhookStatus);
 
         LayoutCards();
     }
@@ -413,6 +414,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _weakWifi.Value = settings.WeakWifiSignalPercent;
         RefreshKumaStatus(Services.Kuma.LastPush);
         _webhookUrl.Text = settings.WebhookUrl;
+        _webhookLabel.Text = settings.WebhookLabel;
         RefreshWebhookStatus(Services.Webhook.LastDelivery);
 
         _historyRetention.SelectedIndexChanged -= OnHistoryRetentionChanged;
@@ -749,6 +751,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _kumaStatus.ForeColor = p.TextMuted;
         _webhookUrl.BackColor = p.SurfaceAlt;
         _webhookUrl.ForeColor = p.TextPrimary;
+        _webhookLabel.BackColor = p.SurfaceAlt;
+        _webhookLabel.ForeColor = p.TextPrimary;
         _webhookStatus.BackColor = p.Surface;
         _webhookStatus.ForeColor = p.TextMuted;
         _settingsBackupNote.BackColor = p.Surface;

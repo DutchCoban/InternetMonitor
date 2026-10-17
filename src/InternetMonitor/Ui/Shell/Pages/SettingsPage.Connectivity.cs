@@ -145,6 +145,16 @@ public sealed partial class SettingsPage
         _webhookUrl.Leave += OnWebhookUrlChanged;
         AddRow(_integrationsCard, "settings.webhook.url", _webhookUrl);
 
+        // What the messages call this machine; only asked for once there is a URL to send them to.
+        _webhookLabel = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(200), Font = Theme.Font(FontRole.Body) };
+        _webhookLabel.Leave += (_, _) =>
+        {
+            Services.Settings.WebhookLabel = _webhookLabel.Text.Trim();
+            Services.Settings.Save();
+            Services.Webhook.Reconfigure(Services.Settings.WebhookUrl, Services.Settings.WebhookLabel);
+        };
+        AddRow(_integrationsCard, "settings.webhook.label", _webhookLabel);
+
         _webhookStatus = new Label
         {
             AutoSize = false,
@@ -173,7 +183,7 @@ public sealed partial class SettingsPage
 
         Services.Settings.WebhookUrl = url;
         Services.Settings.Save();
-        Services.Webhook.Reconfigure(url);
+        Services.Webhook.Reconfigure(url, Services.Settings.WebhookLabel);
         RefreshWebhookStatus(Services.Webhook.LastDelivery);
         RefreshDependentRows();
     }

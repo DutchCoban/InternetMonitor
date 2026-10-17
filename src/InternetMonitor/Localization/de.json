@@ -825,5 +825,7 @@
   "speedtest.run.help": "Den Geschwindigkeitstest jetzt starten. Er überträgt etwa zehn Sekunden lang echte Daten; bei Mobilfunk sagt die Leiste, ungefähr wie viel.",
   "mtu.run.help": "Das größte unfragmentierte Paket zum Ziel mit Don't-Fragment-Pings finden. Dauert ein paar Sekunden.",
   "mtu.target.help": "Ein Hostname oder eine Adresse als Messziel. Eine öffentliche Adresse, die auf Pings antwortet, eignet sich am besten.",
-  "settings.webhook.status.pending": "{0} wartet, bis das Internet zurück ist."
+  "settings.webhook.status.pending": "{0} wartet, bis das Internet zurück ist.",
+  "settings.webhook.label": "Bezeichnung für diesen Rechner",
+  "settings.webhook.label.help": "Wie die Nachrichten diesen Rechner nennen, damit ein Empfänger mit vielen Rechnern weiß, welcher spricht: ein Hostname, eine Adresse, ein Arbeitsplatz - Ihre Wahl. Leer lässt es weg; nichts anderes in der Nachricht identifiziert den Rechner."
 }

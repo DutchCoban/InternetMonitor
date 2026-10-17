@@ -141,7 +141,7 @@ public sealed class AppHost : ApplicationContext
         _updateInstaller = new UpdateInstaller();
 
         _webhook = new IncidentWebhook(AppVersion);
-        _webhook.Reconfigure(_settings.WebhookUrl);
+        _webhook.Reconfigure(_settings.WebhookUrl, _settings.WebhookLabel);
         _clock = new ClockMonitor(() => _settings.NtpServer);
 
         _speedTestScheduler = new SpeedTestScheduler();

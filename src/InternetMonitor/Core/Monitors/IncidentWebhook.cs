@@ -24,7 +24,8 @@ public sealed record WebhookDeliveryStatus(DateTimeOffset AtUtc, bool Failed, st
 /// minute) rather than knocking every cycle. Nothing about monitoring waits for any of this.
 ///
 /// Every message carries the incident's UUID next to its readable id, so a receiver can open and
-/// close exactly one thing even when two machines post to it.
+/// close exactly one thing even when two machines post to it. A label the user chose - a hostname,
+/// an address, a desk - says which machine is speaking; without one, nothing in the message does.
 ///
 /// The URL must be https, except for an address inside your own network (a private IP, localhost,
 /// a bare hostname or a .local/.lan/.home/.internal name), where plain http is allowed: that is
@@ -50,6 +51,7 @@ public sealed class IncidentWebhook : IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _lock = new();
     private string _url = string.Empty;
+    private string? _label;
     private int _failuresInARow;
     private DateTimeOffset _nextAttemptUtc = DateTimeOffset.MinValue;
 
@@ -125,11 +127,15 @@ public sealed class IncidentWebhook : IAsyncDisposable
             || (b[0] == 169 && b[1] == 254);
     }
 
-    /// <summary>Sets the URL; anything unusable switches the webhook off. A new address drops what was queued for the old one.</summary>
-    public void Reconfigure(string url)
+    /// <summary>
+    /// Sets the URL and the label; anything unusable as a URL switches the webhook off. A new
+    /// address drops what was queued for the old one; a new label does not.
+    /// </summary>
+    public void Reconfigure(string url, string label = "")
     {
         string trimmed = url.Trim();
         string usable = IsUsableUrl(trimmed) ? trimmed : string.Empty;
+        string trimmedLabel = label.Trim();
         lock (_lock)
         {
             if (usable != _url)
@@ -138,6 +144,7 @@ public sealed class IncidentWebhook : IAsyncDisposable
             }
 
             _url = usable;
+            _label = trimmedLabel.Length > 0 ? trimmedLabel : null;
         }
     }
 
@@ -156,7 +163,7 @@ public sealed class IncidentWebhook : IAsyncDisposable
                 _pending.Dequeue();
             }
 
-            _pending.Enqueue(Payload(incident, opened ? "opened" : "resolved", _appVersion));
+            _pending.Enqueue(Payload(incident, opened ? "opened" : "resolved", _appVersion, _label));
         }
 
         _ = FlushAsync();
@@ -188,7 +195,7 @@ public sealed class IncidentWebhook : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return await DeliverAsync(TestPayload(_appVersion), cancellationToken).ConfigureAwait(false);
+            return await DeliverAsync(TestPayload(_appVersion, _label), cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -197,11 +204,12 @@ public sealed class IncidentWebhook : IAsyncDisposable
     }
 
     /// <summary>The JSON body for one incident event. Public and pure, so the shape is testable and documented by the test.</summary>
-    public static WebhookPayload Payload(Incident incident, string eventName, string appVersion) => new(
+    public static WebhookPayload Payload(Incident incident, string eventName, string appVersion, string? label = null) => new(
         eventName,
         incident.ConditionKey is null ? "outage" : "warning",
         incident.Id,
         incident.Uuid.ToString("D"),
+        label,
         incident.Cause.ToString(),
         incident.ConditionKey is null ? ProviderReportData.SideOf(incident.Cause).ToString() : "NetworkHealth",
         incident.Headline,
@@ -210,8 +218,8 @@ public sealed class IncidentWebhook : IAsyncDisposable
         incident.Duration is { } duration ? (long)duration.TotalSeconds : null,
         appVersion);
 
-    public static WebhookPayload TestPayload(string appVersion) =>
-        new("test", "test", "TEST", Guid.NewGuid().ToString("D"), "Healthy", "None", "Test delivery from Internet Monitor", DateTimeOffset.UtcNow, null, null, appVersion);
+    public static WebhookPayload TestPayload(string appVersion, string? label = null) =>
+        new("test", "test", "TEST", Guid.NewGuid().ToString("D"), label, "Healthy", "None", "Test delivery from Internet Monitor", DateTimeOffset.UtcNow, null, null, appVersion);
 
     /// <summary>
     /// Delivers the queue in order, one at a time, and stops at the first failure so nothing
@@ -305,6 +313,7 @@ public sealed record WebhookPayload(
     string Kind,
     string Id,
     string Uuid,
+    string? Label,
     string Cause,
     string Side,
     string Headline,

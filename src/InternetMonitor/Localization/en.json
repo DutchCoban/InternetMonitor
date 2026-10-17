@@ -825,5 +825,7 @@
   "speedtest.run.help": "Run the speed test now. It moves real data for about ten seconds; on mobile data the bar says roughly how much.",
   "mtu.run.help": "Find the largest unfragmented packet to the target with don't-fragment pings. Takes a few seconds.",
   "mtu.target.help": "A host name or address to measure against. A public address that answers pings works best.",
-  "settings.webhook.status.pending": "{0} waiting until the internet is back."
+  "settings.webhook.status.pending": "{0} waiting until the internet is back.",
+  "settings.webhook.label": "Label for this machine",
+  "settings.webhook.label.help": "What the messages call this machine, so a receiver fed by many machines knows which one is speaking: a hostname, an address, a desk - your choice. Empty leaves it out; nothing else in the message identifies the machine."
 }

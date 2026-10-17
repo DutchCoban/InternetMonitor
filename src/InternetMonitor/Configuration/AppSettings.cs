@@ -361,6 +361,13 @@ public sealed class AppSettings
     /// <summary>Where an incident opening or closing is POSTed as JSON (see <see cref="Core.Monitors.IncidentWebhook"/>). Empty means off; only https is ever called.</summary>
     public string WebhookUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// What the webhook calls this machine, so a receiver fed by many machines knows which one
+    /// speaks: a hostname, an address, a desk, whatever the user chooses. Empty leaves the field out
+    /// of the message - nothing identifies the machine unless the user says so.
+    /// </summary>
+    public string WebhookLabel { get; set; } = string.Empty;
+
     // ---- Diagnostics ----------------------------------------------------------------------------
 
     /// <summary>Off by default - this is troubleshooting output, not something a monitor needs running to do its job.</summary>

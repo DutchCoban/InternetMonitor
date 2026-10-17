@@ -825,5 +825,7 @@
   "speedtest.run.help": "Executar o teste de velocidade agora. Move dados reais durante cerca de dez segundos; em dados móveis a barra indica aproximadamente quantos.",
   "mtu.run.help": "Encontrar o maior pacote não fragmentado para o destino com pings don't-fragment. Demora alguns segundos.",
   "mtu.target.help": "Um nome de anfitrião ou endereço contra o qual medir. Um endereço público que responda a pings funciona melhor.",
-  "settings.webhook.status.pending": "{0} à espera de a internet voltar."
+  "settings.webhook.status.pending": "{0} à espera de a internet voltar.",
+  "settings.webhook.label": "Etiqueta desta máquina",
+  "settings.webhook.label.help": "Como as mensagens chamam esta máquina, para que um recetor alimentado por muitas máquinas saiba qual está a falar: um nome de anfitrião, um endereço, um posto - à sua escolha. Vazio omite-o; nada mais na mensagem identifica a máquina."
 }

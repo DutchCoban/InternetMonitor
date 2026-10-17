@@ -368,7 +368,9 @@ opens and one when it closes (`event`, `kind`, `id`, `uuid`, `cause`, `side`, `h
 Discord or Slack webhook, or anything else that takes JSON. A test button sends a sample. `id` is
 the readable INC-20261017-213816.729 (the local date and time it opened); `uuid` is globally
 unique, the same on the "opened" and the "resolved" message, so a receiver can open and close
-exactly one thing even when two machines post to it.
+exactly one thing even when two machines post to it. `label` is what you chose to call this
+machine in the same settings - a hostname, an address, a desk - so a receiver fed by many machines
+knows which one is speaking; left empty, nothing in the message identifies the machine.
 
 An outage on the provider's side is exactly when nothing can leave the house, so a message that
 cannot be delivered waits, in order, and goes as soon as a check reaches the internet again - the
