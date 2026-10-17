@@ -254,11 +254,15 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         int y = BelowRows(_networkHealthCard);
 
         int toggleWidth = Dp(44);
-        int nameWidth = Dp(170);
         int numberWidth = Dp(70);
-        int intervalLabelWidth = Dp(40);
         int minutesLabelWidth = Dp(80);
         int gap = Sp(2);
+
+        // The name and the little "in" / "every" word are as wide as their longest text needs:
+        // "toutes les" and "a cada" do not fit the width "in" and "elke" were drawn for.
+        static int Widest(IEnumerable<Label> labels) => labels.Max(l => TextRenderer.MeasureText(l.Text, l.Font).Width);
+        int nameWidth = Math.Max(Dp(170), Widest(_conditionRows.Select(r => r.Name)) + Sp(1));
+        int intervalLabelWidth = Math.Max(Dp(40), Widest(_conditionRows.Select(r => r.IntervalLabel)) + Sp(1));
 
         foreach (ConditionRow row in _conditionRows)
         {
