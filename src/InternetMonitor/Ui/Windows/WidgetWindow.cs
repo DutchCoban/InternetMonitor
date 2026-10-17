@@ -45,10 +45,12 @@ public sealed class WidgetWindow : Form
 
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
         DoubleBuffered = true;
-        ClientSize = new Size(Dp(WidthDp), Dp(HeightDp));
 
+        // The chart exists before the first size is set: setting ClientSize raises OnResize, which
+        // lays the chart out, and a widget that crashed there was the first thing a user saw.
         _chart = new MetricChart { Compact = true };
         Controls.Add(_chart);
+        ClientSize = new Size(Dp(WidthDp), Dp(HeightDp));
 
         _topMostItem = new ToolStripMenuItem { CheckOnClick = true, Checked = TopMost };
         _topMostItem.CheckedChanged += (_, _) =>
@@ -173,6 +175,12 @@ public sealed class WidgetWindow : Form
 
     private void LayoutChart()
     {
+        if (_chart is null)
+        {
+            // A resize from the Form's own construction, before the constructor body ran.
+            return;
+        }
+
         int left = Sp(3);
         _chart.Bounds = new Rectangle(left, Dp(66), ClientSize.Width - (left * 2), ClientSize.Height - Dp(66) - Sp(3));
     }
