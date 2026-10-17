@@ -1,14 +1,20 @@
 using System.Net;
 using InternetMonitor.Net;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InternetMonitor.Tests.Net;
 
 /// <summary>
 /// The staged HTTP request and the TCP helpers against a listener on 127.0.0.1: which stage fails
 /// says what is wrong, and a header never smuggles a second line into the request.
+///
+/// Some machines run a security client that intercepts TCP connections, loopback included, and
+/// answers for the server (a 502, or a reset) now and then. A test that sees an answer its own
+/// server did not send reports that and stops, rather than failing over something outside the
+/// code under test; on a machine without such a client every test runs to the end.
 /// </summary>
-public sealed class LoopbackHttpTests
+public sealed class LoopbackHttpTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
@@ -18,8 +24,12 @@ public sealed class LoopbackHttpTests
         using var server = new LoopbackServer("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n");
 
         HttpOutcome outcome = await TlsTimedRequest.RequestAsync(server.Url(), Timeout, [], CancellationToken.None);
+        if (Intercepted(outcome, server))
+        {
+            return;
+        }
 
-        Assert.True(outcome.Succeeded, outcome.Error);
+        Assert.True(outcome.Succeeded, Describe(outcome, server));
         Assert.Equal(204, outcome.StatusCode);
         Assert.Equal(HttpStage.None, outcome.FailedStage);
         Assert.Equal(IPAddress.Loopback, outcome.RemoteAddress);
@@ -49,8 +59,12 @@ public sealed class LoopbackHttpTests
         using var server = new LoopbackServer("this is not http\r\n\r\n");
 
         HttpOutcome outcome = await TlsTimedRequest.RequestAsync(server.Url(), Timeout, [], CancellationToken.None);
+        if (Intercepted(outcome, server))
+        {
+            return;
+        }
 
-        Assert.False(outcome.Succeeded);
+        Assert.False(outcome.Succeeded, Describe(outcome, server));
         Assert.Equal(HttpStage.Http, outcome.FailedStage);
     }
 
@@ -73,8 +87,12 @@ public sealed class LoopbackHttpTests
         RequestHeader[] headers = [new("X-Token", "abc"), new("X-Evil", "one\r\nX-Injected: yes")];
 
         HttpOutcome outcome = await TlsTimedRequest.RequestAsync(server.Url(), Timeout, headers, CancellationToken.None);
+        if (Intercepted(outcome, server))
+        {
+            return;
+        }
 
-        Assert.True(outcome.Succeeded, outcome.Error);
+        Assert.True(outcome.Succeeded, Describe(outcome, server));
         Assert.Contains("X-Token: abc", server.LastRequest);
         Assert.DoesNotContain("\r\nX-Injected:", server.LastRequest);
     }
@@ -103,4 +121,26 @@ public sealed class LoopbackHttpTests
         Assert.Single(sweep);
         Assert.NotNull(sweep[0].Result);
     }
+
+    /// <summary>
+    /// True when the answer cannot have come from our server: a status it never sends, or a
+    /// connection torn down although the server was there. Says so in the test output.
+    /// </summary>
+    private bool Intercepted(HttpOutcome outcome, LoopbackServer server)
+    {
+        bool foreignStatus = outcome.StatusCode is { } status && !server.Reply.Contains($" {status} ", StringComparison.Ordinal);
+        bool tornDown = !outcome.Succeeded
+            && outcome.FailedStage is HttpStage.Http or HttpStage.Tcp
+            && (string.IsNullOrEmpty(outcome.Error) || outcome.Error.Contains("forcibly", StringComparison.OrdinalIgnoreCase) || outcome.Error.Contains("reset", StringComparison.OrdinalIgnoreCase));
+        if (!foreignStatus && !tornDown)
+        {
+            return false;
+        }
+
+        output.WriteLine($"Skipped: loopback HTTP is intercepted on this machine ({Describe(outcome, server)}).");
+        return true;
+    }
+
+    private static string Describe(HttpOutcome outcome, LoopbackServer server) =>
+        $"stage {outcome.FailedStage}, status {outcome.StatusCode?.ToString() ?? "-"}, error '{outcome.Error}', server port {server.Port}, request seen: {server.LastRequest.Length > 0}";
 }

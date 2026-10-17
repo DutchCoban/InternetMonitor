@@ -27,6 +27,9 @@ internal sealed class LoopbackServer : IDisposable
 
     public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
+    /// <summary>The raw bytes this server answers with, so a test can tell its own answer from a stranger's.</summary>
+    public string Reply => _reply;
+
     public Uri Url(string path = "/probe", string scheme = "http") => new($"{scheme}://127.0.0.1:{Port}{path}");
 
     /// <summary>The request text of the last connection, headers included.</summary>
