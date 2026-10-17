@@ -244,7 +244,7 @@ public sealed class LanScanner
     /// The usable host range of <paramref name="localAddress"/>'s own subnet - everything between
     /// the network and broadcast addresses, exclusive - capped at <see cref="MaxHosts"/>.
     /// </summary>
-    private static (List<IPAddress> Addresses, bool Truncated) EnumerateHosts(IPAddress localAddress, IPAddress subnetMask)
+    internal static (List<IPAddress> Addresses, bool Truncated) EnumerateHosts(IPAddress localAddress, IPAddress subnetMask)
     {
         byte[] addressBytes = localAddress.GetAddressBytes();
         byte[] maskBytes = subnetMask.GetAddressBytes();

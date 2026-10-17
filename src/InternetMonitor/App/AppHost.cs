@@ -70,33 +70,8 @@ public sealed class AppHost : ApplicationContext
         var defaultTargets = new CheckTargets();
         CheckTargets BuildTargets()
         {
-            List<EndpointConfig> endpoints = _settings.ApplicationEndpoints;
-            IReadOnlyList<System.Net.IPAddress> publicIpTargets = _settings.ParsedPublicIpTargets();
-
-            (int warningMs, int errorMs) = _settings.LatencyThresholds;
             PlainLanguage.WeakWifiSignalPercent = _settings.WeakWifiSignalPercent;
-
-            return defaultTargets with
-            {
-                PublicIpTargets = publicIpTargets,
-                CustomDnsServers = _settings.ParsedCustomDnsServers(),
-                LatencyWarningMs = warningMs,
-                LatencyErrorMs = errorMs,
-                WeakWifiSignalPercent = _settings.WeakWifiSignalPercent,
-                AdapterMode = _settings.AdapterMode,
-                AdapterId = _settings.AdapterId.Length > 0 ? _settings.AdapterId : null,
-                AdapterName = _settings.AdapterName.Length > 0 ? _settings.AdapterName : null,
-                Targets =
-                [
-                    .. defaultTargets.Targets,
-                    .. endpoints.Where(e => e.Enabled).Select(e => e.Kind switch
-                    {
-                        EndpointKind.TcpPort => new TargetEndpoint(e.Name, Url: "", TargetKind.TcpPort, Host: e.Host, Port: e.Port) { Id = e.Id },
-                        EndpointKind.Ping => new TargetEndpoint(e.Name, Url: "", TargetKind.Ping, Host: e.Host) { Id = e.Id },
-                        _ => new TargetEndpoint(e.Name, e.Url, TargetKind.Url, ExpectedStatusCode: e.ExpectedStatusCode, Headers: e.Headers) { Id = e.Id },
-                    }),
-                ],
-            };
+            return TargetsFromSettings.Build(_settings, defaultTargets);
         }
 
         _pipeline = new StepPipeline(BuildTargets);
@@ -468,63 +443,7 @@ public sealed class AppHost : ApplicationContext
     /// </summary>
     private void RecordHistory(StepSnapshot snapshot)
     {
-        foreach (StepResult result in snapshot.All)
-        {
-            if (result.ChartValue is not { } value || SeriesNames.For(result.Step) is not { } series)
-            {
-                continue;
-            }
-
-            // Skipped steps measured nothing. Recording a zero for them would draw a cliff on the
-            // chart that looks like a measurement rather than an absence.
-            if (result.State == StepState.Skipped)
-            {
-                continue;
-            }
-
-            _history.Sample(series, result.TimestampUtc, value);
-        }
-
-        // The Wi-Fi signal is not step 2's chart value (that stays the 0/1 link state), so it gets
-        // its own series. The access point goes along as metadata: the History chart marks where it
-        // changed, which is how a roam between access points becomes visible after the fact.
-        if (snapshot[StepId.Link] is { State: not StepState.Skipped } link
-            && link.Facts is LinkFacts { Wifi.SignalPercent: { } signal } facts)
-        {
-            _history.Sample(SeriesNames.WifiSignal, link.TimestampUtc, signal, facts.Wifi.Bssid);
-        }
-
-        if (snapshot[StepId.Target]?.Facts is TargetFacts targetFacts)
-        {
-            if (targetFacts.Ipv6Reachable is { } ipv6)
-            {
-                _history.Sample(SeriesNames.Ipv6, snapshot.TakenUtc, ipv6 ? 1 : 0);
-            }
-
-            // Every configured endpoint gets its own series of round trips, so the History page
-            // can chart a named target the way it charts the built-in steps. An unreachable one
-            // records nothing - a gap in the line, the same as a failed step.
-            foreach (TargetEndpointResult endpoint in targetFacts.Endpoints)
-            {
-                if (endpoint.EndpointId is { } id && endpoint.Reachable && (endpoint.Timings?.Total.TotalMilliseconds ?? endpoint.ConnectMs) is { } ms)
-                {
-                    _history.Sample(SeriesNames.ForEndpoint(id), snapshot.TakenUtc, Math.Round(ms));
-                }
-            }
-        }
-
-        // Whether the line was metered, so the provider report can tell time spent on a phone's
-        // hotspot from time on the line it is about.
-        if (snapshot[StepId.Link]?.Facts is LinkFacts { Cost.Metered: { } metered })
-        {
-            _history.Sample(SeriesNames.Metered, snapshot.TakenUtc, metered ? 1 : 0);
-        }
-
-        if (snapshot.Throughput is { } traffic)
-        {
-            _history.Sample(SeriesNames.TrafficDown, snapshot.TakenUtc, Math.Round(traffic.DownMbps, 2));
-            _history.Sample(SeriesNames.TrafficUp, snapshot.TakenUtc, Math.Round(traffic.UpMbps, 2));
-        }
+        HistoryRecorder.Record(_history, snapshot);
     }
 
     /// <summary>
@@ -534,16 +453,7 @@ public sealed class AppHost : ApplicationContext
     /// </summary>
     private void RecordOutageState(DateTimeOffset at)
     {
-        Incident? active = _tracker.ActiveIncident;
-        string? state = active is null ? null : $"{active.Cause.Key()}|{active.Id}";
-        if (state != _lastOutageState)
-        {
-            _history.Record(SeriesNames.Outage, at, active is null ? 0 : 1, state);
-            _lastOutageState = state;
-            return;
-        }
-
-        _history.Sample(SeriesNames.Outage, at, active is null ? 0 : 1, state);
+        _lastOutageState = HistoryRecorder.RecordOutage(_history, _tracker.ActiveIncident, at, _lastOutageState);
     }
 
     private string? _lastOutageState = string.Empty;

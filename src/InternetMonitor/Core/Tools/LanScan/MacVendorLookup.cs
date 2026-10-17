@@ -44,8 +44,14 @@ public sealed class MacVendorLookup : IDisposable
     private bool _dirty;
 
     public MacVendorLookup()
+        : this(new HttpClientHandler())
     {
-        _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = MaxResponseBytes };
+    }
+
+    /// <summary>The same lookup over a substituted HTTP handler, so the tests can play both providers.</summary>
+    internal MacVendorLookup(HttpMessageHandler handler)
+    {
+        _http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = MaxResponseBytes };
         _http.DefaultRequestHeaders.Add("User-Agent", "InternetMonitor/2.0");
         LoadCache();
     }

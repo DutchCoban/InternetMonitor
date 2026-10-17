@@ -296,47 +296,21 @@ public sealed class EndpointEditWindow : Form
 
     private void OnSaveClicked(object? sender, EventArgs e)
     {
-        string name = _name.Text.Trim();
-        if (name.Length == 0)
+        EndpointConfig? result = EndpointInput.TryBuild(
+            _editingId,
+            _existingEnabled,
+            _name.Text,
+            SelectedKind,
+            _url.Text,
+            (int)_expectedStatus.Value,
+            _headerRows.Select(r => (r.Name.Text, r.Value.Text)),
+            _host.Text,
+            (int)_port.Value,
+            out string? errorKey);
+        if (result is null)
         {
-            _error.Text = _loc.Get("settings.endpoint.error.name");
+            _error.Text = _loc.Get(errorKey!);
             return;
-        }
-
-        EndpointConfig result;
-        if (SelectedKind == EndpointKind.Url)
-        {
-            string url = _url.Text.Trim();
-            bool validScheme = Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed)
-                && (parsed.Scheme == Uri.UriSchemeHttps || parsed.Scheme == Uri.UriSchemeHttp);
-            if (!validScheme)
-            {
-                _error.Text = _loc.Get("settings.endpoint.error.url");
-                return;
-            }
-
-            int? expected = _expectedStatus.Value == 0 ? null : (int)_expectedStatus.Value;
-
-            // Rows with no name are dropped rather than rejected - a blank row the user added and
-            // left empty is not a mistake worth an error message, it is just not a header yet.
-            List<EndpointHeader> headers = [.. _headerRows
-                .Where(r => r.Name.Text.Trim().Length > 0)
-                .Select(r => new EndpointHeader(r.Name.Text.Trim(), r.Value.Text))];
-
-            result = new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.Url, Url: url, ExpectedStatusCode: expected, Enabled: _existingEnabled, Headers: headers);
-        }
-        else
-        {
-            string host = _host.Text.Trim();
-            if (host.Length == 0)
-            {
-                _error.Text = _loc.Get("settings.endpoint.error.host");
-                return;
-            }
-
-            result = SelectedKind == EndpointKind.Ping
-                ? new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.Ping, Host: host, Enabled: _existingEnabled)
-                : new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.TcpPort, Host: host, Port: (int)_port.Value, Enabled: _existingEnabled);
         }
 
         Result = result;

@@ -58,6 +58,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     /// pipeline's shape.
     /// </summary>
     private readonly Func<IPAddress?> _gatewayProvider;
+    private readonly NetworkHealthProbes _probes;
 
     private readonly ConditionTracker _tcpRetransmissions = new("tcpRetransmissions", AggregationMode.Sum);
     private readonly ConditionTracker _packetLoss = new("packetLoss", AggregationMode.Average);
@@ -75,7 +76,14 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     private readonly BackgroundLoop _dhcpLoop = new();
 
     public NetworkHealthMonitor(IncidentStore incidents, Func<IReadOnlyList<IPAddress>> pingTargets, Func<IPAddress?> gatewayProvider)
+        : this(incidents, pingTargets, gatewayProvider, NetworkHealthProbes.Real)
     {
+    }
+
+    /// <summary>The same monitor over substituted counters, pings and DHCP probe, so the tests can drive it without a network.</summary>
+    internal NetworkHealthMonitor(IncidentStore incidents, Func<IReadOnlyList<IPAddress>> pingTargets, Func<IPAddress?> gatewayProvider, NetworkHealthProbes probes)
+    {
+        _probes = probes;
         _incidents = incidents;
         _pingTargets = pingTargets;
         _gatewayProvider = gatewayProvider;
@@ -179,11 +187,11 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     /// difference since the previous tick (clamped at 0, for a counter reset); the first tick only
     /// sets the baseline. Packet loss is a ping to every configured address, as a percentage.
     /// </summary>
-    private async Task PollCountersOnceAsync(CancellationToken cancellationToken)
+    internal async Task PollCountersOnceAsync(CancellationToken cancellationToken)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        if (_tcpRetransmissions.Threshold.Enabled && TcpStats.RetransmittedSegments() is { } retransmitted)
+        if (_tcpRetransmissions.Threshold.Enabled && _probes.TcpRetransmissions() is { } retransmitted)
         {
             if (_lastTcpRetransmissions is { } previous)
             {
@@ -193,7 +201,7 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
             _lastTcpRetransmissions = retransmitted;
         }
 
-        if (_ttlExceeded.Threshold.Enabled && IcmpStats.TimeExceededReceived() is { } ttlExceeded)
+        if (_ttlExceeded.Threshold.Enabled && _probes.TtlExceeded() is { } ttlExceeded)
         {
             if (_lastTtlExceeded is { } previous)
             {
@@ -206,8 +214,8 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         IReadOnlyList<IPAddress> pingTargets = _pingTargets();
         if (_packetLoss.Threshold.Enabled && pingTargets.Count > 0)
         {
-            IReadOnlyList<(IPAddress Address, PingOutcome Outcome)> results = await IcmpPing
-                .SendAllAsync(pingTargets, PingTimeout, cancellationToken)
+            IReadOnlyList<(IPAddress Address, PingOutcome Outcome)> results = await _probes
+                .Ping(pingTargets, PingTimeout, cancellationToken)
                 .ConfigureAwait(false);
 
             int lostPercent = (int)Math.Round(100.0 * results.Count(r => !r.Outcome.Success) / results.Count);
@@ -224,9 +232,9 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
     private Task RunDhcpLoopAsync(TimeSpan interval, CancellationToken cancellationToken) =>
         BackgroundLoop.EveryAsync(interval, PollDhcpOnceAsync, cancellationToken, firstTickNow: true);
 
-    private async Task PollDhcpOnceAsync(CancellationToken cancellationToken)
+    internal async Task PollDhcpOnceAsync(CancellationToken cancellationToken)
     {
-        DhcpProbeResult result = await DhcpDiscoverProbe.DiscoverAsync(DhcpListenWindow, cancellationToken).ConfigureAwait(false);
+        DhcpProbeResult result = await _probes.Dhcp(DhcpListenWindow, cancellationToken).ConfigureAwait(false);
         _lastDhcpProbeStatus = result.Status;
 
         if (result.Status != DhcpProbeStatus.Ok || !_rogueDhcp.Threshold.Enabled)
@@ -463,4 +471,21 @@ public sealed class NetworkHealthMonitor : IAsyncDisposable
         /// <summary>Set when an incident closed early: samples up to here no longer count towards opening one.</summary>
         public DateTimeOffset? CountedFrom { get; set; }
     }
+}
+
+/// <summary>
+/// What the monitor measures, as functions: the two Windows counters, the ping sweep and the DHCP
+/// probe. The app uses <see cref="Real"/>; the tests substitute readings.
+/// </summary>
+internal sealed record NetworkHealthProbes(
+    Func<long?> TcpRetransmissions,
+    Func<long?> TtlExceeded,
+    Func<IReadOnlyList<IPAddress>, TimeSpan, CancellationToken, Task<IReadOnlyList<(IPAddress Address, PingOutcome Outcome)>>> Ping,
+    Func<TimeSpan, CancellationToken, Task<DhcpProbeResult>> Dhcp)
+{
+    public static NetworkHealthProbes Real { get; } = new(
+        TcpStats.RetransmittedSegments,
+        IcmpStats.TimeExceededReceived,
+        (targets, timeout, token) => IcmpPing.SendAllAsync(targets, timeout, token),
+        (window, token) => DhcpDiscoverProbe.DiscoverAsync(window, token));
 }

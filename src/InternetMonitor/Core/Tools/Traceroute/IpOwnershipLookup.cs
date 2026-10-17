@@ -49,12 +49,20 @@ public sealed class IpOwnershipLookup : IDisposable
     private readonly ConcurrentDictionary<string, string> _asNames = new();
     private readonly HttpClient _http;
     private readonly bool _useRdap;
+    private readonly Func<string, CancellationToken, Task<string?>> _queryTxt;
     private bool _dirty;
 
     public IpOwnershipLookup(bool useRdap = true)
+        : this(useRdap, new HttpClientHandler(), QueryTxtAsync)
+    {
+    }
+
+    /// <summary>The same lookup over a substituted HTTP handler and TXT query, so the tests can answer without a network.</summary>
+    internal IpOwnershipLookup(bool useRdap, HttpMessageHandler handler, Func<string, CancellationToken, Task<string?>> queryTxt)
     {
         _useRdap = useRdap;
-        _http = new HttpClient
+        _queryTxt = queryTxt;
+        _http = new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan,
             MaxResponseContentBufferSize = MaxRdapResponseBytes,
@@ -120,7 +128,7 @@ public sealed class IpOwnershipLookup : IDisposable
         byte[] bytes = address.GetAddressBytes();
         string query = $"{bytes[3]}.{bytes[2]}.{bytes[1]}.{bytes[0]}.origin.asn.cymru.com";
 
-        string? answer = await QueryTxtAsync(query, cancellationToken).ConfigureAwait(false);
+        string? answer = await _queryTxt(query, cancellationToken).ConfigureAwait(false);
         if (answer is null)
         {
             return null;
@@ -156,7 +164,7 @@ public sealed class IpOwnershipLookup : IDisposable
             return cached;
         }
 
-        string? answer = await QueryTxtAsync($"AS{asNumber}.asn.cymru.com", cancellationToken).ConfigureAwait(false);
+        string? answer = await _queryTxt($"AS{asNumber}.asn.cymru.com", cancellationToken).ConfigureAwait(false);
         if (answer is null)
         {
             return null;

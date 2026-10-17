@@ -18,6 +18,19 @@ namespace InternetMonitor.Core.Steps.Checks;
 /// </summary>
 public sealed class AdapterCheck : IStepCheck
 {
+    private readonly Func<IReadOnlyList<NetworkInterface>> _enumerate;
+
+    public AdapterCheck()
+        : this(InterfaceSelector.GetAll)
+    {
+    }
+
+    /// <summary>The same step over a substituted adapter list, so the tests can run it without the machine's adapters.</summary>
+    internal AdapterCheck(Func<IReadOnlyList<NetworkInterface>> enumerate)
+    {
+        _enumerate = enumerate;
+    }
+
     public StepId Id => StepId.Adapter;
 
     public bool IsLocal => true;
@@ -29,7 +42,7 @@ public sealed class AdapterCheck : IStepCheck
 
         // One enumeration for the whole cycle: the candidates, the routed adapter and - in step 3 -
         // the VPN detection all read this list rather than asking Windows again.
-        IReadOnlyList<NetworkInterface> all = InterfaceSelector.GetAll();
+        IReadOnlyList<NetworkInterface> all = _enumerate();
         context.AllAdapters = all;
         IReadOnlyList<NetworkInterface> candidates = InterfaceSelector.Candidates(all);
         Configuration.CheckTargets targets = context.Targets;

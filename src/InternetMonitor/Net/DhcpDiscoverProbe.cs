@@ -101,7 +101,7 @@ public static class DhcpDiscoverProbe
     /// the broadcast address - this probe has no address of its own to be answered at), a random
     /// locally-administered client MAC, the magic cookie, and only the message-type option.
     /// </summary>
-    private static byte[] BuildDiscover(uint transactionId)
+    internal static byte[] BuildDiscover(uint transactionId)
     {
         var packet = new byte[240 + 4];
         packet[0] = OpBootRequest;
@@ -123,7 +123,7 @@ public static class DhcpDiscoverProbe
         return packet;
     }
 
-    private static bool TryParseOffer(ReadOnlySpan<byte> packet, uint expectedTransactionId, IPEndPoint remote, out DhcpOfferInfo offer)
+    internal static bool TryParseOffer(ReadOnlySpan<byte> packet, uint expectedTransactionId, IPEndPoint remote, out DhcpOfferInfo offer)
     {
         offer = default;
 
