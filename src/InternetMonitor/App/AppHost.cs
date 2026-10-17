@@ -70,10 +70,16 @@ public sealed class AppHost : ApplicationContext
             List<EndpointConfig> endpoints = _settings.ApplicationEndpoints;
             IReadOnlyList<System.Net.IPAddress> publicIpTargets = _settings.ParsedPublicIpTargets();
 
+            (int warningMs, int errorMs) = _settings.LatencyThresholds;
+            PlainLanguage.WeakWifiSignalPercent = _settings.WeakWifiSignalPercent;
+
             return defaultTargets with
             {
                 PublicIpTargets = publicIpTargets,
                 CustomDnsServers = _settings.ParsedCustomDnsServers(),
+                LatencyWarningMs = warningMs,
+                LatencyErrorMs = errorMs,
+                WeakWifiSignalPercent = _settings.WeakWifiSignalPercent,
                 Targets =
                 [
                     .. defaultTargets.Targets,
@@ -132,7 +138,7 @@ public sealed class AppHost : ApplicationContext
         _speedTestScheduler.SkipRun = () => !_settings.SpeedTestOnMetered && IsMetered();
         _speedTestScheduler.Reconfigure(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
 
-        var services = new AppServices(_settings, defaultTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler);
+        var services = new AppServices(_settings, BuildTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -145,15 +151,21 @@ public sealed class AppHost : ApplicationContext
 
         _tray = new TrayController();
         _tray.OpenRequested += ShowWindow;
+        _tray.CheckNowRequested += _cadence.RunNow;
+        _tray.PauseRequested += _cadence.Pause;
+        _tray.ResumeRequested += _cadence.Resume;
         _tray.SettingsRequested += ShowSettings;
         _tray.CheckForUpdatesRequested += OnCheckForUpdatesRequested;
+        _tray.BalloonClicked += ShowIncidents;
         _tray.ExitRequested += Shutdown;
+        _cadence.PauseChanged += OnPauseChanged;
 
         _pipeline.CycleCompleted += OnCycleCompleted;
         _pipeline.StepChanged += _tracker.NoteStepChange;
         _incidents.Changed += OnIncidentsChanged;
         _tracker.IncidentOpened += OnIncidentOpened;
         _tracker.IncidentClosed += _diagnosticLog.LogIncidentResolved;
+        _tracker.IncidentClosed += OnIncidentClosed;
         _networkHealth.IncidentOpened += OnIncidentOpened;
         _networkHealth.IncidentClosed += _diagnosticLog.LogIncidentResolved;
         _cadence.Start();
@@ -238,12 +250,60 @@ public sealed class AppHost : ApplicationContext
         _ui.Post(
             _ =>
             {
-                if (_settings.ShowIncidentPopups)
+                if (!_settings.ShowIncidentPopups)
+                {
+                    return;
+                }
+
+                if (_settings.NotificationStyle == NotificationStyle.Windows)
+                {
+                    _tray.ShowBalloon(LocalizationManager.Instance.Get("incident.toast.title"), incident.Headline, ToolTipIcon.Warning);
+                }
+                else
                 {
                     IncidentToast.ShowFor(incident);
                 }
             },
             null);
+    }
+
+    /// <summary>The counterpart of <see cref="OnIncidentOpened"/>: the connection is back. Only for the pipeline's own incidents - a packet-level warning ending is not news.</summary>
+    private void OnIncidentClosed(Incident incident) => _ui.Post(
+        _ =>
+        {
+            if (!_settings.ShowIncidentPopups)
+            {
+                return;
+            }
+
+            if (_settings.NotificationStyle == NotificationStyle.Windows)
+            {
+                LocalizationManager loc = LocalizationManager.Instance;
+                _tray.ShowBalloon(loc.Get("incident.toast.resolved.title"), loc.Format("incident.toast.resolved.text", IncidentTracker.FormatDuration(incident.Duration)), ToolTipIcon.Info);
+            }
+            else
+            {
+                IncidentToast.ShowResolved(incident);
+            }
+        },
+        null);
+
+    /// <summary>Monitoring was paused or resumed from the tray; the tray and the Status page say so.</summary>
+    private void OnPauseChanged() => _ui.Post(
+        _ =>
+        {
+            _tray.SetPaused(_cadence.IsPaused, _cadence.PausedUntil);
+            if (!_window.IsDisposed)
+            {
+                _window.SetPaused(_cadence.IsPaused, _cadence.PausedUntil);
+            }
+        },
+        null);
+
+    private void ShowIncidents()
+    {
+        ShowWindow();
+        _window.ShowPage("incidents");
     }
 
     /// <summary>
@@ -518,6 +578,8 @@ public sealed class AppHost : ApplicationContext
             // by a half-disposed app is worse than none.
             _cadence.Dispose();
             _pipeline.CycleCompleted -= OnCycleCompleted;
+            _cadence.PauseChanged -= OnPauseChanged;
+            _tracker.IncidentClosed -= OnIncidentClosed;
             _pipeline.StepChanged -= _tracker.NoteStepChange;
             _incidents.Changed -= OnIncidentsChanged;
             _tracker.IncidentOpened -= OnIncidentOpened;

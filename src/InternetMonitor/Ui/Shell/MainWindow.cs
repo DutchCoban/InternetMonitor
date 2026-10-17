@@ -160,6 +160,15 @@ public sealed class MainWindow : Form
         }
     }
 
+    /// <summary>Monitoring was paused or resumed from the tray - the Status page's hero says so.</summary>
+    public void SetPaused(bool paused, DateTimeOffset? until)
+    {
+        if (_pages["status"] is StatusPage status)
+        {
+            status.SetPaused(paused, until);
+        }
+    }
+
     /// <summary>Shows the number of open incidents on the nav rail, or clears it at zero.</summary>
     public void SetIncidentBadge(int count) => _rail.SetBadge("incidents", count);
 

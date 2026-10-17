@@ -1,5 +1,8 @@
 namespace InternetMonitor.Core.Monitors;
 
+/// <summary>What the last push did, for the Settings page's status line.</summary>
+public sealed record KumaPushStatus(DateTimeOffset AtUtc, bool Failed, string Detail);
+
 /// <summary>
 /// Sends an unconditional periodic heartbeat GET to a fully-formed Uptime Kuma push-monitor URL.
 /// Deliberately independent of everything else in the app - no dependency on the step pipeline or
@@ -21,8 +24,14 @@ public sealed class KumaPusher : IAsyncDisposable
     private string _url = string.Empty;
     private TimeSpan _interval = TimeSpan.FromSeconds(MinimumIntervalSeconds);
 
-    /// <summary>Whether the most recent push succeeded - for a future status indicator; not acted on internally.</summary>
-    public bool LastPushFailed { get; private set; }
+    /// <summary>Whether the most recent push succeeded.</summary>
+    public bool LastPushFailed => LastPush?.Failed ?? false;
+
+    /// <summary>The most recent push, or null before the first one.</summary>
+    public KumaPushStatus? LastPush { get; private set; }
+
+    /// <summary>Raised after every push, on the loop's own thread; UI subscribers must marshal.</summary>
+    public event Action<KumaPushStatus>? PushCompleted;
 
     /// <summary>Whether a push loop is running - that is, whether a usable URL is configured.</summary>
     public bool IsActive => _loop.IsRunning;
@@ -76,18 +85,26 @@ public sealed class KumaPusher : IAsyncDisposable
 
     private async Task PushOnceAsync(string url, CancellationToken cancellationToken)
     {
+        KumaPushStatus status;
         try
         {
             using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-            LastPushFailed = !response.IsSuccessStatusCode;
+            status = new KumaPushStatus(DateTimeOffset.UtcNow, !response.IsSuccessStatusCode, $"HTTP {(int)response.StatusCode}");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
         }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException or InvalidOperationException or NotSupportedException)
         {
             // InvalidOperationException and NotSupportedException cover a URL HttpClient will not
             // send to - belt and braces next to the check in Reconfigure - so a bad URL fails this
             // one push rather than silently ending the loop.
-            LastPushFailed = true;
+            status = new KumaPushStatus(DateTimeOffset.UtcNow, true, ex is OperationCanceledException ? "timed out" : ex.Message);
         }
+
+        LastPush = status;
+        PushCompleted?.Invoke(status);
     }
 
     public async ValueTask DisposeAsync()

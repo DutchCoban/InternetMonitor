@@ -112,6 +112,20 @@ public sealed class StatusHero : ThemedControl
         Invalidate();
     }
 
+    /// <summary>Replaces the verdict with "paused" until the next cycle's <see cref="Apply"/> - there is none while paused.</summary>
+    public void ShowPaused(DateTimeOffset? until)
+    {
+        LocalizationManager loc = LocalizationManager.Instance;
+        _checking = false;
+        _severity = Severity.Idle;
+        _headline = loc.Get("hero.paused.title");
+        _explanation = until is { } at
+            ? loc.Format("hero.paused.detail", at.ToLocalTime().ToString("HH:mm"))
+            : loc.Get("hero.paused.detail.indefinite");
+        _loginButton.Visible = false;
+        Invalidate();
+    }
+
     private void PositionLoginButton()
     {
         int gap = Dp(4);

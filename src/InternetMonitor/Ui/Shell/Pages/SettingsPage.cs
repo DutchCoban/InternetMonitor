@@ -42,6 +42,11 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private ComboBox _theme = null!;
     private Toggle _autoStart = null!;
     private Toggle _showIncidentPopups = null!;
+    private ComboBox _notificationStyle = null!;
+    private NumericUpDown _latencyWarning = null!;
+    private NumericUpDown _latencyError = null!;
+    private NumericUpDown _weakWifi = null!;
+    private Label _kumaStatus = null!;
     private Toggle _checkForUpdates = null!;
     private Toggle _autoUpdateInstall = null!;
     private Label _currentVersion = null!;
@@ -250,6 +255,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         int integrationsY = BelowRows(_integrationsCard);
         _kumaError.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
         integrationsY += Dp(18);
+        _kumaStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
+        integrationsY += Dp(18);
         _kumaAbout.Location = new Point(integrationsContent.Left, integrationsY);
         integrationsY += _kumaAbout.Height;
         CloseCard(_integrationsCard, integrationsY);
@@ -309,12 +316,21 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
 
         _showIncidentPopups.SetWithoutNotify(settings.ShowIncidentPopups);
 
+        _notificationStyle.SelectedIndexChanged -= OnNotificationStyleChanged;
+        PopulateNotificationStyleItems();
+        SelectComboItem(_notificationStyle, settings.NotificationStyle.ToString());
+        _notificationStyle.SelectedIndexChanged += OnNotificationStyleChanged;
+
         _checkForUpdates.SetWithoutNotify(settings.CheckForUpdates);
         _autoUpdateInstall.SetWithoutNotify(settings.AutoUpdateInstall);
         _autoUpdateInstall.Enabled = settings.CheckForUpdates;
 
         _foregroundInterval.Value = settings.ForegroundIntervalSeconds;
         _backgroundInterval.Value = settings.BackgroundIntervalSeconds;
+        _latencyWarning.Value = settings.LatencyWarningMs;
+        _latencyError.Value = settings.LatencyErrorMs;
+        _weakWifi.Value = settings.WeakWifiSignalPercent;
+        RefreshKumaStatus(Services.Kuma.LastPush);
 
         _historyRetention.SelectedIndexChanged -= OnHistoryRetentionChanged;
         PopulateHistoryRetentionItems();
@@ -372,6 +388,24 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _kumaInterval.ValueChanged += OnKumaSettingsChanged;
 
         RefreshEndpoints();
+    }
+
+    private void PopulateNotificationStyleItems()
+    {
+        _notificationStyle.Items.Clear();
+        foreach (NotificationStyle style in Enum.GetValues<NotificationStyle>())
+        {
+            _notificationStyle.Items.Add(new ComboItem(style.ToString(), Loc.Get($"settings.notificationStyle.{style.ToString().ToLowerInvariant()}")));
+        }
+    }
+
+    private void OnNotificationStyleChanged(object? sender, EventArgs e)
+    {
+        if (_notificationStyle.SelectedItem is ComboItem item && Enum.TryParse(item.Key, out NotificationStyle style))
+        {
+            Services.Settings.NotificationStyle = style;
+            Services.Settings.Save();
+        }
     }
 
     private void PopulateThemeItems()
@@ -495,6 +529,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _settingsBackupCard.Title = Loc.Get("settings.section.configBackup");
         _settingsBackupCard.Subtitle = Loc.Get("settings.section.configBackup.subtitle");
         _settingsBackupNote.Text = Loc.Get("settings.backup.note");
+        RefreshKumaStatus(Services.Kuma.LastPush);
 
         foreach ((Label label, _) in _rows)
         {
@@ -567,14 +602,14 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
             label.BackColor = p.Surface;
         }
 
-        foreach (ComboBox box in new[] { _language, _theme, _logLevel, _speedTestInterval, _historyRetention })
+        foreach (ComboBox box in new[] { _language, _theme, _notificationStyle, _logLevel, _speedTestInterval, _historyRetention })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;
             box.FlatStyle = FlatStyle.Flat;
         }
 
-        foreach (NumericUpDown field in new[] { _foregroundInterval, _backgroundInterval, _kumaInterval })
+        foreach (NumericUpDown field in new[] { _foregroundInterval, _backgroundInterval, _latencyWarning, _latencyError, _weakWifi, _kumaInterval })
         {
             field.BackColor = p.SurfaceAlt;
             field.ForeColor = p.TextPrimary;
@@ -606,6 +641,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _kumaUrl.ForeColor = p.TextPrimary;
         _kumaError.BackColor = p.Surface;
         _kumaError.ForeColor = p.Error;
+        _kumaStatus.BackColor = p.Surface;
+        _kumaStatus.ForeColor = p.TextMuted;
         _settingsBackupNote.BackColor = p.Surface;
         _settingsBackupNote.ForeColor = p.TextMuted;
 

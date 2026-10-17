@@ -19,7 +19,7 @@ namespace InternetMonitor.App;
 /// </summary>
 public sealed class AppServices(
     AppSettings settings,
-    CheckTargets targets,
+    Func<CheckTargets> targets,
     StepPipeline pipeline,
     CadenceController cadence,
     MetricStore history,
@@ -33,7 +33,8 @@ public sealed class AppServices(
     public AppSettings Settings { get; } = settings;
 
     /// <summary>What the checks aim at and the thresholds they judge against; charts read the thresholds too.</summary>
-    public CheckTargets Targets { get; } = targets;
+    /// <summary>The targets and thresholds as the next cycle will use them - built from the live settings.</summary>
+    public CheckTargets Targets => targets();
 
     public StepPipeline Pipeline { get; } = pipeline;
 

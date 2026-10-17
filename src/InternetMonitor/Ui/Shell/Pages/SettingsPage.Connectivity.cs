@@ -102,6 +102,18 @@ public sealed partial class SettingsPage
         };
         _integrationsCard.Controls.Add(_kumaError);
 
+        // What the last push did - the one thing a push integration is otherwise silent about.
+        _kumaStatus = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+            Text = string.Empty,
+        };
+        _integrationsCard.Controls.Add(_kumaStatus);
+        Services.Kuma.PushCompleted += OnKumaPushCompleted;
+        Disposed += (_, _) => Services.Kuma.PushCompleted -= OnKumaPushCompleted;
+
         _kumaAbout = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Globe, Text = Loc.Get("settings.kuma.about") };
         _kumaAbout.SizeToContent();
         _kumaAbout.Click += (_, _) => OpenUptimeKumaProjectPage();
@@ -109,6 +121,30 @@ public sealed partial class SettingsPage
     }
 
     private static void OpenUptimeKumaProjectPage() => ShellOpen.OpenUrl("https://github.com/louislam/uptime-kuma");
+
+    /// <summary>Arrives on the pusher's loop; the label is touched on the UI thread only.</summary>
+    private void OnKumaPushCompleted(KumaPushStatus status)
+    {
+        if (IsHandleCreated && !IsDisposed)
+        {
+            BeginInvoke(() => RefreshKumaStatus(status));
+        }
+    }
+
+    private void RefreshKumaStatus(KumaPushStatus? status)
+    {
+        if (_kumaStatus is null)
+        {
+            return;
+        }
+
+        _kumaStatus.Text = status is null
+            ? Services.Settings.KumaPushUrl.Length > 0 ? Loc.Get("settings.kuma.status.none") : string.Empty
+            : Loc.Format(
+                "settings.kuma.status",
+                status.AtUtc.ToLocalTime().ToString("HH:mm:ss"),
+                status.Failed ? Loc.Format("settings.kuma.status.failed", status.Detail) : Loc.Get("settings.kuma.status.ok"));
+    }
 
     private void OnKumaSettingsChanged(object? sender, EventArgs e)
     {

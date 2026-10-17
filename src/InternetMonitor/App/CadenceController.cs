@@ -6,23 +6,9 @@ using Microsoft.Win32;
 namespace InternetMonitor.App;
 
 /// <summary>
-/// Decides how often the pipeline runs, and kicks it immediately when something happens that makes
-/// the current reading stale.
-///
-/// Two rates, because the two situations are genuinely different. With a window open the user is
-/// watching, and a dashboard that updates every fifteen seconds does not feel live - that runs at
-/// the foreground rate (3s by default). With only the tray icon alive nobody is looking, so the
-/// background rate (15s, v1's interval) is plenty and costs a fraction of the traffic.
-///
-/// On top of that, three events make any existing reading worthless and trigger a cycle at once,
-/// because waiting out a timer to notice them is exactly the lag that made v1 feel slow:
-/// an address change, an availability change, and waking from sleep. The last one matters most in
-/// practice - a laptop opened at a different desk is the single most common way for every answer
-/// on screen to be wrong.
-///
-/// Note what is deliberately *not* here: history recording. At the foreground rate the pipeline
-/// runs five times as often, and letting that drive history would make retention and chart density
-/// depend on whether a window happened to be open. MetricStore coalesces instead - see phase 4.
+/// Decides when the pipeline runs: a short interval while a window is open, a longer one in the
+/// tray, straight away when the network changes or the machine wakes, and not at all while the
+/// user has paused it. The loop itself is one timer; everything else is a reason to wake it early.
 /// </summary>
 public sealed class CadenceController : IDisposable
 {
@@ -34,6 +20,8 @@ public sealed class CadenceController : IDisposable
     private volatile bool _foreground;
     private Task? _loop;
     private bool _disposed;
+    private DateTimeOffset? _pausedUntil;
+    private bool _paused;
 
     public CadenceController(StepPipeline pipeline, Func<AppSettings> settings)
     {
@@ -45,10 +33,9 @@ public sealed class CadenceController : IDisposable
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
     }
 
-    /// <summary>
-    /// True while a window the user can see is open. Set by the shell; the loop picks it up on its
-    /// next wait rather than being restarted, so toggling it is free.
-    /// </summary>
+    /// <summary>Raised on whichever thread changed it when monitoring is paused or resumed; UI subscribers must marshal.</summary>
+    public event Action? PauseChanged;
+
     public bool Foreground
     {
         get => _foreground;
@@ -70,9 +57,13 @@ public sealed class CadenceController : IDisposable
         }
     }
 
+    public bool IsPaused => _paused;
+
+    /// <summary>When the pause ends by itself, or null for "until resumed" (and when not paused).</summary>
+    public DateTimeOffset? PausedUntil => _paused ? _pausedUntil : null;
+
     public void Start() => _loop ??= RunLoopAsync(_shutdown.Token);
 
-    /// <summary>Requests a cycle immediately. Safe to call from any thread, and cheap to call often.</summary>
     public void RunNow()
     {
         if (_disposed)
@@ -93,6 +84,32 @@ public sealed class CadenceController : IDisposable
         }
     }
 
+    /// <summary>
+    /// Stops running cycles for <paramref name="duration"/>, or until <see cref="Resume"/> when
+    /// null. Nothing is measured meanwhile - no history, no incidents - so a planned router restart
+    /// does not end up in the record; a report shows the time as not measured. An incident that was
+    /// open stays open until the first cycle after the pause settles it.
+    /// </summary>
+    public void Pause(TimeSpan? duration)
+    {
+        _pausedUntil = duration is { } span ? DateTimeOffset.UtcNow + span : null;
+        _paused = true;
+        PauseChanged?.Invoke();
+    }
+
+    public void Resume()
+    {
+        if (!_paused)
+        {
+            return;
+        }
+
+        _paused = false;
+        _pausedUntil = null;
+        PauseChanged?.Invoke();
+        RunNow();
+    }
+
     private async Task RunLoopAsync(CancellationToken cancellationToken)
     {
         // One cycle straight away: the tray icon should mean something within a second of launch,
@@ -109,6 +126,18 @@ public sealed class CadenceController : IDisposable
             catch (OperationCanceledException)
             {
                 return;
+            }
+
+            if (_paused)
+            {
+                if (_pausedUntil is { } until && DateTimeOffset.UtcNow >= until)
+                {
+                    Resume();
+                }
+                else
+                {
+                    continue;
+                }
             }
 
             await SafeRunCycleAsync(cancellationToken).ConfigureAwait(false);

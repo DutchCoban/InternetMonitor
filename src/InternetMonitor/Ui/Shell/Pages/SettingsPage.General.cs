@@ -40,6 +40,10 @@ public sealed partial class SettingsPage
             Services.Settings.Save();
         };
         AddRow(_generalCard, "settings.showIncidentPopups", _showIncidentPopups);
+
+        _notificationStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
+        _notificationStyle.SelectedIndexChanged += OnNotificationStyleChanged;
+        AddRow(_generalCard, "settings.notificationStyle", _notificationStyle);
     }
 
     // ---- Updates ------------------------------------------------------------------------------
@@ -104,6 +108,32 @@ public sealed partial class SettingsPage
         _historyRetention = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
         _historyRetention.SelectedIndexChanged += OnHistoryRetentionChanged;
         AddRow(_cadenceCard, "settings.historyRetention", _historyRetention);
+
+        // The thresholds the checks judge a reading by. Applied on the next cycle: the pipeline
+        // rebuilds its targets from the settings every cycle, so nothing else needs re-wiring.
+        _latencyWarning = MakeIntervalField(50, 5000);
+        _latencyWarning.ValueChanged += (_, _) =>
+        {
+            Services.Settings.LatencyWarningMs = (int)_latencyWarning.Value;
+            Services.Settings.Save();
+        };
+        AddRow(_cadenceCard, "settings.latencyWarning", _latencyWarning);
+
+        _latencyError = MakeIntervalField(100, 10_000);
+        _latencyError.ValueChanged += (_, _) =>
+        {
+            Services.Settings.LatencyErrorMs = (int)_latencyError.Value;
+            Services.Settings.Save();
+        };
+        AddRow(_cadenceCard, "settings.latencyError", _latencyError);
+
+        _weakWifi = MakeIntervalField(10, 80);
+        _weakWifi.ValueChanged += (_, _) =>
+        {
+            Services.Settings.WeakWifiSignalPercent = (int)_weakWifi.Value;
+            Services.Settings.Save();
+        };
+        AddRow(_cadenceCard, "settings.weakWifi", _weakWifi);
     }
 
     private void OnHistoryRetentionChanged(object? sender, EventArgs e)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -5,6 +6,16 @@ using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Ui.Theming;
 
 namespace InternetMonitor.Configuration;
+
+/// <summary>How the app tells the user a problem began or ended.</summary>
+public enum NotificationStyle
+{
+    /// <summary>The app's own pop-up in the corner of the screen, gone after a few seconds.</summary>
+    Popup,
+
+    /// <summary>A Windows notification from the tray icon: through the notification centre, honouring "do not disturb".</summary>
+    Windows,
+}
 
 /// <summary>
 /// One network-health condition's threshold: fires when more than <see cref="MaxOccurrences"/>
@@ -52,6 +63,8 @@ public sealed class AppSettings
     /// </summary>
     public bool ShowIncidentPopups { get; set; } = true;
 
+    public NotificationStyle NotificationStyle { get; set; } = NotificationStyle.Popup;
+
     // ---- Cadence -----------------------------------------------------------------------------
 
     /// <summary>
@@ -75,6 +88,37 @@ public sealed class AppSettings
         get => _backgroundIntervalSeconds;
         set => _backgroundIntervalSeconds = Math.Clamp(value, 5, 300);
     }
+
+    // ---- Thresholds ---------------------------------------------------------------------------
+
+    private int _latencyWarningMs = 300;
+    private int _latencyErrorMs = 1000;
+    private int _weakWifiSignalPercent = 40;
+
+    /// <summary>A round trip from here counts as slow (a warning). Clamped to 50-5000 ms; always below <see cref="LatencyErrorMs"/>.</summary>
+    public int LatencyWarningMs
+    {
+        get => _latencyWarningMs;
+        set => _latencyWarningMs = Math.Clamp(value, 50, 5000);
+    }
+
+    /// <summary>A round trip from here counts as severe. Clamped to 100-10000 ms.</summary>
+    public int LatencyErrorMs
+    {
+        get => _latencyErrorMs;
+        set => _latencyErrorMs = Math.Clamp(value, 100, 10_000);
+    }
+
+    /// <summary>Below this Windows signal quality step 2 warns about a weak Wi-Fi signal. Clamped to 10-80%.</summary>
+    public int WeakWifiSignalPercent
+    {
+        get => _weakWifiSignalPercent;
+        set => _weakWifiSignalPercent = Math.Clamp(value, 10, 80);
+    }
+
+    /// <summary>The thresholds as a <see cref="CheckTargets"/> would carry them, with the warning kept below the error.</summary>
+    public (int WarningMs, int ErrorMs) LatencyThresholds =>
+        (Math.Min(LatencyWarningMs, LatencyErrorMs - 1), LatencyErrorMs);
 
     // ---- History ------------------------------------------------------------------------------
 
@@ -316,7 +360,8 @@ public sealed class AppSettings
         {
             if (!File.Exists(AppPaths.SettingsFile))
             {
-                return new AppSettings();
+                // A first start: speak the language Windows does, when it is one of ours.
+                return new AppSettings { Language = LanguageFor(CultureInfo.CurrentUICulture) };
             }
 
             string json = File.ReadAllText(AppPaths.SettingsFile);
@@ -326,6 +371,13 @@ public sealed class AppSettings
         {
             return new AppSettings();
         }
+    }
+
+    /// <summary>The app language for a Windows UI culture: its two-letter code when supported, otherwise English.</summary>
+    public static string LanguageFor(CultureInfo culture)
+    {
+        string code = culture.TwoLetterISOLanguageName.ToLowerInvariant();
+        return Localization.LocalizationManager.SupportedLanguages.Any(l => l.Code == code) ? code : "en";
     }
 
     /// <summary>

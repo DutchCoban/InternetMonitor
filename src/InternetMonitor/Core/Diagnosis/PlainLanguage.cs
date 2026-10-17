@@ -49,8 +49,8 @@ public static class PlainLanguage
             LocalizationManager.GetEnglish($"{prefix}.todo"));
     }
 
-    // Step 2's own threshold. Not a user setting, so the defaults are the values in force.
-    private static readonly int WeakWifiSignalPercent = new Configuration.CheckTargets().WeakWifiSignalPercent;
+    /// <summary>Step 2's weak-signal threshold, kept in step with the setting by the composition root.</summary>
+    public static int WeakWifiSignalPercent { get; set; } = new Configuration.CheckTargets().WeakWifiSignalPercent;
 
     private static string Prefix(RootCause cause, StepSnapshot snapshot) => $"explain.{cause.Key()}{Variant(cause, snapshot)}";
 

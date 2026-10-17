@@ -162,6 +162,24 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
 
     private void OnIncidentsChanged() => Post(() => _ = RefreshUptimeAsync(force: true));
 
+    /// <summary>From the composition root, on the UI thread. A resume shows the last verdict again until the next cycle replaces it.</summary>
+    public void SetPaused(bool paused, DateTimeOffset? until)
+    {
+        if (_hero is null)
+        {
+            return;
+        }
+
+        if (paused)
+        {
+            _hero.ShowPaused(until);
+        }
+        else if (Services.Pipeline.LatestSnapshot is { } snapshot)
+        {
+            _hero.Apply(snapshot, checking: true);
+        }
+    }
+
     /// <summary>
     /// Recomputes the strip off the UI thread - a week of history is a few hundred thousand points
     /// to walk - and at most once a minute from the cycle, since a quarter-hour block cannot change
