@@ -362,14 +362,18 @@ and how to set up a push monitor to get a URL from.
 ## Webhook
 
 Settings → Integrations → Webhook URL: an address that receives one JSON `POST` when an incident
-opens and one when it closes (`event`, `kind`, `id`, `cause`, `side`, `headline`, `startUtc`,
-`endUtc`, `durationSeconds`, `appVersion`). That is enough for Home Assistant, ntfy, a Discord or
-Slack webhook, or anything else that takes JSON. A test button sends a sample.
+opens and one when it closes (`event`, `kind`, `id`, `uuid`, `cause`, `side`, `headline`,
+`startUtc`, `endUtc`, `durationSeconds`, `appVersion`). That is enough for Home Assistant, ntfy, a
+Discord or Slack webhook, or anything else that takes JSON. A test button sends a sample. `id` is
+the readable INC-20261017-0003; `uuid` is globally unique, the same on the "opened" and the
+"resolved" message, so a receiver can open and close exactly one thing even when two machines
+post to it or the readable counter restarts.
 
 An outage on the provider's side is exactly when nothing can leave the house, so a message that
 cannot be delivered waits, in order, and goes as soon as a check reaches the internet again - the
 "opened" and the "resolved" then arrive together, each with its own timestamp. Up to 50 messages
-are kept. The URL must be https, except inside your own network: an http address on a private IP,
+are kept. When the internet is fine but the endpoint itself refuses, retries back off: 5, 10, 20,
+40 seconds, then once a minute. The URL must be https, except inside your own network: an http address on a private IP,
 `localhost`, a bare hostname or a `.local`/`.lan`/`.home`/`.internal` name is accepted, which is
 where a Home Assistant or ntfy lives that should hear about an outage while it is happening.
 

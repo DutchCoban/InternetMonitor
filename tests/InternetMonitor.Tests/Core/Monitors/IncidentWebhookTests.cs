@@ -28,6 +28,7 @@ public sealed class IncidentWebhookTests
         Assert.Equal("resolved", payload.Event);
         Assert.Equal("outage", payload.Kind);
         Assert.Equal("INC-20261017-0003", payload.Id);
+        Assert.True(Guid.TryParseExact(payload.Uuid, "D", out Guid uuid) && uuid != Guid.Empty);
         Assert.Equal("Internet", payload.Cause);
         Assert.Equal("Provider", payload.Side);
         Assert.Equal(270, payload.DurationSeconds);
@@ -92,6 +93,12 @@ public sealed class IncidentWebhookTests
         Assert.Equal(1, webhook.PendingCount);
         Assert.True(webhook.LastDelivery!.Failed);
 
+        // The failure set a back-off: a retry right now is not attempted.
+        Assert.True(webhook.NextAttemptUtc > DateTimeOffset.UtcNow);
+        webhook.RetryPending();
+        await Task.Delay(50);
+        Assert.Equal(1, handler.Attempts);
+
         handler.Failing = false;
         webhook.Notify(Outage(), opened: false);
         await handler.WaitForAttemptsAsync(3);
@@ -99,6 +106,17 @@ public sealed class IncidentWebhookTests
 
         Assert.Equal(0, webhook.PendingCount);
         Assert.Equal(["opened", "resolved"], handler.DeliveredEvents);
+        Assert.Equal(DateTimeOffset.MinValue, webhook.NextAttemptUtc);
+    }
+
+    [Fact]
+    public void The_same_incident_opens_and_closes_under_one_uuid_and_two_incidents_never_share_one()
+    {
+        Incident incident = Outage();
+        var other = new Incident { Id = incident.Id, Cause = incident.Cause, StartUtc = incident.StartUtc, Headline = incident.Headline };
+
+        Assert.Equal(IncidentWebhook.Payload(incident, "opened", "2.3.0").Uuid, IncidentWebhook.Payload(incident, "resolved", "2.3.0").Uuid);
+        Assert.NotEqual(IncidentWebhook.Payload(incident, "opened", "2.3.0").Uuid, IncidentWebhook.Payload(other, "opened", "2.3.0").Uuid);
     }
 
     [Theory]
@@ -121,6 +139,8 @@ public sealed class IncidentWebhookTests
     private sealed class FlakyHandler : HttpMessageHandler
     {
         private int _attempts;
+
+        public int Attempts => Volatile.Read(ref _attempts);
 
         public bool Failing { get; set; }
 

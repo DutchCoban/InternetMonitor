@@ -19,8 +19,12 @@ public sealed record WebhookDeliveryStatus(DateTimeOffset AtUtc, bool Failed, st
 /// An incident on the provider's side is exactly when the internet is down, so the "opened" message
 /// usually cannot leave the house. Messages therefore queue: a delivery that fails stays pending,
 /// in order, and the host asks for another try as soon as a cycle reaches the internet again - the
-/// "opened" and the "resolved" then arrive together, each with its own timestamp. Nothing about
-/// monitoring waits for any of this.
+/// "opened" and the "resolved" then arrive together, each with its own timestamp. When the internet
+/// is fine but the endpoint itself refuses, the retries back off (5, 10, 20, 40 seconds, then every
+/// minute) rather than knocking every cycle. Nothing about monitoring waits for any of this.
+///
+/// Every message carries the incident's UUID next to its readable id, so a receiver can open and
+/// close exactly one thing even when two machines post to it or the readable counter restarts.
 ///
 /// The URL must be https, except for an address inside your own network (a private IP, localhost,
 /// a bare hostname or a .local/.lan/.home/.internal name), where plain http is allowed: that is
@@ -46,6 +50,8 @@ public sealed class IncidentWebhook : IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _lock = new();
     private string _url = string.Empty;
+    private int _failuresInARow;
+    private DateTimeOffset _nextAttemptUtc = DateTimeOffset.MinValue;
 
     public IncidentWebhook(string appVersion)
         : this(appVersion, new HttpClientHandler())
@@ -156,10 +162,16 @@ public sealed class IncidentWebhook : IAsyncDisposable
         _ = FlushAsync();
     }
 
-    /// <summary>The internet is reachable again: try to deliver what is still waiting. Returns at once.</summary>
+    /// <summary>When the next retry may go: moves out after each failure in a row, back to "now" after a success.</summary>
+    public DateTimeOffset NextAttemptUtc => _nextAttemptUtc;
+
+    /// <summary>
+    /// The internet is reachable again: try to deliver what is still waiting, unless a recent
+    /// failure says to wait a little longer first. Returns at once.
+    /// </summary>
     public void RetryPending()
     {
-        if (PendingCount > 0)
+        if (PendingCount > 0 && DateTimeOffset.UtcNow >= _nextAttemptUtc)
         {
             _ = FlushAsync();
         }
@@ -189,6 +201,7 @@ public sealed class IncidentWebhook : IAsyncDisposable
         eventName,
         incident.ConditionKey is null ? "outage" : "warning",
         incident.Id,
+        incident.Uuid.ToString("D"),
         incident.Cause.ToString(),
         incident.ConditionKey is null ? ProviderReportData.SideOf(incident.Cause).ToString() : "NetworkHealth",
         incident.Headline,
@@ -198,7 +211,7 @@ public sealed class IncidentWebhook : IAsyncDisposable
         appVersion);
 
     public static WebhookPayload TestPayload(string appVersion) =>
-        new("test", "test", "TEST", "Healthy", "None", "Test delivery from Internet Monitor", DateTimeOffset.UtcNow, null, null, appVersion);
+        new("test", "test", "TEST", Guid.NewGuid().ToString("D"), "Healthy", "None", "Test delivery from Internet Monitor", DateTimeOffset.UtcNow, null, null, appVersion);
 
     /// <summary>
     /// Delivers the queue in order, one at a time, and stops at the first failure so nothing
@@ -230,9 +243,15 @@ public sealed class IncidentWebhook : IAsyncDisposable
                 WebhookDeliveryStatus? status = await DeliverAsync(payload, CancellationToken.None).ConfigureAwait(false);
                 if (status is null || status.Failed)
                 {
+                    // 5, 10, 20, 40 seconds, then once a minute - a refusing endpoint is not knocked
+                    // on every cycle, and a new message still tries at once (Notify bypasses this).
+                    int failures = Math.Min(++_failuresInARow, 5);
+                    _nextAttemptUtc = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(Math.Min(60, 5 * (1 << (failures - 1))));
                     return;
                 }
 
+                _failuresInARow = 0;
+                _nextAttemptUtc = DateTimeOffset.MinValue;
                 lock (_lock)
                 {
                     if (_pending.Count > 0 && ReferenceEquals(_pending.Peek(), payload))
@@ -285,6 +304,7 @@ public sealed record WebhookPayload(
     string Event,
     string Kind,
     string Id,
+    string Uuid,
     string Cause,
     string Side,
     string Headline,
