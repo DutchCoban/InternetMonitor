@@ -80,6 +80,7 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
         ApplyFilterColors();
 
         _detail = new IncidentDetail { Dock = DockStyle.Fill };
+        _detail.NoteChanged += Services.Incidents.Update;
         _detailCard = new Card { Dock = DockStyle.Fill };
         _detailCard.Controls.Add(_detail);
 

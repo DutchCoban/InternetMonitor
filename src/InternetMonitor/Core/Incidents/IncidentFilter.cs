@@ -120,6 +120,7 @@ public static class IncidentFilter
             incident.Explanation?.What,
             incident.Explanation?.LikelyCause,
             incident.Explanation?.WhatToDo,
+            incident.Note,
             .. incident.Timeline.Select(t => t.Text),
         ];
 

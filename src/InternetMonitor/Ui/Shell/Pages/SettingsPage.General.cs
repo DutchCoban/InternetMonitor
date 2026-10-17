@@ -181,6 +181,14 @@ public sealed partial class SettingsPage
         };
         AddRow(_toolsCard, "settings.tracerouteLookup", _tracerouteLookup);
 
+        _tracerouteOnIncident = new Toggle();
+        _tracerouteOnIncident.CheckedChanged += (_, _) =>
+        {
+            Services.Settings.TracerouteOnIncident = _tracerouteOnIncident.Checked;
+            Services.Settings.Save();
+        };
+        AddRow(_toolsCard, "settings.tracerouteOnIncident", _tracerouteOnIncident);
+
         _lanScanVendorLookup = new Toggle();
         _lanScanVendorLookup.CheckedChanged += (_, _) =>
         {

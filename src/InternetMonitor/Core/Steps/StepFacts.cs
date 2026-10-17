@@ -128,6 +128,9 @@ public sealed record TargetEndpointResult(
 {
     /// <summary>True when a URL target answered with something other than the one status code it was configured to expect.</summary>
     public bool StatusMismatch => Reachable && ExpectedStatusCode is { } expected && StatusCode != expected;
+
+    /// <summary>The configured endpoint's stable id, for its history series; null for the built-in reachability check.</summary>
+    public string? EndpointId { get; init; }
 }
 
 public sealed record TargetFacts(

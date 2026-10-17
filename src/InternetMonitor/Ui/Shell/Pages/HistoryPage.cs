@@ -117,18 +117,40 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
         _stepsCaption.Text = Loc.Get((string)_stepsCaption.Tag!);
         _rangesCaption.Text = Loc.Get((string)_rangesCaption.Tag!);
 
-        _steps.SetChips(
-            SeriesNames.Chartable.Select(s => new ChipGroup.Chip(s.Id, Loc.Get(s.NameKey))),
-            _selectedSeriesId);
-
+        RefreshSeriesChips();
         RefreshRangeChips();
     }
 
     protected override void OnActivated()
     {
-        // Retention can have changed in Settings since this page was last shown.
+        // Retention and the endpoint list can have changed in Settings since this page was last shown.
+        RefreshSeriesChips();
         RefreshRangeChips();
         LoadSeries();
+    }
+
+    /// <summary>The built-in series, then one chip per enabled step-7 endpoint, named as the user named it.</summary>
+    private void RefreshSeriesChips()
+    {
+        IEnumerable<ChipGroup.Chip> builtIn = SeriesNames.Chartable.Select(s => new ChipGroup.Chip(s.Id, Loc.Get(s.NameKey)));
+        IEnumerable<ChipGroup.Chip> endpoints = Services.Settings.ApplicationEndpoints
+            .Where(e => e.Enabled)
+            .Select(e => new ChipGroup.Chip(SeriesNames.ForEndpoint(e.Id), e.Name));
+
+        _steps.SetChips(builtIn.Concat(endpoints), _selectedSeriesId);
+    }
+
+    /// <summary>A configured endpoint's series: round trips in ms with the latency bands, like the built-in network steps.</summary>
+    private ChartableSeries? EndpointSeries(string? seriesId)
+    {
+        if (seriesId is null || SeriesNames.EndpointOf(seriesId) is not { } endpointId)
+        {
+            return null;
+        }
+
+        return Services.Settings.ApplicationEndpoints.Any(e => e.Id == endpointId)
+            ? new ChartableSeries(seriesId, string.Empty, "ms", false, LatencyBands: true)
+            : null;
     }
 
     /// <summary>
@@ -153,7 +175,7 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
 
     private void LoadSeries()
     {
-        ChartableSeries? series = SeriesNames.Chartable.FirstOrDefault(s => s.Id == _selectedSeriesId);
+        ChartableSeries? series = SeriesNames.Chartable.FirstOrDefault(s => s.Id == _selectedSeriesId) ?? EndpointSeries(_selectedSeriesId);
         if (series is null)
         {
             _chart.SetSeries([], string.Empty);

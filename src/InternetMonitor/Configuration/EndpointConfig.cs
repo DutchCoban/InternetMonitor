@@ -11,6 +11,9 @@ public enum EndpointKind
     /// spoken on top - for a database, a mail server, or anything else that does not answer HTTP.
     /// </summary>
     TcpPort,
+
+    /// <summary>An ICMP echo to a host, with its round trip charted - a named ping target.</summary>
+    Ping,
 }
 
 /// <summary>One extra header sent with a <see cref="EndpointKind.Url"/> check - an API key or an Authorization token, most often.</summary>

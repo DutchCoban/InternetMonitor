@@ -118,6 +118,78 @@ public sealed partial class SettingsPage
         _kumaAbout.SizeToContent();
         _kumaAbout.Click += (_, _) => OpenUptimeKumaProjectPage();
         _integrationsCard.Controls.Add(_kumaAbout);
+
+        // The webhook: where an incident opening or closing is POSTed as JSON.
+        _webhookUrl = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(200), Font = Theme.Font(FontRole.Body) };
+        _webhookUrl.Leave += OnWebhookUrlChanged;
+        AddRow(_integrationsCard, "settings.webhook.url", _webhookUrl);
+
+        _webhookStatus = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = Theme.Font(FontRole.Small),
+            Text = string.Empty,
+        };
+        _integrationsCard.Controls.Add(_webhookStatus);
+
+        _webhookTest = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Arrow, Text = Loc.Get("settings.webhook.test") };
+        _webhookTest.SizeToContent();
+        _webhookTest.Click += (_, _) => _ = SendWebhookTestAsync();
+        _integrationsCard.Controls.Add(_webhookTest);
+        Services.Webhook.DeliveryCompleted += OnWebhookDelivered;
+        Disposed += (_, _) => Services.Webhook.DeliveryCompleted -= OnWebhookDelivered;
+    }
+
+    private void OnWebhookUrlChanged(object? sender, EventArgs e)
+    {
+        string url = _webhookUrl.Text.Trim();
+        if (url.Length > 0 && !IncidentWebhook.IsUsableUrl(url))
+        {
+            _webhookStatus.Text = Loc.Get("settings.webhook.url.error");
+            return;
+        }
+
+        Services.Settings.WebhookUrl = url;
+        Services.Settings.Save();
+        Services.Webhook.Reconfigure(url);
+        RefreshWebhookStatus(Services.Webhook.LastDelivery);
+    }
+
+    private async Task SendWebhookTestAsync()
+    {
+        OnWebhookUrlChanged(this, EventArgs.Empty);
+        if (!Services.Webhook.IsActive)
+        {
+            return;
+        }
+
+        _webhookStatus.Text = Loc.Get("settings.webhook.status.sending");
+        WebhookDeliveryStatus? status = await Services.Webhook.SendTestAsync(CancellationToken.None).ConfigureAwait(true);
+        RefreshWebhookStatus(status);
+    }
+
+    private void OnWebhookDelivered(WebhookDeliveryStatus status)
+    {
+        if (IsHandleCreated && !IsDisposed)
+        {
+            BeginInvoke(() => RefreshWebhookStatus(status));
+        }
+    }
+
+    private void RefreshWebhookStatus(WebhookDeliveryStatus? status)
+    {
+        if (_webhookStatus is null)
+        {
+            return;
+        }
+
+        _webhookStatus.Text = status is null
+            ? Services.Settings.WebhookUrl.Length > 0 ? Loc.Get("settings.webhook.status.none") : string.Empty
+            : Loc.Format(
+                "settings.webhook.status",
+                status.AtUtc.ToLocalTime().ToString("HH:mm:ss"),
+                status.Failed ? Loc.Format("settings.kuma.status.failed", status.Detail) : Loc.Get("settings.kuma.status.ok"));
     }
 
     private static void OpenUptimeKumaProjectPage() => ShellOpen.OpenUrl("https://github.com/louislam/uptime-kuma");

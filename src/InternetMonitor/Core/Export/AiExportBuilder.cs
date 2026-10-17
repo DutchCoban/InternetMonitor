@@ -326,6 +326,21 @@ public static class AiExportBuilder
                     .Item("What to do", doc.Names.Text(explanation.WhatToDo));
             }
 
+            if (incident.Note is { Length: > 0 } note)
+            {
+                doc.Item("User's note", doc.Names.Text(note));
+            }
+
+            if (incident.Traceroute is { } route)
+            {
+                // Hop addresses are the provider's routers, not the user's, so they stay as they are.
+                doc.Line(I($"- Route to {route.Target} when it opened ({(route.Reached ? "reached" : "did not reach the target")}):"));
+                foreach (string hop in route.Describe("no answer"))
+                {
+                    doc.Line("  - " + hop.Trim());
+                }
+            }
+
             if (incident.RecentChanges.Count > 0)
             {
                 doc.Line("- Changed in the 30 minutes before (local time):");

@@ -41,9 +41,19 @@ public static class IncidentReportBuilder
             AppendParagraph(sb, loc.Get("incidents.whatToDo"), explanation.WhatToDo);
         }
 
+        if (incident.Note is { Length: > 0 } note)
+        {
+            AppendParagraph(sb, loc.Get("incidents.note"), note);
+        }
+
         if (incident.RecentChanges.Count > 0)
         {
             AppendList(sb, loc.Get("incidents.recentChanges"), incident.RecentChanges);
+        }
+
+        if (incident.Traceroute is { } route)
+        {
+            AppendList(sb, loc.Format("incidents.route", route.Target), route.Describe(loc.Get("incidents.route.noAnswer")));
         }
 
         if (incident.Timeline.Count > 0)

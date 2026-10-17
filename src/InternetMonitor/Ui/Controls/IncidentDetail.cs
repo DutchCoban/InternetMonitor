@@ -7,27 +7,68 @@ using InternetMonitor.Ui.Theming;
 namespace InternetMonitor.Ui.Controls;
 
 /// <summary>
-/// One incident, laid out to be read top to bottom by someone who wants to know what happened:
-/// the plain-language explanation first, then what changed just beforehand, then the timeline,
-/// then the raw step states.
-///
-/// The ordering is the point. v1 showed the raw probe dump and nothing else, which answers "what
-/// did the tool measure" but not "what went wrong" - and the second question is the one people
-/// actually have. The measurements are still here, at the bottom, for when they are needed.
+/// Everything one incident recorded, laid out to be read: headline and metadata, the three
+/// plain-language paragraphs, what changed just before, the timeline, every step's result when it
+/// started, the route that was traced when it opened, and the user's own note. The note is the one
+/// editable thing on the page - a ticket number, "called the provider" - and is saved when the
+/// field loses focus.
 /// </summary>
 public sealed class IncidentDetail : ThemedControl
 {
+    private readonly TextBox _note;
     private Incident? _incident;
     private int _scrollOffset;
     private int _contentHeight;
+    private bool _loadingNote;
+
+    public IncidentDetail()
+    {
+        _note = new TextBox
+        {
+            Multiline = true,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = Theme.Font(FontRole.Body),
+            Visible = false,
+            ScrollBars = ScrollBars.Vertical,
+        };
+        _note.Leave += (_, _) => CommitNote();
+        Controls.Add(_note);
+    }
+
+    /// <summary>The user edited the note of the shown incident; the page persists it.</summary>
+    public event Action<Incident>? NoteChanged;
 
     protected override Color BehindColor => Theme.Current.Surface;
 
     public void Show(Incident? incident)
     {
+        CommitNote();
         _incident = incident;
         _scrollOffset = 0;
+
+        _loadingNote = true;
+        _note.Text = incident?.Note ?? string.Empty;
+        _note.PlaceholderText = LocalizationManager.Instance.Get("incidents.note.placeholder");
+        _note.Visible = incident is not null;
+        _loadingNote = false;
+
         Invalidate();
+    }
+
+    private void CommitNote()
+    {
+        if (_loadingNote || _incident is not { } incident)
+        {
+            return;
+        }
+
+        string text = _note.Text.Trim();
+        string? note = text.Length == 0 ? null : text;
+        if (note != incident.Note)
+        {
+            incident.Note = note;
+            NoteChanged?.Invoke(incident);
+        }
     }
 
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -73,6 +114,8 @@ public sealed class IncidentDetail : ThemedControl
             y = DrawParagraph(g, p, loc.Get("incidents.whatToDo"), explanation.WhatToDo, width, y);
         }
 
+        y = DrawNote(g, p, loc, width, y);
+
         if (incident.RecentChanges.Count > 0)
         {
             y = DrawList(g, p, loc.Get("incidents.recentChanges"), incident.RecentChanges, width, y);
@@ -87,6 +130,11 @@ public sealed class IncidentDetail : ThemedControl
                 [.. incident.Timeline.Select(t => $"{t.AtUtc.ToLocalTime():HH:mm:ss}  {t.Text}")],
                 width,
                 y);
+        }
+
+        if (incident.Traceroute is { } route)
+        {
+            y = DrawList(g, p, loc.Format("incidents.route", route.Target), route.Describe(loc.Get("incidents.route.noAnswer")), width, y);
         }
 
         if (incident.StepsAtStart.Count > 0)
@@ -124,6 +172,27 @@ public sealed class IncidentDetail : ThemedControl
 
         g.DrawTextCrisp(meta, Theme.Font(FontRole.Small), p.TextMuted, new Rectangle(Sp(2), y, width, Dp(16)));
         return y + Dp(24);
+    }
+
+    /// <summary>The note's label, with the text box placed under it - moved along with the painted content as the page scrolls.</summary>
+    private int DrawNote(Graphics g, Palette p, LocalizationManager loc, int width, int y)
+    {
+        g.DrawTextCrisp(loc.Get("incidents.note").ToUpperInvariant(), Theme.Font(FontRole.SmallStrong), p.TextMuted, new Rectangle(Sp(2), y, width, Dp(14)));
+        y += Dp(17);
+
+        var bounds = new Rectangle(Sp(2), y, width, Dp(60));
+        if (_note.Bounds != bounds)
+        {
+            _note.Bounds = bounds;
+        }
+
+        if (_note.BackColor != p.SurfaceAlt)
+        {
+            _note.BackColor = p.SurfaceAlt;
+            _note.ForeColor = p.TextPrimary;
+        }
+
+        return y + bounds.Height + Sp(3);
     }
 
     private int DrawParagraph(Graphics g, Palette p, string label, string body, int width, int y)

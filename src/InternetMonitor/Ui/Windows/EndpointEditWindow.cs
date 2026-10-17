@@ -66,7 +66,8 @@ public sealed class EndpointEditWindow : Form
         _kind = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = Theme.Font(FontRole.Body) };
         _kind.Items.Add(new KindItem(EndpointKind.Url, _loc.Get("settings.endpoint.kind.url")));
         _kind.Items.Add(new KindItem(EndpointKind.TcpPort, _loc.Get("settings.endpoint.kind.tcpPort")));
-        _kind.SelectedIndex = existing?.Kind == EndpointKind.TcpPort ? 1 : 0;
+        _kind.Items.Add(new KindItem(EndpointKind.Ping, _loc.Get("settings.endpoint.kind.ping")));
+        _kind.SelectedIndex = existing?.Kind switch { EndpointKind.TcpPort => 1, EndpointKind.Ping => 2, _ => 0 };
         _kind.SelectedIndexChanged += (_, _) => LayoutFields();
 
         _urlLabel = MakeLabel(_loc.Get("settings.endpoint.url"));
@@ -83,7 +84,7 @@ public sealed class EndpointEditWindow : Form
         _addHeader.Click += (_, _) => { AddHeaderRow(string.Empty, string.Empty); LayoutFields(); };
 
         _hostLabel = MakeLabel(_loc.Get("settings.endpoint.host"));
-        _host = MakeTextBox(existing is { Kind: EndpointKind.TcpPort } ? existing.Host : string.Empty);
+        _host = MakeTextBox(existing is { Kind: EndpointKind.TcpPort or EndpointKind.Ping } ? existing.Host : string.Empty);
 
         _portLabel = MakeLabel(_loc.Get("settings.endpoint.port"));
         _port = MakeNumeric(1, 65535, existing is { Kind: EndpointKind.TcpPort } ? existing.Port : 443);
@@ -185,10 +186,11 @@ public sealed class EndpointEditWindow : Form
             remove.Visible = isUrl;
         }
 
+        bool isPing = SelectedKind == EndpointKind.Ping;
         _hostLabel.Visible = !isUrl;
         _host.Visible = !isUrl;
-        _portLabel.Visible = !isUrl;
-        _port.Visible = !isUrl;
+        _portLabel.Visible = !isUrl && !isPing;
+        _port.Visible = !isUrl && !isPing;
 
         int left = Sp(4);
         int fieldWidth = ClientSize.Width - (left * 2);
@@ -240,7 +242,10 @@ public sealed class EndpointEditWindow : Form
         {
             _warning.Visible = false;
             Row(_hostLabel, _host, Dp(24));
-            Row(_portLabel, _port, Dp(24));
+            if (!isPing)
+            {
+                Row(_portLabel, _port, Dp(24));
+            }
         }
 
         _error.Bounds = new Rectangle(left, y, fieldWidth, Dp(18));
@@ -329,7 +334,9 @@ public sealed class EndpointEditWindow : Form
                 return;
             }
 
-            result = new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.TcpPort, Host: host, Port: (int)_port.Value, Enabled: _existingEnabled);
+            result = SelectedKind == EndpointKind.Ping
+                ? new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.Ping, Host: host, Enabled: _existingEnabled)
+                : new EndpointConfig(_editingId ?? Guid.NewGuid().ToString("N"), name, EndpointKind.TcpPort, Host: host, Port: (int)_port.Value, Enabled: _existingEnabled);
         }
 
         Result = result;

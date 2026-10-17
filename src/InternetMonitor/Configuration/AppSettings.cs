@@ -158,6 +158,13 @@ public sealed class AppSettings
     public bool TracerouteOwnerLookup { get; set; } = true;
 
     /// <summary>
+    /// Whether a provider-side incident (internet, DNS, target) records a traceroute to the
+    /// reachability target the moment it opens - where the packets stopped is the evidence a help
+    /// desk asks for. On by default; it is one trace per incident, not per cycle.
+    /// </summary>
+    public bool TracerouteOnIncident { get; set; } = true;
+
+    /// <summary>
     /// Whether the LAN scanner looks up each device's manufacturer. Same reasoning and the same
     /// default as <see cref="TracerouteOwnerLookup"/>: on by default because it is most of the
     /// value of the feature, switchable because it is the only thing in the scanner that sends a
@@ -305,6 +312,9 @@ public sealed class AppSettings
         get => _kumaIntervalSeconds;
         set => _kumaIntervalSeconds = Math.Max(Core.Monitors.KumaPusher.MinimumIntervalSeconds, value);
     }
+
+    /// <summary>Where an incident opening or closing is POSTed as JSON (see <see cref="Core.Monitors.IncidentWebhook"/>). Empty means off; only https is ever called.</summary>
+    public string WebhookUrl { get; set; } = string.Empty;
 
     // ---- Diagnostics ----------------------------------------------------------------------------
 

@@ -28,7 +28,8 @@ public sealed class AppServices(
     DiagnosticLogger diagnosticLog,
     NetworkHealthMonitor networkHealth,
     UpdateChecker updateChecker,
-    SpeedTestScheduler speedTestScheduler)
+    SpeedTestScheduler speedTestScheduler,
+    IncidentWebhook webhook)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -53,4 +54,6 @@ public sealed class AppServices(
     public UpdateChecker UpdateChecker { get; } = updateChecker;
 
     public SpeedTestScheduler SpeedTestScheduler { get; } = speedTestScheduler;
+
+    public IncidentWebhook Webhook { get; } = webhook;
 }

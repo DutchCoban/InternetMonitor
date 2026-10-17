@@ -107,6 +107,17 @@ public static class SeriesNames
     /// <summary>How many milliseconds the round trip grew while the speed test filled the line.</summary>
     public const string SpeedTestBufferbloat = "speedtest-bufferbloat";
 
+    private const string EndpointPrefix = "endpoint-";
+
+    /// <summary>The series a configured step-7 endpoint's round trips are recorded under, keyed by its stable id.</summary>
+    public static string ForEndpoint(string endpointId) => EndpointPrefix + endpointId;
+
+    /// <summary>The endpoint id behind a series name from <see cref="ForEndpoint"/>, or null for any other series.</summary>
+    public static string? EndpointOf(string seriesId) =>
+        seriesId.StartsWith(EndpointPrefix, StringComparison.Ordinal) && seriesId.Length > EndpointPrefix.Length
+            ? seriesId[EndpointPrefix.Length..]
+            : null;
+
     /// <summary>
     /// Every series the History page can show, in display order. The pipeline steps are built from
     /// the step-keyed members above (so they stay in sync automatically); the series that have no

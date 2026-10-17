@@ -6,6 +6,7 @@ using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Core.Tools.SpeedTest;
+using InternetMonitor.Core.Tools.Traceroute;
 using InternetMonitor.Core.Updates;
 using InternetMonitor.Localization;
 using InternetMonitor.Ui.Shell;
@@ -42,6 +43,7 @@ public sealed class AppHost : ApplicationContext
     private readonly SynchronizationContext _ui;
     private readonly UpdateChecker _updateChecker;
     private readonly UpdateInstaller _updateInstaller;
+    private readonly IncidentWebhook _webhook;
     private System.Windows.Forms.Timer? _updateRestartTimer;
     private readonly SpeedTestScheduler _speedTestScheduler;
 
@@ -85,8 +87,9 @@ public sealed class AppHost : ApplicationContext
                     .. defaultTargets.Targets,
                     .. endpoints.Where(e => e.Enabled).Select(e => e.Kind switch
                     {
-                        EndpointKind.TcpPort => new TargetEndpoint(e.Name, Url: "", TargetKind.TcpPort, Host: e.Host, Port: e.Port),
-                        _ => new TargetEndpoint(e.Name, e.Url, TargetKind.Url, ExpectedStatusCode: e.ExpectedStatusCode, Headers: e.Headers),
+                        EndpointKind.TcpPort => new TargetEndpoint(e.Name, Url: "", TargetKind.TcpPort, Host: e.Host, Port: e.Port) { Id = e.Id },
+                        EndpointKind.Ping => new TargetEndpoint(e.Name, Url: "", TargetKind.Ping, Host: e.Host) { Id = e.Id },
+                        _ => new TargetEndpoint(e.Name, e.Url, TargetKind.Url, ExpectedStatusCode: e.ExpectedStatusCode, Headers: e.Headers) { Id = e.Id },
                     }),
                 ],
             };
@@ -133,12 +136,15 @@ public sealed class AppHost : ApplicationContext
         _updateChecker.Reconfigure(_settings.CheckForUpdates);
         _updateInstaller = new UpdateInstaller();
 
+        _webhook = new IncidentWebhook(AppVersion);
+        _webhook.Reconfigure(_settings.WebhookUrl);
+
         _speedTestScheduler = new SpeedTestScheduler();
         _speedTestScheduler.RunCompleted += OnSpeedTestRunCompleted;
         _speedTestScheduler.SkipRun = () => !_settings.SpeedTestOnMetered && IsMetered();
         _speedTestScheduler.Reconfigure(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
 
-        var services = new AppServices(_settings, BuildTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler);
+        var services = new AppServices(_settings, BuildTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler, _webhook);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -164,10 +170,13 @@ public sealed class AppHost : ApplicationContext
         _pipeline.StepChanged += _tracker.NoteStepChange;
         _incidents.Changed += OnIncidentsChanged;
         _tracker.IncidentOpened += OnIncidentOpened;
+        _tracker.IncidentOpened += incident => _ = AttachTracerouteAsync(incident);
         _tracker.IncidentClosed += _diagnosticLog.LogIncidentResolved;
         _tracker.IncidentClosed += OnIncidentClosed;
+        _tracker.IncidentClosed += incident => _webhook.Notify(incident, opened: false);
         _networkHealth.IncidentOpened += OnIncidentOpened;
         _networkHealth.IncidentClosed += _diagnosticLog.LogIncidentResolved;
+        _networkHealth.IncidentClosed += incident => _webhook.Notify(incident, opened: false);
         _cadence.Start();
         _lineQuality.Start();
 
@@ -243,9 +252,53 @@ public sealed class AppHost : ApplicationContext
     /// that off in Settings). Marshalled to the UI thread because IncidentTracker fires this from
     /// the pipeline's background thread, and IncidentToast is a Form.
     /// </summary>
+    private static string AppVersion => (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3);
+
+    /// <summary>
+    /// A provider-side incident just opened: trace the route to the reachability target now, while
+    /// the problem is there, and hang the result on the incident. The host's address from the last
+    /// cycle is used when it is known - during a DNS incident the name itself may not resolve - and
+    /// the first public ping address otherwise; either shows where the packets stop.
+    /// </summary>
+    private async Task AttachTracerouteAsync(Incident incident)
+    {
+        if (!_settings.TracerouteOnIncident || incident.Cause is not (RootCause.Internet or RootCause.Dns or RootCause.Target))
+        {
+            return;
+        }
+
+        string? target = _pipeline.LatestSnapshot?.FactsFor<TargetFacts>(StepId.Target)?.Endpoints.FirstOrDefault(e => e.IsReachabilityCheck)?.RemoteAddress?.ToString()
+            ?? _settings.ParsedPublicIpTargets().FirstOrDefault()?.ToString();
+        if (target is null)
+        {
+            return;
+        }
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        using IpOwnershipLookup? ownership = _settings.TracerouteOwnerLookup ? new IpOwnershipLookup() : null;
+        try
+        {
+            TracerouteResult result = await new TracerouteRunner()
+                .RunAsync(target, null, TracerouteRunner.Enricher(ownership), timeout.Token)
+                .ConfigureAwait(false);
+
+            incident.Traceroute = new IncidentTraceroute(
+                result.Target,
+                result.StartedUtc,
+                result.ReachedDestination,
+                [.. result.Hops.Select(h => new IncidentHop(h.Ttl, h.Responders.FirstOrDefault()?.ToString(), h.Hostname, h.Owner?.Describe(), h.AvgMs))]);
+            _incidents.Update(incident);
+        }
+        catch (OperationCanceledException)
+        {
+            // Took too long - the incident stands on its own, as it always did.
+        }
+    }
+
     private void OnIncidentOpened(Incident incident)
     {
         _diagnosticLog.LogIncidentOpened(incident);
+        _webhook.Notify(incident, opened: true);
 
         _ui.Post(
             _ =>
@@ -430,9 +483,23 @@ public sealed class AppHost : ApplicationContext
             _history.Sample(SeriesNames.WifiSignal, link.TimestampUtc, signal, facts.Wifi.Bssid);
         }
 
-        if (snapshot[StepId.Target]?.Facts is TargetFacts { Ipv6Reachable: { } ipv6 })
+        if (snapshot[StepId.Target]?.Facts is TargetFacts targetFacts)
         {
-            _history.Sample(SeriesNames.Ipv6, snapshot.TakenUtc, ipv6 ? 1 : 0);
+            if (targetFacts.Ipv6Reachable is { } ipv6)
+            {
+                _history.Sample(SeriesNames.Ipv6, snapshot.TakenUtc, ipv6 ? 1 : 0);
+            }
+
+            // Every configured endpoint gets its own series of round trips, so the History page
+            // can chart a named target the way it charts the built-in steps. An unreachable one
+            // records nothing - a gap in the line, the same as a failed step.
+            foreach (TargetEndpointResult endpoint in targetFacts.Endpoints)
+            {
+                if (endpoint.EndpointId is { } id && endpoint.Reachable && (endpoint.Timings?.Total.TotalMilliseconds ?? endpoint.ConnectMs) is { } ms)
+                {
+                    _history.Sample(SeriesNames.ForEndpoint(id), snapshot.TakenUtc, Math.Round(ms));
+                }
+            }
         }
 
         // Whether the line was metered, so the provider report can tell time spent on a phone's
@@ -600,7 +667,8 @@ public sealed class AppHost : ApplicationContext
                 _kuma.DisposeAsync().AsTask(),
                 _networkHealth.DisposeAsync().AsTask(),
                 _updateChecker.DisposeAsync().AsTask(),
-                _speedTestScheduler.DisposeAsync().AsTask())).GetAwaiter().GetResult();
+                _speedTestScheduler.DisposeAsync().AsTask(),
+                _webhook.DisposeAsync().AsTask())).GetAwaiter().GetResult();
 
             _updateRestartTimer?.Stop();
             _updateRestartTimer?.Dispose();

@@ -47,6 +47,10 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private NumericUpDown _latencyError = null!;
     private NumericUpDown _weakWifi = null!;
     private Label _kumaStatus = null!;
+    private TextBox _webhookUrl = null!;
+    private AppButton _webhookTest = null!;
+    private Label _webhookStatus = null!;
+    private Toggle _tracerouteOnIncident = null!;
     private Toggle _checkForUpdates = null!;
     private Toggle _autoUpdateInstall = null!;
     private Label _currentVersion = null!;
@@ -257,6 +261,10 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         integrationsY += Dp(18);
         _kumaStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
         integrationsY += Dp(18);
+        _webhookStatus.Bounds = new Rectangle(integrationsContent.Left, integrationsY, integrationsContent.Width, Dp(16));
+        integrationsY += Dp(18);
+        _webhookTest.Location = new Point(integrationsContent.Left, integrationsY);
+        integrationsY += _webhookTest.Height + Sp(1);
         _kumaAbout.Location = new Point(integrationsContent.Left, integrationsY);
         integrationsY += _kumaAbout.Height;
         CloseCard(_integrationsCard, integrationsY);
@@ -331,6 +339,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _latencyError.Value = settings.LatencyErrorMs;
         _weakWifi.Value = settings.WeakWifiSignalPercent;
         RefreshKumaStatus(Services.Kuma.LastPush);
+        _webhookUrl.Text = settings.WebhookUrl;
+        RefreshWebhookStatus(Services.Webhook.LastDelivery);
 
         _historyRetention.SelectedIndexChanged -= OnHistoryRetentionChanged;
         PopulateHistoryRetentionItems();
@@ -338,6 +348,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _historyRetention.SelectedIndexChanged += OnHistoryRetentionChanged;
 
         _tracerouteLookup.SetWithoutNotify(settings.TracerouteOwnerLookup);
+        _tracerouteOnIncident.SetWithoutNotify(settings.TracerouteOnIncident);
         _lanScanVendorLookup.SetWithoutNotify(settings.LanScanVendorLookup);
         _lanScanTcpFallback.SetWithoutNotify(settings.LanScanTcpFallback);
 
@@ -584,6 +595,9 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
 
         _kumaAbout.Text = Loc.Get("settings.kuma.about");
         _kumaAbout.SizeToContent();
+        _webhookTest.Text = Loc.Get("settings.webhook.test");
+        _webhookTest.SizeToContent();
+        RefreshWebhookStatus(Services.Webhook.LastDelivery);
 
         RefreshEndpoints();
         ApplyControlColors();
@@ -643,6 +657,10 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _kumaError.ForeColor = p.Error;
         _kumaStatus.BackColor = p.Surface;
         _kumaStatus.ForeColor = p.TextMuted;
+        _webhookUrl.BackColor = p.SurfaceAlt;
+        _webhookUrl.ForeColor = p.TextPrimary;
+        _webhookStatus.BackColor = p.Surface;
+        _webhookStatus.ForeColor = p.TextMuted;
         _settingsBackupNote.BackColor = p.Surface;
         _settingsBackupNote.ForeColor = p.TextMuted;
 

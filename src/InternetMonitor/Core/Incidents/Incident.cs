@@ -34,6 +34,27 @@ public sealed record StepSnapshotEntry(
 /// <summary>A moment during an incident when something changed.</summary>
 public sealed record TimelineEntry(DateTimeOffset AtUtc, string Text);
 
+/// <summary>One hop of the route traced when an incident opened; <see cref="Address"/> is null for a silent hop.</summary>
+public sealed record IncidentHop(int Ttl, string? Address, string? Hostname, string? Owner, double? LatencyMs);
+
+/// <summary>
+/// The route to the reachability target as it was when a provider-side incident opened - the
+/// evidence a help desk asks for: which hop the packets stopped at.
+/// </summary>
+public sealed record IncidentTraceroute(string Target, DateTimeOffset AtUtc, bool Reached, IReadOnlyList<IncidentHop> Hops)
+{
+    /// <summary>One line per hop, for the detail panel and the text exports.</summary>
+    public IReadOnlyList<string> Describe(string noAnswer) =>
+    [
+        .. Hops.Select(h => h.Address is null
+            ? $"{h.Ttl,2}. {noAnswer}"
+            : $"{h.Ttl,2}. {h.Address}"
+              + (h.Hostname is { Length: > 0 } ? $"  {h.Hostname}" : string.Empty)
+              + (h.Owner is { Length: > 0 } ? $"  {h.Owner}" : string.Empty)
+              + (h.LatencyMs is { } ms ? $"  {ms:F0} ms" : string.Empty)),
+    ];
+}
+
 /// <summary>
 /// Everything known about one disruption.
 ///
@@ -77,6 +98,12 @@ public sealed record Incident
     /// <see cref="Headline"/> text.
     /// </summary>
     public string? ConditionKey { get; init; }
+
+    /// <summary>The user's own words about this incident - a ticket number, what the provider said.</summary>
+    public string? Note { get; set; }
+
+    /// <summary>Set once the trace started when the incident opened has finished; null when none was run.</summary>
+    public IncidentTraceroute? Traceroute { get; set; }
 
     public TimeSpan? Duration => EndUtc is { } end ? end - StartUtc : null;
 }

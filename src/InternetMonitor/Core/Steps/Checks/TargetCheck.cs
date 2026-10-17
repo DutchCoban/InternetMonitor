@@ -252,6 +252,7 @@ public sealed class TargetCheck : IStepCheck
         return r.Kind switch
         {
             TargetKind.TcpPort => ("step.target.ok.tcp", [r.Name, r.Url, msText]),
+            TargetKind.Ping => ("step.target.ok.ping", [r.Name, r.Url, msText]),
             _ => ("step.target.ok", [r.Name, r.StatusCode ?? 0, msText]),
         };
     }
@@ -266,6 +267,7 @@ public sealed class TargetCheck : IStepCheck
         return r.Kind switch
         {
             TargetKind.TcpPort => $"TCP {r.Url} ({r.ConnectMs:F0} ms)",
+            TargetKind.Ping => $"{r.ConnectMs:F0} ms",
             _ => $"HTTP {r.StatusCode} ({r.Timings?.Total.TotalMilliseconds:F0} ms)",
         };
     }
@@ -284,8 +286,35 @@ public sealed class TargetCheck : IStepCheck
         CancellationToken cancellationToken) => target.Kind switch
         {
             TargetKind.TcpPort => CheckTcpPortAsync(target, timeout, source, dnsServers, cancellationToken),
+            TargetKind.Ping => CheckPingAsync(target, timeout, source, dnsServers, cancellationToken),
             _ => CheckUrlAsync(target, timeout, source, dnsServers, cancellationToken),
         };
+
+    /// <summary>A Ping target: resolve the host unless it is an address, then one echo from the adapter's address.</summary>
+    private static async Task<TargetEndpointResult> CheckPingAsync(
+        TargetEndpoint target,
+        TimeSpan timeout,
+        IPAddress? source,
+        IReadOnlyList<IPAddress> dnsServers,
+        CancellationToken cancellationToken)
+    {
+        if (!IPAddress.TryParse(target.Host, out IPAddress? address))
+        {
+            DnsOutcome dns = await DnsResolve.ResolveViaAsync(target.Host, dnsServers, source, DnsSubBudget, cancellationToken).ConfigureAwait(false);
+            if (!dns.Success)
+            {
+                string error = dns.TimedOut ? "DNS lookup timed out" : $"DNS lookup failed ({dns.Error})";
+                return new TargetEndpointResult(target.Name, TargetKind.Ping, target.Host, false, null, null, HttpStage.Dns, error, null, null, null) { EndpointId = target.Id };
+            }
+
+            address = dns.Addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork) ?? dns.Addresses[0];
+        }
+
+        PingOutcome outcome = await IcmpPing.SendAsync(address, timeout, cancellationToken, source).ConfigureAwait(false);
+        return outcome.Success
+            ? new TargetEndpointResult(target.Name, TargetKind.Ping, target.Host, true, null, null, HttpStage.None, null, null, address, outcome.RoundtripMs) { EndpointId = target.Id }
+            : new TargetEndpointResult(target.Name, TargetKind.Ping, target.Host, false, null, null, HttpStage.None, outcome.Status.ToString(), null, address, null) { EndpointId = target.Id };
+    }
 
     private static async Task<TargetEndpointResult> CheckUrlAsync(
         TargetEndpoint target,
@@ -318,7 +347,10 @@ public sealed class TargetCheck : IStepCheck
             outcome.Timings,
             outcome.RemoteAddress,
             null,
-            target.IsReachabilityCheck);
+            target.IsReachabilityCheck)
+        {
+            EndpointId = target.Id,
+        };
     }
 
     /// <summary>"host:port" is what every measurement and headline shows for a TcpPort target, so
@@ -353,8 +385,8 @@ public sealed class TargetCheck : IStepCheck
         TcpOutcome outcome = await TcpConnect.TryConnectAsync(address, target.Port, timeout, cancellationToken, source).ConfigureAwait(false);
 
         return outcome.Answered
-            ? new TargetEndpointResult(target.Name, TargetKind.TcpPort, label, true, null, null, HttpStage.None, null, null, address, outcome.ElapsedMs)
-            : new TargetEndpointResult(target.Name, TargetKind.TcpPort, label, false, null, null, HttpStage.Tcp, outcome.Error?.ToString() ?? "Timed out", null, address, outcome.ElapsedMs);
+            ? new TargetEndpointResult(target.Name, TargetKind.TcpPort, label, true, null, null, HttpStage.None, null, null, address, outcome.ElapsedMs) { EndpointId = target.Id }
+            : new TargetEndpointResult(target.Name, TargetKind.TcpPort, label, false, null, null, HttpStage.Tcp, outcome.Error?.ToString() ?? "Timed out", null, address, outcome.ElapsedMs) { EndpointId = target.Id };
     }
 
     /// <summary>

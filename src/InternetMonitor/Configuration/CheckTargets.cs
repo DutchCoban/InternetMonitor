@@ -7,6 +7,7 @@ public enum TargetKind
 {
     Url,
     TcpPort,
+    Ping,
 }
 
 /// <summary>
@@ -34,6 +35,9 @@ public sealed record TargetEndpoint(
     /// a user's own server being unreachable says nothing about a login page.
     /// </summary>
     public bool IsReachabilityCheck { get; init; }
+
+    /// <summary>The configured endpoint this came from (its stable id), so its results can be charted under one series; null for the built-in check.</summary>
+    public string? Id { get; init; }
 }
 
 /// <summary>
