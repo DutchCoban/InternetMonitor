@@ -32,11 +32,41 @@ public sealed class ChipGroup : ThemedControl
     private readonly List<Rectangle> _bounds = [];
     private int _selectedIndex;
     private int _hoverIndex = -1;
+    private readonly HelpTips _tips = new();
+    private readonly System.Windows.Forms.Timer _tipDelay = new() { Interval = HelpTips.DelayMs };
+    private int _tipIndex = -1;
 
     public ChipGroup()
     {
         Cursor = Cursors.Hand;
         Height = Dp(30);
+        _tipDelay.Tick += (_, _) => ShowTip();
+    }
+
+    /// <summary>The help text for a chip id, or null for none - the chips are painted, not controls, so the balloon is the group's to show.</summary>
+    public Func<string, string?>? HelpTextFor { get; set; }
+
+    private void ShowTip()
+    {
+        _tipDelay.Stop();
+        if (_hoverIndex < 0 || _hoverIndex >= _chips.Count || HelpTextFor?.Invoke(_chips[_hoverIndex].Id) is not { Length: > 0 } text)
+        {
+            return;
+        }
+
+        _tipIndex = _hoverIndex;
+        Rectangle bounds = _bounds[_hoverIndex];
+        _tips.Show(text, this, new Point(bounds.Left, bounds.Bottom + Dp(4)));
+    }
+
+    private void HideTip()
+    {
+        _tipDelay.Stop();
+        if (_tipIndex >= 0)
+        {
+            _tipIndex = -1;
+            _tips.Hide(this);
+        }
     }
 
     /// <summary>Set once at construction, like <see cref="Card.HeaderGlyph"/> - a chip group does not switch look after it's built.</summary>
@@ -124,6 +154,12 @@ public sealed class ChipGroup : ThemedControl
         if (index != _hoverIndex)
         {
             _hoverIndex = index;
+            HideTip();
+            if (index >= 0 && HelpTextFor is not null)
+            {
+                _tipDelay.Start();
+            }
+
             Invalidate();
         }
     }
@@ -132,7 +168,19 @@ public sealed class ChipGroup : ThemedControl
     {
         base.OnMouseLeave(e);
         _hoverIndex = -1;
+        HideTip();
         Invalidate();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _tipDelay.Dispose();
+            _tips.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -143,6 +191,7 @@ public sealed class ChipGroup : ThemedControl
             return;
         }
 
+        HideTip();
         int index = _bounds.FindIndex(b => b.Contains(e.Location));
         if (index >= 0)
         {

@@ -69,6 +69,10 @@ public sealed class LocalizationManager
         return FallbackStrings.Value.TryGetValue(key, out string? fallback) ? fallback : $"[{key}]";
     }
 
+    /// <summary>The text for <paramref name="key"/>, or null when no language has it - for text that is optional, such as a help balloon.</summary>
+    public string? TryGet(string key) =>
+        _strings.TryGetValue(key, out string? value) ? value : FallbackStrings.Value.GetValueOrDefault(key);
+
     public string Format(string key, params object[] args)
     {
         string template = Get(key);

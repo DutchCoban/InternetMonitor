@@ -368,15 +368,18 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
 
         _reportCard.Title = Loc.Get("reports.provider.title");
         _reportCard.Subtitle = Loc.Get("reports.provider.subtitle");
-        foreach ((Label label, _) in _rows)
+        foreach ((Label label, Control field) in _rows)
         {
             label.Text = Loc.Get((string)label.Tag!);
+            Tips.Set(Loc.TryGet((string)label.Tag! + ".help"), label, field);
         }
 
         PopulatePeriodItems();
         _createReport.Text = Loc.Get("reports.provider.create");
+        Tip(_createReport, "reports.provider.create");
         _createReport.SizeToContent();
         _saveReport.Text = Loc.Get("reports.provider.saveAs");
+        Tip(_saveReport, "reports.provider.saveAs");
         _saveReport.SizeToContent();
         ApplyControlColors();
 
@@ -384,10 +387,13 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         _exportCard.Subtitle = Loc.Get("settings.section.export.subtitle");
 
         _exportAll.Text = Loc.Get("settings.export.all");
+        Tip(_exportAll, "settings.export.all");
         _exportAll.SizeToContent();
         _exportAi.Text = Loc.Get("settings.export.ai");
+        Tip(_exportAi, "settings.export.ai");
         _exportAi.SizeToContent();
         _exportPlain.Text = Loc.Get("settings.export.plain");
+        Tip(_exportPlain, "settings.export.plain");
         _exportPlain.SizeToContent();
 
         LayoutCards();

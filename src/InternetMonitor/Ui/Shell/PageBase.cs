@@ -65,6 +65,12 @@ public abstract class PageBase : Panel
 
     protected static LocalizationManager Loc => LocalizationManager.Instance;
 
+    /// <summary>The page's help balloons - see <see cref="HelpTips"/>.</summary>
+    protected HelpTips Tips { get; } = new();
+
+    /// <summary>Gives a control the help text under <paramref name="key"/> + ".help", or none when there is no such text.</summary>
+    protected void Tip(Control control, string key) => Tips.Set(Loc.TryGet(key + ".help"), control);
+
     protected int Dp(int px) => Theme.Dp(px, DeviceDpi);
 
     protected int Sp(int step) => Theme.Space(step, DeviceDpi);
@@ -202,6 +208,7 @@ public abstract class PageBase : Panel
         if (disposing)
         {
             Theme.Changed -= OnThemeChangedInternal;
+            Tips.Dispose();
         }
 
         base.Dispose(disposing);

@@ -550,11 +550,12 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         RefreshKumaStatus(Services.Kuma.LastPush);
         ReloadAdapterCombos();
 
-        foreach ((Label label, _) in _rows)
+        foreach ((Label label, Control field) in _rows)
         {
             if (label.Tag is string key)
             {
                 label.Text = Loc.Get(key);
+                Tips.Set(Loc.TryGet(key + ".help"), label, field);
             }
         }
 
@@ -563,6 +564,13 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
             row.Name.Text = Loc.Get((string)row.Name.Tag!);
             row.IntervalLabel.Text = Loc.Get((string)row.IntervalLabel.Tag!);
             row.MinutesLabel.Text = Loc.Get((string)row.MinutesLabel.Tag!);
+
+            string? help = Loc.TryGet((string)row.Name.Tag! + ".help");
+            Tips.Set(help, row.Toggle, row.Name, row.IntervalLabel, row.Window, row.MinutesLabel);
+            if (row.Threshold is not null)
+            {
+                Tips.Set(help, row.Threshold);
+            }
         }
 
         string previousLanguage = (_language.SelectedItem as ComboItem)?.Key ?? Services.Settings.Language;
@@ -587,23 +595,31 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _historyRetention.SelectedIndexChanged += OnHistoryRetentionChanged;
 
         _addEndpoint.Text = Loc.Get("settings.endpoint.add");
+        Tip(_addEndpoint, "settings.endpoint.add");
         _addEndpoint.SizeToContent();
 
         _exportSettings.Text = Loc.Get("settings.export.settings");
+        Tip(_exportSettings, "settings.export.settings");
         _exportSettings.SizeToContent();
         _importSettings.Text = Loc.Get("settings.import.settings");
+        Tip(_importSettings, "settings.import.settings");
         _importSettings.SizeToContent();
 
         _browseLogDirectory.Text = Loc.Get("settings.diagnostics.browse");
+        Tip(_browseLogDirectory, "settings.diagnostics.browse");
         _browseLogDirectory.SizeToContent();
         _openLogFolder.Text = Loc.Get("settings.diagnostics.openFolder");
+        Tip(_openLogFolder, "settings.diagnostics.openFolder");
         _openLogFolder.SizeToContent();
         _resetLogDirectory.Text = Loc.Get("settings.diagnostics.resetDirectory");
+        Tip(_resetLogDirectory, "settings.diagnostics.resetDirectory");
         _resetLogDirectory.SizeToContent();
 
         _kumaAbout.Text = Loc.Get("settings.kuma.about");
+        Tip(_kumaAbout, "settings.kuma.about");
         _kumaAbout.SizeToContent();
         _webhookTest.Text = Loc.Get("settings.webhook.test");
+        Tip(_webhookTest, "settings.webhook.test");
         _webhookTest.SizeToContent();
         RefreshWebhookStatus(Services.Webhook.LastDelivery);
 

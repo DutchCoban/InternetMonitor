@@ -109,8 +109,10 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
         _listCard.Title = Loc.Get("incidents.list.title");
         _detailCard.Title = Loc.Get("incidents.detail.title");
         _export.Text = Loc.Get("incidents.export");
+        Tip(_export, "incidents.export");
         _export.SizeToContent();
         _clear.Text = Loc.Get("incidents.clear");
+        Tip(_clear, "incidents.clear");
         _clear.SizeToContent();
         Header.RefreshActions();
 

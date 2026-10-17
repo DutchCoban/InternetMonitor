@@ -401,9 +401,11 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         RefreshClock(Core.Monitors.ClockMonitor.Latest);
 
         _checkNow.Text = Loc.Get("menu.checkNow");
+        Tip(_checkNow, "menu.checkNow");
         _checkNow.SizeToContent();
         _copy.Text = Loc.Get("diagnostics.copy");
         _copy.SizeToContent();
+        Tip(_copy, "diagnostics.copy");
         Header.RefreshActions();
 
         RefreshFromSnapshot(Services.Pipeline.LatestSnapshot);

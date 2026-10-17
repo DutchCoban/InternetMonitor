@@ -94,6 +94,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
     {
         _toolSwitcher = new ChipGroup { Dock = DockStyle.Top, Variant = ChipGroupVariant.Menu };
         _toolSwitcher.SelectionChanged += ShowTool;
+        _toolSwitcher.HelpTextFor = id => Loc.TryGet($"tools.chip.{id}.help");
     }
 
     private void ShowTool(string id)
@@ -681,6 +682,8 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _tracerouteCard.Title = Loc.Get("traceroute.title");
         _tracerouteCard.Subtitle = Loc.Get("traceroute.subtitle");
         _run.Text = Loc.Get(_running is null ? "traceroute.run" : "traceroute.stop");
+        Tip(_run, "traceroute.run");
+        Tip(_target, "traceroute.target");
         _run.SizeToContent();
         LayoutBar();
         _view.Status = Loc.Get("traceroute.idle");
@@ -688,8 +691,10 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _lanScanCard.Title = Loc.Get("lanScan.title");
         _lanScanCard.Subtitle = Loc.Get("lanScan.subtitle");
         _scan.Text = Loc.Get(_scanning is null ? "lanScan.scan" : "lanScan.stop");
+        Tip(_scan, "lanScan.scan");
         _scan.SizeToContent();
         _exportCsv.Text = Loc.Get("lanScan.export");
+        Tip(_exportCsv, "lanScan.export");
         _exportCsv.SizeToContent();
         LayoutLanBar();
         _lanDevices.Status = Loc.Get("lanScan.idle");
@@ -697,6 +702,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _speedTestCard.Title = Loc.Get("speedtest.title");
         _speedTestCard.Subtitle = Loc.Get("speedtest.subtitle");
         _runSpeedTest.Text = Loc.Get(_speedTestRunning is null ? "speedtest.run" : "speedtest.stop");
+        Tip(_runSpeedTest, "speedtest.run");
         _runSpeedTest.SizeToContent();
         LayoutSpeedTestBar();
         _speedTestView.Status = Loc.Get("speedtest.idle");
@@ -704,6 +710,8 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _mtuCard.Title = Loc.Get("mtu.title");
         _mtuCard.Subtitle = Loc.Get("mtu.subtitle");
         _runMtu.Text = Loc.Get(_mtuRunning is null ? "mtu.run" : "mtu.stop");
+        Tip(_runMtu, "mtu.run");
+        Tip(_mtuTarget, "mtu.target");
         _runMtu.SizeToContent();
         LayoutMtuBar();
         if (_mtuRunning is null)

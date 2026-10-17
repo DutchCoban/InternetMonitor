@@ -372,6 +372,8 @@ your report - and the Status page and the tray tooltip say so.
 
 ## Other settings
 
+Every setting and button shows a short explanation when the mouse rests on it for a second.
+
 - **Language** (General) - English, Dutch, German, or Polish. A new installation starts in the
   Windows display language when it is one of these. Switching takes effect immediately across the
   whole app, including an already-open Settings window.

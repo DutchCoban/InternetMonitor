@@ -82,6 +82,7 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         }
 
         _checkNow.Text = Loc.Get("menu.checkNow");
+        Tip(_checkNow, "menu.checkNow");
         _checkNow.SizeToContent();
         _stepsCard.Title = Loc.Get("status.steps.title");
         _stepsCard.Subtitle = Loc.Get("status.steps.subtitle");
