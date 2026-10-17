@@ -157,6 +157,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         var label = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body) };
         card.Controls.Add(label);
         card.Controls.Add(field);
+        field.Name = labelKey;
         _rows.Add((label, field));
         label.Tag = labelKey;
     }

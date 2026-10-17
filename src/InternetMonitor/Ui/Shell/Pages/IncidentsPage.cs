@@ -177,7 +177,14 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
 
     protected override void OnDeactivated() => Services.Incidents.Changed -= OnIncidentsChanged;
 
-    private void OnIncidentsChanged() => BeginInvoke(RefreshIncidents);
+    /// <summary>Arrives on whichever thread changed the store; the list is touched on the UI thread only, and only while there is one.</summary>
+    private void OnIncidentsChanged()
+    {
+        if (IsHandleCreated && !IsDisposed)
+        {
+            BeginInvoke(RefreshIncidents);
+        }
+    }
 
     private void RefreshIncidents()
     {

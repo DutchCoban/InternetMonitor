@@ -49,6 +49,8 @@
   <ItemGroup>
     <!-- Embedded (not Content) so these ship inside the single-file publish exe rather than as
          loose files alongside it. -->
+    <!-- The test project may reach internal members; nothing is made public for tests. -->
+    <InternalsVisibleTo Include="InternetMonitor.Tests" />
     <EmbeddedResource Include="Localization\en.json" LogicalName="InternetMonitor.Localization.en.json" />
     <EmbeddedResource Include="Localization\nl.json" LogicalName="InternetMonitor.Localization.nl.json" />
     <EmbeddedResource Include="Localization\de.json" LogicalName="InternetMonitor.Localization.de.json" />

@@ -143,6 +143,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         var label = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Font(FontRole.Body), Tag = labelKey };
         card.Controls.Add(label);
         card.Controls.Add(field);
+        field.Name = labelKey;
         _rows.Add((label, field));
     }
 
