@@ -10,7 +10,7 @@ namespace InternetMonitor.Tests.Core.Incidents;
 /// incidents.json round-trips every field, survives v1 records and damage, and the time-based id
 /// never repeats - the evidence an outage leaves behind must come back exactly as recorded.
 /// </summary>
-[Collection("DataDir")]
+[Collection("Localization")]
 public sealed class IncidentStoreTests
 {
     private static readonly DateTimeOffset Start = new(2026, 10, 17, 19, 38, 16, 729, TimeSpan.Zero);

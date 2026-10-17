@@ -65,39 +65,27 @@ public sealed partial class SettingsPage
             return;
         }
 
-        // Full is Extended with both switches on, and the page says so both ways: choosing Full
-        // turns them on, stepping back from Full to Extended turns them off again - otherwise the
-        // two switches would promote the level straight back to Full.
+        // Full is Extended with both switches on, and the page says so both ways - see SettingsRules.
         AppSettings settings = Services.Settings;
-        bool wasFull = settings.DiagnosticLogLevel == DiagnosticLogLevel.Full;
-        settings.DiagnosticLogLevel = level;
-        if (level == DiagnosticLogLevel.Full || (wasFull && level == DiagnosticLogLevel.Extended))
-        {
-            bool on = level == DiagnosticLogLevel.Full;
-            settings.LogSuccessfulChecks = on;
-            settings.LogDetailedMeasurements = on;
-            _logSuccessfulChecks.SetWithoutNotify(on);
-            _logDetailedMeasurements.SetWithoutNotify(on);
-        }
-
-        settings.Save();
-        RefreshDependentRows();
+        ApplyLogChoice(SettingsRules.AfterLevelChosen(settings.DiagnosticLogLevel, level, settings.LogSuccessfulChecks, settings.LogDetailedMeasurements));
     }
 
     /// <summary>A log switch flipped: Extended with both on is exactly Full, so the level follows.</summary>
-    private void OnLogSwitchChanged()
+    private void OnLogSwitchChanged() =>
+        ApplyLogChoice(SettingsRules.AfterSwitchFlipped(Services.Settings.DiagnosticLogLevel, _logSuccessfulChecks.Checked, _logDetailedMeasurements.Checked));
+
+    private void ApplyLogChoice(SettingsRules.LogChoice choice)
     {
         AppSettings settings = Services.Settings;
-        settings.LogSuccessfulChecks = _logSuccessfulChecks.Checked;
-        settings.LogDetailedMeasurements = _logDetailedMeasurements.Checked;
+        settings.DiagnosticLogLevel = choice.Level;
+        settings.LogSuccessfulChecks = choice.Successes;
+        settings.LogDetailedMeasurements = choice.Details;
+        _logSuccessfulChecks.SetWithoutNotify(choice.Successes);
+        _logDetailedMeasurements.SetWithoutNotify(choice.Details);
 
-        if (settings.DiagnosticLogLevel == DiagnosticLogLevel.Extended && settings.LogSuccessfulChecks && settings.LogDetailedMeasurements)
-        {
-            settings.DiagnosticLogLevel = DiagnosticLogLevel.Full;
-            _logLevel.SelectedIndexChanged -= OnLogLevelChanged;
-            SelectComboItem(_logLevel, nameof(DiagnosticLogLevel.Full));
-            _logLevel.SelectedIndexChanged += OnLogLevelChanged;
-        }
+        _logLevel.SelectedIndexChanged -= OnLogLevelChanged;
+        SelectComboItem(_logLevel, choice.Level.ToString());
+        _logLevel.SelectedIndexChanged += OnLogLevelChanged;
 
         settings.Save();
         RefreshDependentRows();

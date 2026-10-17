@@ -10,7 +10,7 @@ namespace InternetMonitor.Tests.Configuration;
 /// settings.json survives a restart with every value, ignores what it no longer knows (an older
 /// version's keys), and never takes the app down when it is damaged or missing.
 /// </summary>
-[Collection("DataDir")]
+[Collection("Localization")]
 public sealed class AppSettingsStorageTests
 {
     [Fact]

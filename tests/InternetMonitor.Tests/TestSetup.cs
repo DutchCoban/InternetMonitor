@@ -44,9 +44,6 @@ internal static class TestSetup
     }
 }
 
-/// <summary>
-/// Groups every test that reads or writes the shared data directory's files (settings.json,
-/// incidents.json): one file per store, so these tests must not run side by side.
-/// </summary>
-[CollectionDefinition("DataDir")]
-public sealed class DataDirectoryCollection;
+// Tests that read or write the shared data directory (settings.json, incidents.json) join the
+// "Localization" collection as well: the headless export re-initialises the localisation instance
+// from the stored settings, so it must not run beside a test that switches the active language.

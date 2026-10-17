@@ -299,14 +299,7 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         LayoutNetworkHealthSummary();
     }
 
-    private bool ConditionEnabled(string key) => key switch
-    {
-        "tcpRetransmissions" => Services.Settings.TcpRetransmissions.Enabled,
-        "packetLoss" => Services.Settings.PacketLoss.Enabled,
-        "ttlExceeded" => Services.Settings.TtlExceeded.Enabled,
-        "rogueDhcp" => Services.Settings.RogueDhcp.Enabled,
-        _ => false,
-    };
+    private bool ConditionEnabled(string key) => SettingsRules.ConditionShown(Services.Settings, key);
 
     private void SetSummaryRow(SummaryRow row, NetworkHealthConditionStatus status)
     {

@@ -262,19 +262,15 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     /// </summary>
     private void RefreshDependentRows()
     {
-        AppSettings s = Services.Settings;
-        Show(s.AdapterMode != AdapterMode.Automatic, _adapterChoice);
-        Show(s.ShowIncidentPopups, _notificationStyle);
-        Show(s.CheckForUpdates, _autoUpdateInstall);
-        Show(s.SpeedTestAutoRunEnabled, _speedTestInterval, _speedTestOnMetered);
-
-        bool logging = s.DiagnosticLogLevel != DiagnosticLogLevel.Off;
-        bool extended = s.DiagnosticLogLevel == DiagnosticLogLevel.Extended;
-        Show(extended, _logSuccessfulChecks, _logDetailedMeasurements);
-        Show(logging, _logDirectory, _browseLogDirectory, _openLogFolder, _resetLogDirectory);
-
-        Show(s.KumaPushUrl.Length > 0, _kumaInterval, _kumaStatus);
-        Show(s.WebhookUrl.Length > 0, _webhookLabel, _webhookTest, _webhookStatus);
+        SettingsRules.DependentRows rows = SettingsRules.RowsFor(Services.Settings);
+        Show(rows.AdapterChoice, _adapterChoice);
+        Show(rows.NotificationStyle, _notificationStyle);
+        Show(rows.AutoUpdateInstall, _autoUpdateInstall);
+        Show(rows.SpeedTestOptions, _speedTestInterval, _speedTestOnMetered);
+        Show(rows.LogSwitches, _logSuccessfulChecks, _logDetailedMeasurements);
+        Show(rows.LogFolder, _logDirectory, _browseLogDirectory, _openLogFolder, _resetLogDirectory);
+        Show(rows.Kuma, _kumaInterval, _kumaStatus);
+        Show(rows.Webhook, _webhookLabel, _webhookTest, _webhookStatus);
 
         LayoutCards();
     }
