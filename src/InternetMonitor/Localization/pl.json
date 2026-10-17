@@ -806,7 +806,7 @@
   "settings.webhook.url.help": "Adres https otrzymujący jeden POST z JSON przy rozpoczęciu incydentu i jeden przy zakończeniu - dla Home Assistant, ntfy, Discord, Slack i podobnych. Puste oznacza wyłączone.",
   "settings.webhook.test.help": "Wyślij teraz przykładową wiadomość do webhooka, aby sprawdzić, czy dociera.",
   "settings.endpoint.add.help": "Dodaj własny endpoint dla kroku 7: adres URL, port TCP lub host do pingowania. Każdy dostaje własny wykres na stronie Historia.",
-  "settings.export.settings.help": "Zapisz wszystkie ustawienia do pliku, jako kopię zapasową lub do przeniesienia na inny komputer. Plik zawiera adres Kuma i nagłówki punktów końcowych w oryginalnej postaci.",
+  "settings.export.settings.help": "Zapisz wszystkie ustawienia do pliku, jako kopię zapasową lub do przeniesienia na inny komputer. Plik zawiera adres Kuma i nagłówki endpointów w oryginalnej postaci.",
   "settings.import.settings.help": "Zastąp wszystkie ustawienia tymi z wcześniej zapisanego pliku. Działa natychmiast.",
   "reports.provider.period.help": "Jak daleko wstecz sięga raport. 7, 30 i 90 dni to typowe wybory; 'własna liczba' przyjmuje dowolną liczbę dni do roku.",
   "reports.provider.customDays.help": "Liczba dni własnego okresu, od 1 do 365.",

@@ -19,7 +19,7 @@ public sealed class TerminologyTests
         ["en"] = ["response time", "login required"],
         ["nl"] = ["rondreis", "reactietijd", "pakketverlies", "hertransmissie", "retransmissies", "hartslag", "gemeten verbinding", "opgelost naar", "opgezocht", "pad-mtu", "routering", "route volgen"],
         ["de"] = ["umlaufzeit", "antwortzeit", "latenz", "paketverlust", "neuübertragung", "durchsatz", "pfad-mtu", "nutzlast", "aufgelöst", "verbindungsgeschwindigkeit"],
-        ["pl"] = [@"\bopóźnieni[ea]\b", "czas odpowiedzi", "utrata pakiet", "utraty", @"\bbram[aęy]\b", @"\b(prze)?skok", "pobieranie", "sygnał do", "mtu ścieżki", "ładunek", "rozwiązano na", "rozwiązane przez", "rozwiązywanie nazw", "pakiet testowy", "prędkość łącza"],
+        ["pl"] = [@"\bopóźnieni[ea]\b", "czas odpowiedzi", "utrata pakiet", "utraty", @"\bbram[aęy]\b", @"\b(prze)?skok", "pobieranie", "sygnał do", "mtu ścieżki", "ładunek", "rozwiązano na", "rozwiązane przez", "rozwiązywanie nazw", "pakiet testowy", "prędkość łącza", "punkt[óuy]?w? końcow"],
     };
 
     [Theory]
