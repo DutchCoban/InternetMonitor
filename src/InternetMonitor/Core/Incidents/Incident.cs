@@ -66,14 +66,14 @@ public sealed record IncidentTraceroute(string Target, DateTimeOffset AtUtc, boo
 /// </summary>
 public sealed record Incident
 {
-    /// <summary>The readable id, INC-20261017-0003: unique on this machine, scoped per day.</summary>
+    /// <summary>The readable id, INC-20261017-213816.729: the local date and time it opened, to the millisecond.</summary>
     public required string Id { get; init; }
 
     /// <summary>
-    /// A globally unique id for the outside world. Two machines posting to the same webhook, or a
-    /// counter that restarts after the incident list is cleared, can repeat <see cref="Id"/>; this
-    /// never repeats, so a receiver can open and close exactly this incident and nothing else.
-    /// Incidents recorded before it existed get one when they are next loaded.
+    /// A globally unique id for the outside world. Two machines posting to the same webhook can
+    /// open incidents in the same millisecond and so repeat <see cref="Id"/>; this never repeats,
+    /// so a receiver can open and close exactly this incident and nothing else. Incidents recorded
+    /// before it existed get one when they are next loaded.
     /// </summary>
     public Guid Uuid { get; init; } = Guid.NewGuid();
 

@@ -24,7 +24,7 @@ public sealed record WebhookDeliveryStatus(DateTimeOffset AtUtc, bool Failed, st
 /// minute) rather than knocking every cycle. Nothing about monitoring waits for any of this.
 ///
 /// Every message carries the incident's UUID next to its readable id, so a receiver can open and
-/// close exactly one thing even when two machines post to it or the readable counter restarts.
+/// close exactly one thing even when two machines post to it.
 ///
 /// The URL must be https, except for an address inside your own network (a private IP, localhost,
 /// a bare hostname or a .local/.lan/.home/.internal name), where plain http is allowed: that is

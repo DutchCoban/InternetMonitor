@@ -135,27 +135,30 @@ public sealed class IncidentStore
     }
 
     /// <summary>
-    /// Builds the next id for today: INC-20261012-0001. Scoped per day so the number stays small
-    /// and the date is readable in a support ticket without decoding anything.
+    /// Builds the id for an incident opening now: INC-20261017-213816.729, the local date and the
+    /// local time to the millisecond. The time, not a counter: a counter restarts when the list is
+    /// cleared, and "number 0001" would then mean two different outages to a user and a help desk.
+    /// No colons - the id is also a file name. Two incidents in the same millisecond (two
+    /// network-health conditions can open together) take the next millisecond.
     /// </summary>
     public string NextId(DateTimeOffset now)
     {
-        string prefix = $"INC-{now.ToLocalTime():yyyyMMdd}-";
+        DateTimeOffset local = now.ToLocalTime();
         lock (_lock)
         {
-            int highest = 0;
-            foreach (Incident incident in _incidents)
+            string id = IdFor(local);
+            while (_incidents.Any(i => i.Id == id))
             {
-                if (incident.Id.StartsWith(prefix, StringComparison.Ordinal)
-                    && int.TryParse(incident.Id.AsSpan(prefix.Length), out int number))
-                {
-                    highest = Math.Max(highest, number);
-                }
+                local = local.AddMilliseconds(1);
+                id = IdFor(local);
             }
 
-            return $"{prefix}{highest + 1:0000}";
+            return id;
         }
     }
+
+    /// <summary>The id for an incident that opened at <paramref name="at"/>, read as local time: INC-20261017-213816.729.</summary>
+    public static string IdFor(DateTimeOffset at) => $"INC-{at.ToLocalTime():yyyyMMdd}-{at.ToLocalTime():HHmmss}.{at.ToLocalTime():fff}";
 
     private static List<Incident> Load()
     {

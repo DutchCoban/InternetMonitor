@@ -135,7 +135,8 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   themselves this includes the Wi-Fi signal (with a marker wherever you switched to another access
   point), packet loss and jitter, IPv6, this computer's own traffic, and the speed test results.
 - **Incidents**: a run of consecutive failed diagnosis cycles (debounced, so a brief blip doesn't
-  create noise) grouped into a single incident with a unique ID (`INC-yyyyMMdd-####`), a
+  create noise) grouped into a single incident with a unique ID (`INC-yyyyMMdd-HHmmss.fff`, the
+  local date and time it opened, plus a UUID for machines), a
   classification, a start/end time, and a snapshot of every probe's result at the start and at
   resolution. Incident text (headline, explanation, step snapshots) is always recorded in English
   regardless of the active display language, so an exported incident reads the same no matter who
@@ -365,9 +366,9 @@ Settings → Integrations → Webhook URL: an address that receives one JSON `PO
 opens and one when it closes (`event`, `kind`, `id`, `uuid`, `cause`, `side`, `headline`,
 `startUtc`, `endUtc`, `durationSeconds`, `appVersion`). That is enough for Home Assistant, ntfy, a
 Discord or Slack webhook, or anything else that takes JSON. A test button sends a sample. `id` is
-the readable INC-20261017-0003; `uuid` is globally unique, the same on the "opened" and the
-"resolved" message, so a receiver can open and close exactly one thing even when two machines
-post to it or the readable counter restarts.
+the readable INC-20261017-213816.729 (the local date and time it opened); `uuid` is globally
+unique, the same on the "opened" and the "resolved" message, so a receiver can open and close
+exactly one thing even when two machines post to it.
 
 An outage on the provider's side is exactly when nothing can leave the house, so a message that
 cannot be delivered waits, in order, and goes as soon as a check reaches the internet again - the
