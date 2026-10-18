@@ -80,7 +80,11 @@ public sealed class IncidentToast : Form
     /// the newer problem is the more relevant thing to show.
     /// </summary>
     public static void ShowFor(Incident incident) =>
-        Show(LocalizationManager.Instance.Get("incident.toast.title"), incident.Headline, resolved: false, incident.Cause == RootCause.CaptivePortal);
+        Show(LocalizationManager.Instance.Get(TitleKey(incident)), incident.Headline, resolved: false, incident.Cause == RootCause.CaptivePortal);
+
+    /// <summary>"Connection problem" for a fault; a network change is not one, so it is announced as what it is.</summary>
+    public static string TitleKey(Incident incident) =>
+        incident.Cause == RootCause.NetworkChange ? "incident.toast.change.title" : "incident.toast.title";
 
     /// <summary>The counterpart to <see cref="ShowFor"/>: the connection is back, and for how long it was gone.</summary>
     public static void ShowResolved(Incident incident)

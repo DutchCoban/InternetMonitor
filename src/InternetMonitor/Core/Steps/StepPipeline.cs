@@ -160,7 +160,7 @@ public sealed class StepPipeline : IDisposable
         }
 
         DrainHeldFailures(force: true);
-        CompleteCycle(context.Throughput);
+        CompleteCycle(context.Throughput, context.AdapterReadings);
     }
 
     /// <summary>
@@ -360,12 +360,12 @@ public sealed class StepPipeline : IDisposable
         StepChanged?.Invoke(result);
     }
 
-    private void CompleteCycle(ThroughputSample? throughput)
+    private void CompleteCycle(ThroughputSample? throughput, IReadOnlyList<Net.AdapterReading> adapters)
     {
         StepSnapshot snapshot;
         lock (_gate)
         {
-            snapshot = new StepSnapshot(_current.Values.ToList(), DateTimeOffset.UtcNow) { Throughput = throughput };
+            snapshot = new StepSnapshot(_current.Values.ToList(), DateTimeOffset.UtcNow) { Throughput = throughput, Adapters = adapters };
         }
 
         LatestSnapshot = snapshot;

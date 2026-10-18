@@ -45,6 +45,14 @@ public enum RootCause
     /// </summary>
     NetworkHealth,
 
+    /// <summary>
+    /// Raised by <see cref="Monitors.NetworkChangeMonitor"/>: the environment moved rather than
+    /// broke - the connection went over another adapter, an adapter got an automatic private
+    /// address, the network's settings changed, or the router answers from different hardware.
+    /// Which one is in <see cref="Incidents.Incident.ConditionKey"/>. Never an outage.
+    /// </summary>
+    NetworkChange,
+
     Unknown,
 }
 
@@ -65,6 +73,7 @@ public static class RootCauseExtensions
         RootCause.CaptivePortal => "captivePortal",
         RootCause.Ipv6Broken => "ipv6",
         RootCause.NetworkHealth => "networkHealth",
+        RootCause.NetworkChange => "networkChange",
         _ => "unknown",
     };
 

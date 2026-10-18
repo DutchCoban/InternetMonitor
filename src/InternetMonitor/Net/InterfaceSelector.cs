@@ -208,6 +208,16 @@ public static class InterfaceSelector
     public static bool IsUnspecified(IPAddress address) =>
         address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any);
 
+    /// <summary>
+    /// 169.254.0.0/16 - the address Windows gives itself when DHCP got no answer. Seeing one is
+    /// almost always a DHCP or cabling problem rather than an addressing problem.
+    /// </summary>
+    public static bool IsApipa(IPAddress address)
+    {
+        byte[] bytes = address.GetAddressBytes();
+        return bytes.Length == 4 && bytes[0] == 169 && bytes[1] == 254;
+    }
+
     private static bool IndexMatches(NetworkInterface nic, uint index)
     {
         try

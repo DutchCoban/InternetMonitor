@@ -202,6 +202,12 @@ public sealed record Incident
     /// </summary>
     public string? ConditionKey { get; init; }
 
+    /// <summary>
+    /// What a per-adapter condition is about - the adapter's id - so that after a restart an open
+    /// incident is matched back to its adapter. Null for everything else, and then left out of the file.
+    /// </summary>
+    public string? Subject { get; init; }
+
     /// <summary>The user's own words about this incident - a ticket number, what the provider said.</summary>
     public string? Note { get; set; }
 

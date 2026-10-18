@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Text;
 using InternetMonitor.Configuration;
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
+using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Reports;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Core.Tools.SpeedTest;
@@ -152,7 +154,16 @@ public static class AiExportBuilder
         - Not outages: FirewallSuspected (pings filtered while real traffic works),
           Ipv6Broken (the network offers IPv6 but it does not work while IPv4 does - browsers try
           IPv6 first, so sites load slowly; usually the router or the provider) and
-          NetworkHealth (packet-level warnings: retransmissions, loss, TTL errors, rogue DHCP).
+          NetworkHealth (packet-level warnings: retransmissions, loss, TTL errors, rogue DHCP) and
+          NetworkChange (the environment moved rather than broke: the traffic went over another
+          adapter (pathChanged), an adapter other than the primary one got a 169.254 automatic
+          private address because its DHCP server did not answer (apipa), the gateway, network,
+          DNS servers, DHCP server, IPv6 prefix or Wi-Fi network changed on the same adapter
+          (networkChanged), or the gateway answered from a different hardware address
+          (gatewayHardwareChanged)). A pathChanged incident lasts as long as the detour; its
+          timeline says when the original adapter was usable again while Windows still routed
+          over the other one, which is evidence that the switch-back did not happen by itself.
+          networkChanged and gatewayHardwareChanged are moments: start and end are the same.
 
         **Names in this document.** Wi-Fi network names, access points, hardware addresses and any
         public address of this computer are replaced by stable stand-ins: "Wi-Fi network A",
@@ -262,6 +273,7 @@ public static class AiExportBuilder
         AppendTraffic(doc, Series(SeriesNames.TrafficDown), Series(SeriesNames.TrafficUp), report, from, to);
         AppendSeriesStatistics(doc, history);
         AppendNetworkHealth(doc, incidents, settings);
+        AppendNetworkChanges(doc, incidents, settings);
 
         if (instructions is not null)
         {
@@ -303,6 +315,7 @@ public static class AiExportBuilder
                 : "not entered")
             .Item("Automatic speed test", settings.SpeedTestAutoRunEnabled ? I($"every {settings.SpeedTestIntervalHours} h") : "off")
             .Item("Network-health monitoring", settings.NetworkHealthMonitoringEnabled ? string.Join(", ", settings.EnabledNetworkHealthConditions) : "off")
+            .Item("Network changes recorded", string.Join(", ", new[] { ("pathChanged", settings.IncidentOnPathChange), ("apipa", settings.IncidentOnApipa), ("networkChanged", settings.IncidentOnNetworkChange), ("gatewayHardwareChanged", settings.IncidentOnGatewayHardwareChange) }.Select(o => I($"{o.Item1}={(o.Item2 ? "on" : "off")}"))))
             .Item("Detail level", trimmed.Detail.ToString().ToLowerInvariant());
 
         if (trimmed.Anything)
@@ -543,7 +556,8 @@ public static class AiExportBuilder
     }
 
     private static string IncidentSide(Incident incident) =>
-        incident.ConditionKey is null ? SideName(ProviderReportData.SideOf(incident.Cause)) : "packet-level warning";
+        incident.Cause == RootCause.NetworkChange ? I($"network change ({SideName(NetworkChangeMonitor.SideOf(incident.ConditionKey))})")
+            : incident.ConditionKey is null ? SideName(ProviderReportData.SideOf(incident.Cause)) : "packet-level warning";
 
     /// <summary>
     /// Latency per local day for the four round-trip series, and the public-internet latency by hour of
@@ -811,11 +825,43 @@ public static class AiExportBuilder
             return;
         }
 
-        var grouped = incidents.Where(i => i.ConditionKey is { Length: > 0 }).GroupBy(i => i.ConditionKey!).OrderByDescending(g => g.Count()).ToList();
+        var grouped = incidents.Where(i => i.Cause == RootCause.NetworkHealth && i.ConditionKey is { Length: > 0 }).GroupBy(i => i.ConditionKey!).OrderByDescending(g => g.Count()).ToList();
         if (grouped.Count == 0)
         {
             doc.Line("None recorded.").Blank();
             return;
+        }
+
+        foreach (IGrouping<string, Incident> group in grouped)
+        {
+            doc.Item(group.Key, I($"{group.Count()} time(s), most recently {doc.LocalTime(group.Max(i => i.StartUtc))}"));
+        }
+
+        doc.Blank();
+    }
+
+    /// <summary>The network changes by condition, and which conditions are watched. Each is also in the incident list above.</summary>
+    private static void AppendNetworkChanges(Doc doc, IReadOnlyList<Incident> incidents, AppSettings settings)
+    {
+        doc.Line("## Network changes").Blank();
+
+        NetworkChangeOptions options = settings.NetworkChangeOptions;
+        string[] watched =
+        [
+            .. new[]
+            {
+                (NetworkChangeMonitor.PathChanged, options.PathChanged),
+                (NetworkChangeMonitor.Apipa, options.Apipa),
+                (NetworkChangeMonitor.NetworkChanged, options.NetworkChanged),
+                (NetworkChangeMonitor.GatewayHardwareChanged, options.GatewayHardware),
+            }.Where(o => o.Item2).Select(o => o.Item1),
+        ];
+        doc.Item("Watched", watched.Length == 0 ? "none (all switched off)" : string.Join(", ", watched));
+
+        var grouped = incidents.Where(i => i.Cause == RootCause.NetworkChange && i.ConditionKey is { Length: > 0 }).GroupBy(i => i.ConditionKey!).OrderByDescending(g => g.Count()).ToList();
+        if (grouped.Count == 0)
+        {
+            doc.Item("Recorded", "none");
         }
 
         foreach (IGrouping<string, Incident> group in grouped)

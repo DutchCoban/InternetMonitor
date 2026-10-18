@@ -29,6 +29,7 @@ public sealed class IncidentStoreTests
         StepsAtStart = [new StepSnapshotEntry(StepId.PublicIp, StepState.Failed, "No public address reachable", "detail", new Dictionary<string, string> { ["Latency"] = "- ms" })],
         RecentChanges = ["Gateway changed from 10.0.0.1 to 10.0.0.2"],
         ConditionKey = null,
+        Subject = "{eth}",
         Note = "Ticket 4711",
         Traceroute = new IncidentTraceroute("9.9.9.9", Start, false, [new IncidentHop(1, "10.0.0.1", "router.lan", null, 1.5), new IncidentHop(2, null, null, null, null)]),
         Throughput = new IncidentThroughput(
@@ -66,6 +67,7 @@ public sealed class IncidentStoreTests
         Assert.Equal(incident.Timeline, loaded.Timeline);
         Assert.Equal(incident.RecentChanges, loaded.RecentChanges);
         Assert.Equal("Ticket 4711", loaded.Note);
+        Assert.Equal("{eth}", loaded.Subject);
         Assert.Equal(incident.Traceroute!.Target, loaded.Traceroute!.Target);
         Assert.Equal(incident.Traceroute.Hops, loaded.Traceroute.Hops);
         Assert.Equal(incident.Throughput, loaded.Throughput);
@@ -92,6 +94,17 @@ public sealed class IncidentStoreTests
         store.Clear();
         Assert.Empty(new IncidentStore().All);
         Assert.Equal("[]", File.ReadAllText(AppPaths.IncidentsFile));
+    }
+
+    [Fact]
+    public void A_subject_is_left_out_of_the_file_when_there_is_none()
+    {
+        var store = new IncidentStore();
+        store.Clear();
+        store.Add(Full() with { Subject = null });
+
+        Assert.DoesNotContain("\"Subject\"", File.ReadAllText(AppPaths.IncidentsFile));
+        Assert.Null(Assert.Single(new IncidentStore().All).Subject);
     }
 
     [Fact]

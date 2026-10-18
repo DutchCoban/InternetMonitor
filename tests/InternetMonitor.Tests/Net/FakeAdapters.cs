@@ -46,7 +46,8 @@ internal sealed class FakeIpProperties(
     IReadOnlyList<IPAddress>? dns = null,
     bool dhcp = true,
     int index = 7,
-    bool noIpv4 = false) : IPInterfaceProperties
+    bool noIpv4 = false,
+    IPAddress? dhcpServer = null) : IPInterfaceProperties
 {
     public override UnicastIPAddressInformationCollection UnicastAddresses { get; } = new FakeUnicastCollection(unicast ?? []);
 
@@ -54,7 +55,7 @@ internal sealed class FakeIpProperties(
 
     public override IPAddressCollection DnsAddresses { get; } = new FakeAddressCollection(dns ?? []);
 
-    public override IPAddressCollection DhcpServerAddresses { get; } = new FakeAddressCollection([]);
+    public override IPAddressCollection DhcpServerAddresses { get; } = new FakeAddressCollection(dhcpServer is null ? [] : [dhcpServer]);
 
     public override IPAddressCollection WinsServersAddresses { get; } = new FakeAddressCollection([]);
 

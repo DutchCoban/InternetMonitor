@@ -32,6 +32,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private Card _cadenceCard = null!;
     private Card _toolsCard = null!;
     private Card _diagnosticsCard = null!;
+    private Card _networkChangesCard = null!;
     private Card _networkHealthCard = null!;
     private Card _integrationsCard = null!;
     private Card _endpointsCard = null!;
@@ -111,6 +112,9 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _diagnosticsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Diagnostics };
         BuildDiagnosticsRows();
 
+        _networkChangesCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Adapter };
+        BuildNetworkChangesRows();
+
         _networkHealthCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Pulse };
         BuildNetworkHealthRows();
 
@@ -136,6 +140,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         Controls.Add(_publicIpCard);
         Controls.Add(_integrationsCard);
         Controls.Add(_networkHealthCard);
+        Controls.Add(_networkChangesCard);
         Controls.Add(_diagnosticsCard);
         Controls.Add(_toolsCard);
         Controls.Add(_cadenceCard);
@@ -356,6 +361,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         LayoutCardRows(_cadenceCard);
         LayoutCardRows(_toolsCard);
         LayoutCardRows(_diagnosticsCard);
+        LayoutCardRows(_networkChangesCard);
         LayoutCardRows(_networkHealthCard);
         LayoutConditionRows();
         LayoutIntegrationsCard();
@@ -456,6 +462,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
 
         _tracerouteLookup.SetWithoutNotify(settings.TracerouteOwnerLookup);
         _tracerouteOnIncident.SetWithoutNotify(settings.TracerouteOnIncident);
+        LoadNetworkChangesFromSettings(settings);
         _lanScanVendorLookup.SetWithoutNotify(settings.LanScanVendorLookup);
         _lanScanTcpFallback.SetWithoutNotify(settings.LanScanTcpFallback);
 
@@ -636,6 +643,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _toolsCard.Title = Loc.Get("settings.section.tools");
         _diagnosticsCard.Title = Loc.Get("settings.section.diagnostics");
         _diagnosticsCard.Subtitle = Loc.Get("settings.section.diagnostics.subtitle");
+        _networkChangesCard.Title = Loc.Get("settings.section.networkChanges");
+        _networkChangesCard.Subtitle = Loc.Get("settings.section.networkChanges.subtitle");
         _networkHealthCard.Title = Loc.Get("settings.section.networkHealth");
         _networkHealthCard.Subtitle = Loc.Get("settings.section.networkHealth.subtitle");
         _integrationsCard.Title = Loc.Get("settings.section.integrations");

@@ -12,7 +12,7 @@ public enum IncidentSideFilter
     HomeNetwork,
     ThisComputer,
 
-    /// <summary>A login page, an unknown cause, or a packet-level network-health warning.</summary>
+    /// <summary>A login page, an unknown cause, or a packet-level network-health warning. A network change is on the side it is about.</summary>
     Other,
 }
 
@@ -60,15 +60,21 @@ public static class IncidentFilter
     }
 
     public static IncidentSideFilter SideOf(Incident incident) =>
-        incident.ConditionKey is not null
+        incident.ConditionKey is not null && incident.Cause != RootCause.NetworkChange
             ? IncidentSideFilter.Other
-            : ProviderReportData.SideOf(incident.Cause) switch
+            : OutageSideOf(incident) switch
             {
                 OutageSide.Provider => IncidentSideFilter.Provider,
                 OutageSide.HomeNetwork => IncidentSideFilter.HomeNetwork,
                 OutageSide.ThisComputer => IncidentSideFilter.ThisComputer,
                 _ => IncidentSideFilter.Other,
             };
+
+    /// <summary>A network change says which side it is about itself; every other incident's side follows from its cause.</summary>
+    public static OutageSide OutageSideOf(Incident incident) =>
+        incident.Cause == RootCause.NetworkChange
+            ? Monitors.NetworkChangeMonitor.SideOf(incident.ConditionKey)
+            : ProviderReportData.SideOf(incident.Cause);
 
     private static bool MatchesSide(Incident incident, IncidentSideFilter side) =>
         side == IncidentSideFilter.All || SideOf(incident) == side;

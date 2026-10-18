@@ -9,6 +9,7 @@ using InternetMonitor.Core.Tools.SpeedTest;
 using InternetMonitor.Core.Tools.Traceroute;
 using InternetMonitor.Core.Updates;
 using InternetMonitor.Localization;
+using InternetMonitor.Net;
 using InternetMonitor.Ui.Shell;
 using InternetMonitor.Ui.Theming;
 using InternetMonitor.Ui.Windows;
@@ -39,6 +40,7 @@ public sealed class AppHost : ApplicationContext
     private readonly NetworkHealthMonitor _networkHealth;
     private readonly LineQualitySampler _lineQuality;
     private readonly ChangeDetector _changes;
+    private readonly NetworkChangeMonitor _networkChanges;
     private readonly IncidentTracker _tracker;
     private readonly TrayController _tray;
     private readonly MainWindow _window;
@@ -95,6 +97,7 @@ public sealed class AppHost : ApplicationContext
         _diagnosticLog = new DiagnosticLogger(_settings);
         _changes = new ChangeDetector();
         _tracker = new IncidentTracker(_incidents, _changes);
+        _networkChanges = new NetworkChangeMonitor(_incidents, _changes);
 
         _networkHealth = new NetworkHealthMonitor(
             _incidents,
@@ -161,6 +164,14 @@ public sealed class AppHost : ApplicationContext
         _tracker.IncidentClosed += incident => _ = CaptureThroughputAsync(incident, closed: true);
         _networkHealth.IncidentOpened += incident => _ = CaptureThroughputAsync(incident, closed: false);
         _networkHealth.IncidentClosed += incident => _ = CaptureThroughputAsync(incident, closed: true);
+        _networkChanges.IncidentOpened += OnIncidentOpened;
+        _networkChanges.IncidentClosed += _diagnosticLog.LogIncidentResolved;
+        _networkChanges.IncidentClosed += incident => _webhook.Notify(incident, opened: false);
+
+        // A change that is over the moment it is recorded (start = end) gets its whole capture
+        // from the one event; the others complete it when they close, like every other incident.
+        _networkChanges.IncidentOpened += incident => _ = CaptureThroughputAsync(incident, closed: incident.EndUtc is not null);
+        _networkChanges.IncidentClosed += incident => _ = CaptureThroughputAsync(incident, closed: true);
         _ = CompleteThroughputAsync();
         _cadence.Start();
         _lineQuality.Start();
@@ -226,6 +237,7 @@ public sealed class AppHost : ApplicationContext
 
         RootCauseResult diagnosis = RootCauseAnalyzer.Analyze(snapshot);
         _tracker.Observe(snapshot, diagnosis);
+        _networkChanges.Observe(NetworkReading.From(snapshot, ip => ArpTable.Snapshot().GetValueOrDefault(ip)), _settings.NetworkChangeOptions);
         RecordOutageState(snapshot.TakenUtc);
         _diagnosticLog.LogCycle(snapshot, diagnosis, _tracker.ActiveIncident?.Id);
 
@@ -380,7 +392,7 @@ public sealed class AppHost : ApplicationContext
 
                 if (_settings.NotificationStyle == NotificationStyle.Windows)
                 {
-                    _tray.ShowBalloon(LocalizationManager.Instance.Get("incident.toast.title"), incident.Headline, ToolTipIcon.Warning);
+                    _tray.ShowBalloon(LocalizationManager.Instance.Get(IncidentToast.TitleKey(incident)), incident.Headline, ToolTipIcon.Warning);
                 }
                 else
                 {
@@ -659,6 +671,8 @@ public sealed class AppHost : ApplicationContext
             _tracker.IncidentClosed -= _diagnosticLog.LogIncidentResolved;
             _networkHealth.IncidentOpened -= OnIncidentOpened;
             _networkHealth.IncidentClosed -= _diagnosticLog.LogIncidentResolved;
+            _networkChanges.IncidentOpened -= OnIncidentOpened;
+            _networkChanges.IncidentClosed -= _diagnosticLog.LogIncidentResolved;
             _pipeline.Dispose();
 
             _lineQuality.Sampled -= RecordLineQuality;

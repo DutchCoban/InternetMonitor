@@ -178,6 +178,18 @@ public sealed class PageSmokeTests
                 20,
                 ThroughputCapacitySource.SpeedTest),
         });
+        services.Services.Incidents.Add(new Incident
+        {
+            Id = "INC-20261019-100015.000",
+            Cause = RootCause.NetworkChange,
+            StartUtc = DateTimeOffset.UtcNow.AddMinutes(-40),
+            Status = IncidentStatus.Active,
+            Headline = "Connection moved from Ethernet (192.168.1.23 via 192.168.1.1) to Wi-Fi (10.0.0.5 via 10.0.0.1)",
+            Explanation = new Explanation("what", "cause", "todo"),
+            ConditionKey = "pathChanged",
+            Subject = "{eth}",
+            Timeline = { new TimelineEntry(DateTimeOffset.UtcNow.AddMinutes(-20), "Ethernet has an address again (192.168.1.23) but traffic still goes over Wi-Fi (10.0.0.5 via 10.0.0.1)") },
+        });
         try
         {
             UiTestHost.Run(() =>
@@ -188,7 +200,7 @@ public sealed class PageSmokeTests
                 page.PerformLayout();
 
                 Assert.Contains(UiTestHost.Descendants(page), c => c is IncidentList);
-                Assert.Single(services.Services.Incidents.All);
+                Assert.Equal(2, services.Services.Incidents.All.Count);
                 using var bitmap = new Bitmap(page.Width, page.Height);
                 page.DrawToBitmap(bitmap, new Rectangle(Point.Empty, page.Size));
 

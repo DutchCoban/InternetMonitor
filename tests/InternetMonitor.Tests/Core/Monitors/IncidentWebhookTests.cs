@@ -49,6 +49,16 @@ public sealed class IncidentWebhookTests
     }
 
     [Fact]
+    public void A_network_change_is_a_change_on_the_side_it_is_about()
+    {
+        var move = new Incident { Id = "INC-2", Cause = RootCause.NetworkChange, StartUtc = DateTimeOffset.UtcNow, Headline = "Connection moved from Ethernet to Wi-Fi", ConditionKey = NetworkChangeMonitor.PathChanged };
+        var apipa = new Incident { Id = "INC-3", Cause = RootCause.NetworkChange, StartUtc = DateTimeOffset.UtcNow, Headline = "x", ConditionKey = NetworkChangeMonitor.Apipa };
+
+        Assert.Equal(("change", "ThisComputer"), (IncidentWebhook.Payload(move, "opened", "2.5.0").Kind, IncidentWebhook.Payload(move, "opened", "2.5.0").Side));
+        Assert.Equal(("change", "HomeNetwork"), (IncidentWebhook.Payload(apipa, "opened", "2.5.0").Kind, IncidentWebhook.Payload(apipa, "opened", "2.5.0").Side));
+    }
+
+    [Fact]
     public async Task A_delivery_posts_camel_case_json_to_the_configured_https_url()
     {
         var handler = new CapturingHandler();

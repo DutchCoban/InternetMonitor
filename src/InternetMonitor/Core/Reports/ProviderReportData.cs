@@ -357,7 +357,7 @@ public sealed record ProviderReportData(
     };
 
     public static bool IsOutage(RootCause cause) =>
-        cause is not (RootCause.Healthy or RootCause.FirewallSuspected or RootCause.NetworkHealth or RootCause.Ipv6Broken);
+        cause is not (RootCause.Healthy or RootCause.FirewallSuspected or RootCause.NetworkHealth or RootCause.NetworkChange or RootCause.Ipv6Broken);
 
     private static List<MetricPoint> InPeriod(IReadOnlyList<MetricPoint> points, DateTimeOffset from, DateTimeOffset to) =>
         [.. points.Where(p => p.Timestamp >= from && p.Timestamp <= to)];

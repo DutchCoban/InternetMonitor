@@ -46,9 +46,11 @@ public sealed class ProviderReportTests
             Samples(From, TimeSpan.FromHours(1)),
             Incident(RootCause.Dns, From.AddMinutes(-20), TimeSpan.FromMinutes(30)),
             Incident(RootCause.FirewallSuspected, From.AddHours(1), TimeSpan.FromMinutes(5)),
-            Incident(RootCause.NetworkHealth, From.AddHours(1), TimeSpan.FromMinutes(5), conditionKey: "packetLoss"));
+            Incident(RootCause.NetworkHealth, From.AddHours(1), TimeSpan.FromMinutes(5), conditionKey: "packetLoss"),
+            Incident(RootCause.NetworkChange, From.AddMinutes(10), TimeSpan.FromMinutes(33), conditionKey: "pathChanged"));
 
         OutageEntry outage = Assert.Single(data.Outages);
+        Assert.False(ProviderReportData.IsOutage(RootCause.NetworkChange));
         Assert.Equal(TimeSpan.FromMinutes(10), outage.Duration);
     }
 

@@ -129,6 +129,37 @@ public sealed class AiExportSectionsTests
         Assert.Contains("| Ping to 9.9.9.9 (v1) | ms |", md);
         Assert.Contains("| Time sync (v1) | s (clock offset) |", md);
         Assert.Contains("Network-health monitoring: packetLoss", md);
+        Assert.Contains("- Network changes recorded: pathChanged=on, apipa=on, networkChanged=on, gatewayHardwareChanged=on", md);
+    }
+
+    [Fact]
+    public void Network_changes_have_their_own_section_and_side_and_stay_out_of_the_network_health_one()
+    {
+        var move = new Incident
+        {
+            Id = "INC-20261019-100015.000",
+            Cause = RootCause.NetworkChange,
+            StartUtc = Now.AddHours(-2),
+            EndUtc = Now.AddHours(-2).AddMinutes(33),
+            Status = IncidentStatus.Resolved,
+            Headline = "Connection moved from Ethernet (192.168.1.23 via 192.168.1.1) to Wi-Fi (10.0.0.5 via 10.0.0.1)",
+            ConditionKey = "pathChanged",
+            Subject = "{eth}",
+        };
+        var swap = move with { Id = "INC-20261019-120000.000", StartUtc = Now.AddHours(-1), EndUtc = Now.AddHours(-1), ConditionKey = "gatewayHardwareChanged", Headline = "The router at 192.168.1.1 now answers from hardware address AA:BB:CC:00:00:02 (was AA:BB:CC:00:00:01)", Subject = null };
+        var settings = new AppSettings { IncidentOnGatewayHardwareChange = false };
+
+        string md = Export([move, swap], [], settings);
+
+        Assert.Contains("- Cause: NetworkChange (pathChanged)", md);
+        Assert.Contains("- Side: network change (this computer)", md);
+        Assert.Contains("- Side: network change (home network / router)", md);
+        Assert.Contains("## Network changes", md);
+        Assert.Contains("- Watched: pathChanged, apipa, networkChanged", md);
+        Assert.Contains("- pathChanged: 1 time(s), most recently 2026-10-17 18:00:00", md);
+        Assert.Contains("- gatewayHardwareChanged: 1 time(s)", md);
+        Assert.Contains("## Network-health warnings", md);
+        Assert.Contains("NetworkChange (the environment moved rather than broke", md);
     }
 
     [Fact]

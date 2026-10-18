@@ -1,8 +1,9 @@
-using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
-using System.Text.Json;
+using System.Net;
 using System.Text.Json.Serialization;
+using System.Text.Json;
+using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Reports;
 
@@ -206,12 +207,13 @@ public sealed class IncidentWebhook : IAsyncDisposable
     /// <summary>The JSON body for one incident event. Public and pure, so the shape is testable and documented by the test.</summary>
     public static WebhookPayload Payload(Incident incident, string eventName, string appVersion, string? label = null) => new(
         eventName,
-        incident.ConditionKey is null ? "outage" : "warning",
+        incident.Cause == RootCause.NetworkChange ? "change" : incident.ConditionKey is null ? "outage" : "warning",
         incident.Id,
         incident.Uuid.ToString("D"),
         label,
         incident.Cause.ToString(),
-        incident.ConditionKey is null ? ProviderReportData.SideOf(incident.Cause).ToString() : "NetworkHealth",
+        incident.Cause == RootCause.NetworkChange ? NetworkChangeMonitor.SideOf(incident.ConditionKey).ToString()
+            : incident.ConditionKey is null ? ProviderReportData.SideOf(incident.Cause).ToString() : "NetworkHealth",
         incident.Headline,
         incident.StartUtc,
         incident.EndUtc,

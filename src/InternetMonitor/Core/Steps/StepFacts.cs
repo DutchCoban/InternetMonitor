@@ -27,7 +27,10 @@ public sealed record AdapterFacts(
     long? SpeedMbps,
     bool IsWireless,
     bool IsLikelyVirtual,
-    int CandidateCount) : StepFacts;
+    int CandidateCount,
+
+    // Windows' id for the adapter, stable across renames; null when there is no adapter.
+    string? Id = null) : StepFacts;
 
 public sealed record LinkFacts(
     PhysicalLinkState Link,

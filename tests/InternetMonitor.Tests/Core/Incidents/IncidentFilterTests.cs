@@ -15,7 +15,10 @@ public sealed class IncidentFilterTests
     private static readonly Incident GatewayNow = Make("INC-4", RootCause.Gateway, Now.AddMinutes(-4), null, "Router not answering");
     private static readonly Incident LossWarning = Make("INC-5", RootCause.NetworkHealth, Now.AddHours(-2), TimeSpan.FromMinutes(5), "Packet loss above threshold", conditionKey: "packetLoss");
 
-    private static readonly IReadOnlyList<Incident> All = [GatewayNow, LossWarning, DnsYesterday, LinkLastWeek, InternetOld];
+    private static readonly Incident MoveToWifi = Make("INC-6", RootCause.NetworkChange, Now.AddHours(-3), TimeSpan.FromMinutes(30), "Connection moved from Ethernet to Wi-Fi", conditionKey: "pathChanged");
+    private static readonly Incident RouterSwapped = Make("INC-7", RootCause.NetworkChange, Now.AddDays(-2), TimeSpan.Zero, "The router at 192.168.1.1 now answers from hardware address X (was Y)", conditionKey: "gatewayHardwareChanged");
+
+    private static readonly IReadOnlyList<Incident> All = [GatewayNow, LossWarning, MoveToWifi, DnsYesterday, RouterSwapped, LinkLastWeek, InternetOld];
 
     [Fact]
     public void No_criteria_returns_everything()
@@ -41,16 +44,16 @@ public sealed class IncidentFilterTests
     public void Side_follows_the_provider_report_and_warnings_are_other()
     {
         Assert.Equal([DnsYesterday, InternetOld], Filter(new(Side: IncidentSideFilter.Provider)));
-        Assert.Equal([GatewayNow], Filter(new(Side: IncidentSideFilter.HomeNetwork)));
-        Assert.Equal([LinkLastWeek], Filter(new(Side: IncidentSideFilter.ThisComputer)));
+        Assert.Equal([GatewayNow, RouterSwapped], Filter(new(Side: IncidentSideFilter.HomeNetwork)));
+        Assert.Equal([MoveToWifi, LinkLastWeek], Filter(new(Side: IncidentSideFilter.ThisComputer)));
         Assert.Equal([LossWarning], Filter(new(Side: IncidentSideFilter.Other)));
     }
 
     [Fact]
     public void A_period_includes_incidents_that_overlap_it_and_active_means_still_open()
     {
-        Assert.Equal([GatewayNow, LossWarning, DnsYesterday], Filter(new(Period: IncidentPeriodFilter.Day)));
-        Assert.Equal([GatewayNow, LossWarning, DnsYesterday, LinkLastWeek], Filter(new(Period: IncidentPeriodFilter.Week)));
+        Assert.Equal([GatewayNow, LossWarning, MoveToWifi, DnsYesterday], Filter(new(Period: IncidentPeriodFilter.Day)));
+        Assert.Equal([GatewayNow, LossWarning, MoveToWifi, DnsYesterday, RouterSwapped, LinkLastWeek], Filter(new(Period: IncidentPeriodFilter.Week)));
         Assert.Equal([GatewayNow], Filter(new(Period: IncidentPeriodFilter.Active)));
     }
 

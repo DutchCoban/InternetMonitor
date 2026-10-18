@@ -145,7 +145,10 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   incident takes a note of your own (a ticket number, what the provider said), and a provider-side
   incident records a traceroute the moment it opens, so its detail shows where the packets stopped.
   Every incident also records this computer's own traffic before, during and after it, next to
-  what was normal just before (see [Latency under load](#latency-under-load)).
+  what was normal just before (see [Latency under load](#latency-under-load)). Besides faults,
+  the list records the environment *moving*: the connection going over another adapter, an
+  adapter getting an automatic private address, the network's settings changing, the router
+  answering from different hardware (see [Network changes](#network-changes)).
 - **Tools**: a live-filling **Traceroute** (each hop optionally annotated with who owns it - your
   own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings - and,
   when ICMP doesn't reach the destination at all, a plain TCP connect to the destination to tell
@@ -251,6 +254,41 @@ monitoring runs as soon as one is on. It flags packet-level conditions that sit
 below what the seven steps measure: TCP retransmissions, packet loss, TTL-exceeded responses, and
 an unexpected (rogue) DHCP server on the network - each with its own threshold and time window.
 
+## Network changes
+
+The seven steps follow the adapter Windows routes over, so when the cable adapter loses its DHCP
+server and Windows quietly carries on over Wi-Fi, every check stays green - while the cable
+adapter sits on a 169.254 address and a device that only lives on the wired network is
+unreachable. Proving afterwards what happened when used to take hours. Four kinds of change are
+therefore recorded as incidents of their own (Settings → Network changes, each with its own
+switch, all on by default), with the old and the new value, an explanation and this computer's
+traffic around the moment:
+
+- **Connection moves to another adapter** - "Connection moved from Ethernet (192.168.1.23 via
+  192.168.1.1) to Wi-Fi (10.0.0.5 via 10.0.0.1)". Open for as long as the detour lasts: it closes
+  when the traffic is back on the adapter it came from, with the duration, and by itself when that
+  adapter is switched off or removed (the move stands - a laptop that goes on Wi-Fi for good is not
+  an incident for the rest of its life). Its timeline notes the moment the original adapter was
+  usable again while Windows still routed over the other one.
+- **An adapter gets an automatic private address** - an adapter other than the one carrying the
+  traffic has its link up and DHCP on, but holds only a 169.254 address: its DHCP server did not
+  answer. The explanation says which address it had until when, and from which DHCP server.
+  Closes when it has a proper address again or is disconnected. (The adapter carrying the traffic
+  is step 3's job, as before.)
+- **The network's settings change on the same adapter** - gateway, network, DNS servers, DHCP
+  server, IPv6 prefix or Wi-Fi network went from one known value to another: someone changed the
+  network, or a different DHCP server answered. A value appearing or disappearing is not a change
+  (that is connecting, or an outage). Recorded as a moment: start and end are the same instant.
+- **The router answers from a different hardware address** - the same gateway address, a different
+  MAC address in Windows' ARP table after the gateway check (nothing extra is sent): a replaced
+  router, a failover, or a device impersonating the router. Also a moment.
+
+The first cycle after start-up is only a baseline, and a VPN connecting or disconnecting
+re-baselines rather than reports (a full tunnel replaces the DNS servers by design). None of these
+is an outage: they never count against availability, and the provider report's uptime strip shows
+them in the warning colour. The webhook sends them with `kind: "change"`, and the AI export has a
+*Network changes* section besides listing each one with the incidents.
+
 ## Speed test
 
 The Tools page's third tab runs a [LibreSpeed](https://librespeed.org/) test (ping, jitter,
@@ -299,8 +337,8 @@ Reports → Export covers three kinds of export, and two more are available else
   to look for, how to structure its answer) and everything the provider report has, plus: every
   incident with its timeline, the changes recorded just before it and each step's measurements;
   when outages start by hour and weekday; latency per day and by hour of day; Wi-Fi signal and
-  access-point switches; this computer's traffic, over the period and around every incident; and
-  statistics for every recorded series.
+  access-point switches; this computer's traffic, over the period and around every incident;
+  the network changes by kind; and statistics for every recorded series.
   Wi-Fi network names, access points, MAC addresses and any public IPv4 address this computer
   itself has (a line without NAT) are replaced by stable stand-ins ("Wi-Fi network A", "AP-1",
   "MAC-1", "IP-1"), so it can be pasted into any AI tool. Private addresses, the app's own ping
@@ -384,7 +422,10 @@ and how to set up a push monitor to get a URL from.
 Settings → Integrations → Webhook URL: an address that receives one JSON `POST` when an incident
 opens and one when it closes (`event`, `kind`, `id`, `uuid`, `cause`, `side`, `headline`,
 `startUtc`, `endUtc`, `durationSeconds`, `appVersion`). That is enough for Home Assistant, ntfy, a
-Discord or Slack webhook, or anything else that takes JSON. A test button sends a sample. `id` is
+Discord or Slack webhook, or anything else that takes JSON. A test button sends a sample. `kind`
+is `outage` for a connectivity incident, `warning` for a network-health condition and `change`
+for a [network change](#network-changes); `side` is where it originated (`Provider`,
+`HomeNetwork`, `ThisComputer`, `NetworkHealth` for a warning). `id` is
 the readable INC-20261017-213816.729 (the local date and time it opened); `uuid` is globally
 unique, the same on the "opened" and the "resolved" message, so a receiver can open and close
 exactly one thing even when two machines post to it. `label` is what you chose to call this
@@ -439,7 +480,9 @@ traceroute hop ownership; LAN-scan manufacturer lookup with a TCP fallback; an A
 signed self-update; a webhook; notes on incidents and a route traced when an incident opens; named
 ping targets with their own charts; a report over any period with a comparison; adapter choice; a
 path-MTU tool; a clock check; a network scan that remembers; a command-line export; a portable
-mode; and this computer's own traffic before, during and after every incident.
+mode; this computer's own traffic before, during and after every incident; and network changes
+(an adapter switch, an automatic private address, changed network settings, different router
+hardware) recorded as incidents.
 
 Everything v1 did is back. Quiet hours were dropped on purpose: a pop-up suppressed while you are at
 the keyboard and shown when you are not would defeat the point - pop-ups can simply be switched off.
@@ -469,7 +512,8 @@ For a new contributor, the call chain from startup to a diagnosis on screen is:
 
 Besides the main cycle, a handful of things run on their own schedule: `Core/Monitors/KumaPusher.cs`
 (the heartbeat push), `Core/Monitors/LineQualitySampler.cs` (packet loss and jitter, once a minute),
-`Core/Monitors/NetworkHealthMonitor.cs` (packet-level conditions),
+`Core/Monitors/NetworkHealthMonitor.cs` (packet-level conditions), `Core/Monitors/NetworkChangeMonitor.cs`
+(network changes, fed one reading per cycle),
 `Core/Updates/UpdateChecker.cs` (the daily GitHub check), `Core/Monitors/SpeedTestScheduler.cs`
 (the optional automatic Speed Test) - the last four follow the same `Reconfigure(...)`-driven
 live-restart shape, so a Settings change takes effect immediately without restarting the app.

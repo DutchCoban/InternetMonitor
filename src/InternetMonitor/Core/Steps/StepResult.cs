@@ -109,6 +109,9 @@ public sealed class StepSnapshot
     /// <summary>This computer's traffic over the interval leading up to this cycle, when it could be measured.</summary>
     public ThroughputSample? Throughput { get; init; }
 
+    /// <summary>Every candidate adapter's address situation at this cycle, not only the primary one's - see <see cref="Net.AdapterInventory"/>.</summary>
+    public IReadOnlyList<Net.AdapterReading> Adapters { get; init; } = [];
+
     public IReadOnlyCollection<StepResult> All => _results.Values;
 
     public StepResult? this[StepId step] => _results.GetValueOrDefault(step);

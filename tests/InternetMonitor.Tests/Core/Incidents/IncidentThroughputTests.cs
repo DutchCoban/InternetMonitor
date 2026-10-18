@@ -122,6 +122,20 @@ public sealed class IncidentThroughputTests
     }
 
     [Fact]
+    public void A_moment_has_no_during_window_but_keeps_before_and_after()
+    {
+        Incident moment = Resolved() with { EndUtc = Start };
+
+        IncidentThroughput traffic = IncidentThroughputSummary.Compute(moment, History(Story()), 200, 20, ThroughputCapacitySource.SpeedTest, End.AddMinutes(10), Interval);
+
+        Assert.Null(traffic.During);
+        Assert.Equal(20, traffic.Before!.Samples);
+        Assert.Equal((Start, Start.AddMinutes(5)), (traffic.After!.FromUtc, traffic.After.ToUtc));
+        Assert.False(traffic.AfterPending);
+        Assert.True(traffic.HasAnyWindow);
+    }
+
+    [Fact]
     public void Capacity_comes_from_the_last_real_speed_test_at_or_before_the_start()
     {
         (double? down, double? up) = IncidentThroughputSummary.SpeedTestCapacityBefore(History(Story()), Start);

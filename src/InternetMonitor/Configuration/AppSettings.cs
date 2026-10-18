@@ -392,6 +392,27 @@ public sealed class AppSettings
     /// </summary>
     public string DiagnosticLogDirectory { get; set; } = string.Empty;
 
+    // ---- Network changes -----------------------------------------------------------------------
+
+    // All four on by default: a change of network is exactly the kind of thing that is impossible
+    // to reconstruct afterwards, and each is one incident per event, not a stream.
+
+    /// <summary>The connection moved to another adapter - see <see cref="Core.Monitors.NetworkChangeMonitor.PathChanged"/>.</summary>
+    public bool IncidentOnPathChange { get; set; } = true;
+
+    /// <summary>An adapter other than the primary one holds a 169.254 address - see <see cref="Core.Monitors.NetworkChangeMonitor.Apipa"/>.</summary>
+    public bool IncidentOnApipa { get; set; } = true;
+
+    /// <summary>Gateway, network, DNS, DHCP server, IPv6 prefix or Wi-Fi network changed on the same adapter - see <see cref="Core.Monitors.NetworkChangeMonitor.NetworkChanged"/>.</summary>
+    public bool IncidentOnNetworkChange { get; set; } = true;
+
+    /// <summary>The gateway answers from a different hardware address - see <see cref="Core.Monitors.NetworkChangeMonitor.GatewayHardwareChanged"/>.</summary>
+    public bool IncidentOnGatewayHardwareChange { get; set; } = true;
+
+    [JsonIgnore]
+    public Core.Monitors.NetworkChangeOptions NetworkChangeOptions =>
+        new(IncidentOnPathChange, IncidentOnApipa, IncidentOnNetworkChange, IncidentOnGatewayHardwareChange);
+
     // ---- Network health ------------------------------------------------------------------------
 
     /// <summary>

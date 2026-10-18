@@ -54,7 +54,7 @@ public sealed class IpAddressCheck : IStepCheck
                 && !InterfaceSelector.IsUnspecified(a.Address));
 
         IPAddress? address = unicast?.Address;
-        bool isApipa = address is not null && IsApipa(address);
+        bool isApipa = address is not null && InterfaceSelector.IsApipa(address);
 
         IPAddress? gateway = properties.GatewayAddresses
             .Select(g => g.Address)
@@ -173,16 +173,6 @@ public sealed class IpAddressCheck : IStepCheck
         byte[] bytes = address.GetAddressBytes();
         Array.Clear(bytes, 8, 8);
         return new IPAddress(bytes) + "/64";
-    }
-
-    /// <summary>
-    /// 169.254.0.0/16 - the address Windows gives itself when DHCP got no answer. Seeing one is
-    /// almost always a DHCP or cabling problem rather than an addressing problem.
-    /// </summary>
-    private static bool IsApipa(IPAddress address)
-    {
-        byte[] bytes = address.GetAddressBytes();
-        return bytes.Length == 4 && bytes[0] == 169 && bytes[1] == 254;
     }
 
     private static bool TryGetDhcpEnabled(IPInterfaceProperties properties)

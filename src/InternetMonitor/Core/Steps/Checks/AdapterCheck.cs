@@ -45,6 +45,7 @@ public sealed class AdapterCheck : IStepCheck
         IReadOnlyList<NetworkInterface> all = _enumerate();
         context.AllAdapters = all;
         IReadOnlyList<NetworkInterface> candidates = InterfaceSelector.Candidates(all);
+        context.AdapterReadings = AdapterInventory.Read(candidates);
         Configuration.CheckTargets targets = context.Targets;
         NetworkInterface? adapter = InterfaceSelector.GetPrimary(all, targets.AdapterMode, targets.AdapterId);
 
@@ -91,7 +92,8 @@ public sealed class AdapterCheck : IStepCheck
             SpeedMbps: speedMbps,
             IsWireless: wireless,
             IsLikelyVirtual: InterfaceSelector.IsLikelyVirtual(adapter),
-            CandidateCount: candidates.Count);
+            CandidateCount: candidates.Count,
+            Id: adapter.Id);
 
         var measurements = new List<Measurement>
         {
