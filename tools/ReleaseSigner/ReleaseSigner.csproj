@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Maintainer tool, never shipped: makes the release signing key pair and signs a published
+  <!-- Maintainer tool, never shipped: makes the release signing key pair, signs a published
        InternetMonitor.exe so the app's self-update can verify what it downloaded (see
-       src/InternetMonitor/Core/Updates/ReleaseSignature.cs). Plain .NET, no packages. -->
+       src/InternetMonitor/Core/Updates/ReleaseSignature.cs), and has VirusTotal check the
+       executable before it is published. Plain .NET, no packages. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>

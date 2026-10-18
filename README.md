@@ -517,6 +517,27 @@ private key lives with the maintainer, outside the repository; `keygen` makes a 
 the public half to put in `Core/Updates/ReleaseSignature.cs`. Anyone can check a download by hand
 with `verify <public-key-base64> <path-to-InternetMonitor.exe>` (the `.sig` is expected next to it).
 
+### Checking a release on VirusTotal
+
+Before an executable is published, the same tool has VirusTotal look at it:
+
+```powershell
+dotnet run --project tools/ReleaseSigner -- virustotal <path-to-virustotal-api-key.txt> ./publish/InternetMonitor.exe
+```
+
+The key file holds the API key of a (free) VirusTotal account, one line, kept outside the
+repository like the signing key. The tool uploads the file unless VirusTotal has already seen
+those exact bytes, waits for the analysis, and prints how many engines object and which, the
+report link (keyed by the file's SHA-256, so it is the link for the published asset too), and a
+ready-made line for the release notes. One heuristic hit on an unsigned single-file .NET
+executable happens and is only reported; from two engines calling the file malicious the tool
+exits with code 4 and the release waits for a human look. Uploading shares the file with
+VirusTotal and its partners, which is fine for a release that is about to be public anyway. The
+free API allows 4 requests a minute and 500 a day; a release needs a handful.
+
+The order of a release is therefore: publish, sign, verify, `--selftest`, virustotal, then upload
+the executable and its `.sig` to the GitHub release with the notes.
+
 ### Command line
 
 ```powershell
@@ -603,13 +624,13 @@ shared tools folder. The `INTERNETMONITOR_DATA_DIR` environment variable, when s
 
 ## Security notes
 
-- **The release executable is checked on VirusTotal.** The v2.3.0 download scored 0 of 70 engines
-  ([file report](https://www.virustotal.com/gui/file/e8e0a78b00199ed3247a3efaa1507711d4aa25ba87e664394063a847a480e3e4)),
-  and its sandbox run shows only what the app does by design: the GitHub API for the update
-  check, a time server for the clock check and Microsoft's connectivity page. The report is tied
-  to the file's SHA-256, so it describes exactly the bytes you download. The executable carries
-  the project's own release signature (`InternetMonitor.exe.sig`, checked by the self-update)
-  but no Authenticode certificate, which is why SmartScreen may warn the first time.
+- **Every release executable is checked on VirusTotal before it is published.** The release
+  notes carry the link to the file report, which is tied to the file's SHA-256 and so describes
+  exactly the bytes you download (v2.3.0, for example, scored 0 of 70 engines, and its sandbox run
+  showed only what the app does by design: the GitHub API for the update check, a time server for
+  the clock check and Microsoft's connectivity page). The executable carries the project's own
+  release signature (`InternetMonitor.exe.sig`, checked by the self-update) but no Authenticode
+  certificate, which is why SmartScreen may warn the first time.
 - **User-configured targets are trusted.** Application endpoints are entirely user-supplied and
   flow directly into raw TCP/UDP/HTTPS probes with no target allowlist. This is intended - it's a
   local, single-user monitoring tool, and you're only ever pointing it at hosts you choose. It
