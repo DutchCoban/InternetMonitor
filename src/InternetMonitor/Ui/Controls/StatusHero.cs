@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Drawing.Drawing2D;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
@@ -23,6 +24,8 @@ public sealed class StatusHero : ThemedControl
     private string _explanation = string.Empty;
     private string _latency = string.Empty;
     private string _lastCheck = string.Empty;
+    private string _traffic = string.Empty;
+    private bool _trafficBusy;
     private bool _checking;
 
     private bool _networkHealthEnabled;
@@ -103,6 +106,12 @@ public sealed class StatusHero : ThemedControl
         double? latency = snapshot[StepId.PublicIp]?.ChartValue ?? snapshot[StepId.Target]?.ChartValue;
         _latency = latency is { } ms ? $"{ms:F0} ms" : "-";
         _lastCheck = snapshot.TakenUtc.ToLocalTime().ToString("HH:mm:ss");
+
+        // This computer's own traffic over the last cycle - the live rate, not the stored average.
+        _traffic = snapshot.Throughput is { } traffic
+            ? loc.Format("hero.stat.traffic.value", traffic.DownMbps.ToString("F1", CultureInfo.InvariantCulture), traffic.UpMbps.ToString("F1", CultureInfo.InvariantCulture))
+            : "-";
+        _trafficBusy = snapshot.Throughput?.Busy == true;
 
         _loginButton.Text = loc.Get("hero.portal.open");
         _loginButton.SizeToContent();
@@ -224,19 +233,30 @@ public sealed class StatusHero : ThemedControl
         DrawStat(g, p, loc.Get("hero.stat.latency"), _latency, p.TextPrimary, textLeft, statsTop);
         DrawStat(g, p, loc.Get("hero.stat.lastCheck"), _lastCheck, p.TextPrimary, textLeft + Dp(120), statsTop);
 
-        if (_networkHealthEnabled)
+        // The stats to the right are dropped, not squeezed, when the card is too narrow for them.
+        int trafficLeft = textLeft + Dp(240);
+        int trafficWidth = Dp(150);
+        if (trafficLeft + trafficWidth <= right)
+        {
+            Color trafficColor = _trafficBusy ? SeverityColors.Strong(Severity.Warning) : p.TextPrimary;
+            DrawStat(g, p, loc.Get("hero.stat.traffic"), _traffic, trafficColor, trafficLeft, statsTop, trafficWidth);
+        }
+
+        int healthLeft = trafficLeft + trafficWidth + Dp(10);
+        if (_networkHealthEnabled && healthLeft + Dp(116) <= right)
         {
             string value = _networkHealthOpenCount == 0
                 ? loc.Get("hero.stat.networkHealth.ok")
                 : loc.Format("hero.stat.networkHealth.open", _networkHealthOpenCount);
             Color color = SeverityColors.Strong(_networkHealthOpenCount == 0 ? Severity.Ok : Severity.Error);
-            DrawStat(g, p, loc.Get("hero.stat.networkHealth"), value, color, textLeft + Dp(240), statsTop);
+            DrawStat(g, p, loc.Get("hero.stat.networkHealth"), value, color, healthLeft, statsTop);
         }
     }
 
-    private void DrawStat(Graphics g, Palette p, string label, string value, Color valueColor, int x, int y)
+    private void DrawStat(Graphics g, Palette p, string label, string value, Color valueColor, int x, int y, int? width = null)
     {
-        g.DrawTextCrisp(label, Theme.Font(FontRole.Small), p.TextMuted, new Rectangle(x, y, Dp(116), Dp(14)));
-        g.DrawTextCrisp(value, Theme.Font(FontRole.BodyStrong), valueColor, new Rectangle(x, y + Dp(14), Dp(116), Dp(18)));
+        int w = width ?? Dp(116);
+        g.DrawTextCrisp(label, Theme.Font(FontRole.Small), p.TextMuted, new Rectangle(x, y, w, Dp(14)));
+        g.DrawTextCrisp(value, Theme.Font(FontRole.BodyStrong), valueColor, new Rectangle(x, y + Dp(14), w, Dp(18)));
     }
 }

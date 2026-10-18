@@ -132,7 +132,13 @@ public static class AiExportBuilder
         **Incidents.** An incident opens after three consecutive failing cycles and closes after two
         consecutive good ones, so very short blips do not appear. Each records its most likely
         cause, a timeline, every step's result at the start and at resolution, and what changed in
-        the environment in the 30 minutes before it opened.
+        the environment in the 30 minutes before it opened. Each also carries this computer's own
+        traffic around it: a baseline (the 15 minutes before the 5 minutes before it opened), those
+        5 minutes, the incident itself, and the 5 minutes after it closed - average and peak in
+        Mbit/s, and as a share of the line's capacity (the last speed test, else the adapter's link
+        speed). A high load just before a fault points at the router or at bufferbloat rather than
+        at the provider; an idle line that fails does not. Only this computer's traffic is visible:
+        a quiet line here can still be full because of another device.
 
         **Causes and where they originate.**
         - This computer: Adapter, Link (cable or Wi-Fi), IpConfiguration.
@@ -248,7 +254,7 @@ public static class AiExportBuilder
         doc.Line(HowToRead).Blank();
         AppendSummary(doc, report, settings);
         AppendOutagePatterns(doc, report);
-        AppendIncidents(doc, incidents, limits);
+        AppendIncidents(doc, incidents, limits, Series, to, TimeSpan.FromSeconds(settings.BackgroundIntervalSeconds));
         AppendLatency(doc, Series, from, to);
         AppendLineQuality(doc, report);
         AppendSpeedTests(doc, report, settings, limits);
@@ -398,7 +404,7 @@ public static class AiExportBuilder
         doc.Item("By day of week", string.Join(", ", byDay)).Blank();
     }
 
-    private static void AppendIncidents(Doc doc, IReadOnlyList<Incident> incidents, Limits limits)
+    private static void AppendIncidents(Doc doc, IReadOnlyList<Incident> incidents, Limits limits, Func<string, IReadOnlyList<MetricPoint>> series, DateTimeOffset now, TimeSpan sampleInterval)
     {
         doc.Line("## Incidents (all recorded, newest first)").Blank();
         if (incidents.Count == 0)
@@ -460,6 +466,15 @@ public static class AiExportBuilder
                 }
             }
 
+            if (IncidentThroughputSummary.Resolve(incident, series, now, sampleInterval) is { } traffic)
+            {
+                doc.Line("- This computer's own traffic around it (Mbit/s download / upload; only this computer is visible):");
+                foreach (string line in traffic.Describe(LocalizationManager.GetEnglish, LocalizationManager.FormatEnglish))
+                {
+                    doc.Line("  - " + line);
+                }
+            }
+
             if (incident.Timeline.Count > 0)
             {
                 doc.Line("- Timeline:");
@@ -509,15 +524,18 @@ public static class AiExportBuilder
         doc.Line("### Older incidents (one line each)").Blank()
             .Line(I($"{summarised.Count} older incidents, newest first. Their full detail is in the \"export all data\" zip."))
             .Blank()
-            .Row("Id", "Cause", "Side", "Start (local)", "Duration", "Headline").Rule(6);
+            .Row("Id", "Cause", "Side", "Start (local)", "Duration", "Load before", "Headline").Rule(7);
         foreach (Incident incident in summarised)
         {
+            // This computer's own load in the five minutes before, as a share of the line's capacity.
+            double? loadBefore = IncidentThroughputSummary.Resolve(incident, series, now, sampleInterval)?.Before?.PeakUtilization;
             doc.Row(
                 incident.Id,
                 incident.ConditionKey is { } condition ? I($"{incident.Cause} ({condition})") : incident.Cause.ToString(),
                 IncidentSide(incident),
                 doc.LocalTime(incident.StartUtc),
                 incident.Duration is { } d ? Duration(d) : "ongoing",
+                loadBefore is { } share ? IncidentThroughput.Percent(share) : "-",
                 doc.Names.Text(incident.Headline));
         }
 
@@ -723,15 +741,19 @@ public static class AiExportBuilder
     {
         double[] d = [.. down.Where(p => p.Timestamp >= from && p.Timestamp <= to).Select(p => p.Value).Order()];
         double[] u = [.. up.Where(p => p.Timestamp >= from && p.Timestamp <= to).Select(p => p.Value).Order()];
-        doc.Line("## This computer's own traffic (Mbit/s per cycle)").Blank();
+        doc.Line("## This computer's own traffic (Mbit/s, each point an average over its recording interval)").Blank();
         if (d.Length == 0)
         {
             doc.Line("Not measured in this period.").Blank();
             return;
         }
 
+        // Each point also carries the fastest single cycle inside its interval, which is where a short burst shows.
+        double peakDown = down.Where(p => p.Timestamp >= from && p.Timestamp <= to).Max(TrafficHistory.PeakOf);
+        double peakUp = up.Where(p => p.Timestamp >= from && p.Timestamp <= to).Select(TrafficHistory.PeakOf).DefaultIfEmpty(0).Max();
         doc.Item("Download", I($"average {d.Average():F1}, p95 {Percentile(d, 0.95):F1}, max {d[^1]:F1}"))
-            .Item("Upload", u.Length > 0 ? I($"average {u.Average():F1}, p95 {Percentile(u, 0.95):F1}, max {u[^1]:F1}") : "-");
+            .Item("Upload", u.Length > 0 ? I($"average {u.Average():F1}, p95 {Percentile(u, 0.95):F1}, max {u[^1]:F1}") : "-")
+            .Item("Fastest single cycle", I($"download {peakDown:F1}, upload {peakUp:F1}"));
 
         if (report.SpeedTests.LastOrDefault() is { DownloadMbps: >= 1 } latest)
         {

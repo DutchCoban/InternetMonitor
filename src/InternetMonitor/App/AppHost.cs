@@ -31,6 +31,8 @@ public sealed class AppHost : ApplicationContext
     private readonly StepPipeline _pipeline;
     private readonly CadenceController _cadence;
     private readonly MetricStore _history;
+    private readonly TrafficAccumulator _traffic = new();
+    private readonly CancellationTokenSource _shutdown = new();
     private readonly IncidentStore _incidents;
     private readonly KumaPusher _kuma;
     private readonly DiagnosticLogger _diagnosticLog;
@@ -155,6 +157,11 @@ public sealed class AppHost : ApplicationContext
         _networkHealth.IncidentOpened += OnIncidentOpened;
         _networkHealth.IncidentClosed += _diagnosticLog.LogIncidentResolved;
         _networkHealth.IncidentClosed += incident => _webhook.Notify(incident, opened: false);
+        _tracker.IncidentOpened += incident => _ = CaptureThroughputAsync(incident, closed: false);
+        _tracker.IncidentClosed += incident => _ = CaptureThroughputAsync(incident, closed: true);
+        _networkHealth.IncidentOpened += incident => _ = CaptureThroughputAsync(incident, closed: false);
+        _networkHealth.IncidentClosed += incident => _ = CaptureThroughputAsync(incident, closed: true);
+        _ = CompleteThroughputAsync();
         _cadence.Start();
         _lineQuality.Start();
         _clock.Start();
@@ -278,6 +285,83 @@ public sealed class AppHost : ApplicationContext
         catch (OperationCanceledException)
         {
             // Took too long - the incident stands on its own, as it always did.
+        }
+    }
+
+    /// <summary>
+    /// Hangs this computer's traffic around the incident on it (see <see cref="IncidentThroughput"/>):
+    /// the baseline and the five minutes before when it opens, the incident itself when it closes,
+    /// and the five minutes after once they have passed. Each pass is saved, so whatever the app
+    /// lives to see survives a history that is pruned later; what it does not live to see, the
+    /// start-up pass (<see cref="CompleteThroughputAsync"/>) fills in from history next time.
+    /// Network-health incidents have no step snapshot, but the traffic series is written by the
+    /// pipeline regardless, so the same capture serves them.
+    /// </summary>
+    private async Task CaptureThroughputAsync(Incident incident, bool closed)
+    {
+        try
+        {
+            await _history.Loaded.ConfigureAwait(false);
+            AttachThroughput(incident);
+            if (!closed)
+            {
+                return;
+            }
+
+            // One recording interval of slack, so the window's last point has been stored.
+            await Task.Delay(IncidentThroughputSummary.AfterWindow + _history.MinimumSampleInterval, _shutdown.Token).ConfigureAwait(false);
+            AttachThroughput(incident);
+        }
+        catch (OperationCanceledException)
+        {
+            // The app is closing; the start-up pass completes the record next time.
+        }
+    }
+
+    private void AttachThroughput(Incident incident)
+    {
+        (double? down, double? up, ThroughputCapacitySource source) = LineCapacity();
+        incident.Throughput = IncidentThroughputSummary.Compute(incident, _history.Get, down, up, source, DateTimeOffset.UtcNow, _history.MinimumSampleInterval);
+        _incidents.Update(incident);
+    }
+
+    /// <summary>What the line can carry: the last speed test when there is one, else the adapter's link speed as an upper bound.</summary>
+    private (double? Down, double? Up, ThroughputCapacitySource Source) LineCapacity()
+    {
+        ThroughputMeter meter = _pipeline.Throughput;
+        if (meter.CapacityDownMbps is not null || meter.CapacityUpMbps is not null)
+        {
+            return (meter.CapacityDownMbps, meter.CapacityUpMbps, ThroughputCapacitySource.SpeedTest);
+        }
+
+        if (_pipeline.LatestSnapshot?.FactsFor<AdapterFacts>(StepId.Adapter)?.SpeedMbps is { } link && link > 0)
+        {
+            return (link, link, ThroughputCapacitySource.LinkSpeed);
+        }
+
+        return (null, null, ThroughputCapacitySource.None);
+    }
+
+    /// <summary>Incidents whose after-window the previous run did not live to record get it now, from history.</summary>
+    private async Task CompleteThroughputAsync()
+    {
+        try
+        {
+            await _history.Loaded.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        foreach (Incident incident in _incidents.All.Where(i => IncidentThroughputSummary.NeedsCompletion(i, now, _history.MinimumSampleInterval)).ToList())
+        {
+            if (IncidentThroughputSummary.Resolve(incident, _history.Get, now, _history.MinimumSampleInterval) is { } completed)
+            {
+                incident.Throughput = completed;
+                _incidents.Update(incident);
+            }
         }
     }
 
@@ -443,7 +527,7 @@ public sealed class AppHost : ApplicationContext
     /// </summary>
     private void RecordHistory(StepSnapshot snapshot)
     {
-        HistoryRecorder.Record(_history, snapshot);
+        HistoryRecorder.Record(_history, snapshot, _traffic);
     }
 
     /// <summary>
@@ -564,6 +648,7 @@ public sealed class AppHost : ApplicationContext
             // Order matters on the way out. Stop producing work first (cadence, then pipeline),
             // then take down what consumes it, and only then the tray - a visible tray icon backed
             // by a half-disposed app is worse than none.
+            _shutdown.Cancel();
             _cadence.Dispose();
             _pipeline.CycleCompleted -= OnCycleCompleted;
             _cadence.PauseChanged -= OnPauseChanged;

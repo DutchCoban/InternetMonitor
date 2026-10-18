@@ -16,7 +16,7 @@ internal static class HistoryRecorder
     /// rather than the UI's: it is pure bookkeeping, and the UI thread has no business waiting on
     /// a lock that a flush might be holding.
     /// </summary>
-    internal static void Record(MetricStore history, StepSnapshot snapshot)
+    internal static void Record(MetricStore history, StepSnapshot snapshot, TrafficAccumulator traffic)
     {
         foreach (StepResult result in snapshot.All)
         {
@@ -70,10 +70,27 @@ internal static class HistoryRecorder
             history.Sample(SeriesNames.Metered, snapshot.TakenUtc, metered ? 1 : 0);
         }
 
-        if (snapshot.Throughput is { } traffic)
+        // This computer's traffic: the stored point is the average over every cycle since the
+        // previous stored point (see TrafficAccumulator), with the fastest cycle as its metadata.
+        // Both series are sampled at the same instant, so one answer says whether both were kept.
+        if (snapshot.Throughput is { } sample)
         {
-            history.Sample(SeriesNames.TrafficDown, snapshot.TakenUtc, Math.Round(traffic.DownMbps, 2));
-            history.Sample(SeriesNames.TrafficUp, snapshot.TakenUtc, Math.Round(traffic.UpMbps, 2));
+            traffic.Add(sample);
+            if (traffic.Current is { } interval)
+            {
+                bool kept = history.Sample(SeriesNames.TrafficDown, snapshot.TakenUtc, Math.Round(interval.AvgDownMbps, 2), TrafficHistory.Metadata(interval.PeakDownMbps));
+                history.Sample(SeriesNames.TrafficUp, snapshot.TakenUtc, Math.Round(interval.AvgUpMbps, 2), TrafficHistory.Metadata(interval.PeakUpMbps));
+                if (kept)
+                {
+                    traffic.Reset();
+                }
+            }
+        }
+        else
+        {
+            // No reading this cycle (first cycle, adapter switch, counter reset): the interval
+            // starts over rather than bridging a gap whose length nobody measured.
+            traffic.Reset();
         }
     }
 

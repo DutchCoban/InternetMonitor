@@ -133,6 +133,7 @@ public static class ProviderReportHtml
             html.Append("<h3>").Append(E(loc.Get("report.p.allOutages"))).Append("</h3><table><thead><tr>")
                 .Append(Th(loc.Get("report.p.col.start"))).Append(Th(loc.Get("report.p.col.duration"), true))
                 .Append(Th(loc.Get("report.p.col.cause"))).Append(Th(loc.Get("report.p.col.side")))
+                .Append(Th(loc.Get("report.p.col.loadBefore"), true))
                 .Append("</tr></thead><tbody>");
             foreach (OutageEntry outage in data.Outages)
             {
@@ -140,10 +141,11 @@ public static class ProviderReportHtml
                 html.Append(outage.Side == OutageSide.Provider ? "<tr class=\"provider\">" : "<tr>")
                     .Append(Td(Local(outage.StartUtc, "dd-MM-yyyy HH:mm:ss"))).Append(Td(duration, true))
                     .Append(Td(loc.Get($"cause.{outage.Cause.Key()}"))).Append(Td(SideLabel(outage.Side, loc)))
+                    .Append(Td(outage.LoadBeforeUtilization is { } load ? Percent(load, 0) : "-", true))
                     .Append("</tr>");
             }
 
-            html.Append("</tbody></table>");
+            html.Append("</tbody></table><p class=\"note\">").Append(E(loc.Get("report.p.loadBefore.note"))).Append("</p>");
         }
 
         html.Append("</section>");

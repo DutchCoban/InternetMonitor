@@ -169,6 +169,14 @@ public sealed class PageSmokeTests
             EndUtc = DateTimeOffset.UtcNow.AddMinutes(-50),
             Status = IncidentStatus.Resolved,
             Headline = "No public address reachable",
+            Throughput = new IncidentThroughput(
+                null,
+                new ThroughputWindow(DateTimeOffset.UtcNow.AddMinutes(-65), DateTimeOffset.UtcNow.AddHours(-1), 20, 41, 4.1, 140, 14, DateTimeOffset.UtcNow.AddMinutes(-61), 0.2, 0.7),
+                null,
+                null,
+                200,
+                20,
+                ThroughputCapacitySource.SpeedTest),
         });
         try
         {

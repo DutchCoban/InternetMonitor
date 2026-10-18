@@ -27,6 +27,7 @@ public sealed class ThroughputTests
 
         Assert.Equal(100, sample.DownMbps, 3);
         Assert.Equal(10, sample.UpMbps, 3);
+        Assert.Equal(4, sample.IntervalSeconds, 3);
     }
 
     [Fact]

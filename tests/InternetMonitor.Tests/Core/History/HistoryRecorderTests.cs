@@ -53,7 +53,7 @@ public sealed class HistoryRecorderTests : IDisposable
             Throughput = new ThroughputSample(12.3456, 1.5, 0.2),
         };
 
-        HistoryRecorder.Record(store, snapshot);
+        HistoryRecorder.Record(store, snapshot, new TrafficAccumulator());
 
         Assert.Equal([12], store.Get(SeriesNames.For(StepId.Gateway)!).Select(p => p.Value));
         Assert.Empty(store.Get(SeriesNames.For(StepId.Dns)!));
@@ -66,8 +66,39 @@ public sealed class HistoryRecorderTests : IDisposable
         Assert.Equal([123], store.Get(SeriesNames.ForEndpoint("e1")).Select(p => p.Value));
         Assert.Empty(store.Get(SeriesNames.ForEndpoint("e2")));
         Assert.Equal([1], store.Get(SeriesNames.Metered).Select(p => p.Value));
-        Assert.Equal([12.35], store.Get(SeriesNames.TrafficDown).Select(p => p.Value));
+        MetricPoint down = Assert.Single(store.Get(SeriesNames.TrafficDown));
+        Assert.Equal((12.35, "peak=12.35"), (down.Value, down.Metadata));
         Assert.Equal([1.5], store.Get(SeriesNames.TrafficUp).Select(p => p.Value));
+    }
+
+    [Fact]
+    public async Task Foreground_cycles_fold_into_one_traffic_point_per_interval_with_the_fastest_cycle_as_its_peak()
+    {
+        await using var store = new MetricStore(TimeSpan.FromDays(1), _directory) { MinimumSampleInterval = TimeSpan.FromSeconds(15) };
+        await store.Loaded;
+        var traffic = new TrafficAccumulator();
+        double[] rates = [10, 10, 100, 10, 10, 10, 10];
+
+        for (int i = 0; i < rates.Length; i++)
+        {
+            var snapshot = new StepSnapshot([], T0.AddSeconds(3 * i)) { Throughput = new ThroughputSample(rates[i], rates[i] / 10, null, 3) };
+            HistoryRecorder.Record(store, snapshot, traffic);
+        }
+
+        // The first cycle is stored on its own (nothing before it); the point 15 s later averages
+        // the five cycles since, the 100 among them, and keeps that 100 as the peak.
+        IReadOnlyList<MetricPoint> points = store.Get(SeriesNames.TrafficDown);
+        Assert.Equal([T0, T0.AddSeconds(15)], points.Select(p => p.Timestamp));
+        Assert.Equal((10, "peak=10.00"), (points[0].Value, points[0].Metadata));
+        Assert.Equal((28, "peak=100.00"), (points[1].Value, points[1].Metadata));
+        Assert.Equal(2.8, Assert.Single(store.Get(SeriesNames.TrafficUp), p => p.Timestamp == T0.AddSeconds(15)).Value);
+
+        // A cycle without a reading starts the interval over: the next stored point covers only what came after it.
+        HistoryRecorder.Record(store, new StepSnapshot([], T0.AddSeconds(21)), traffic);
+        HistoryRecorder.Record(store, new StepSnapshot([], T0.AddSeconds(24)) { Throughput = new ThroughputSample(50, 5, null, 3) }, traffic);
+        HistoryRecorder.Record(store, new StepSnapshot([], T0.AddSeconds(30)) { Throughput = new ThroughputSample(70, 7, null, 6) }, traffic);
+        MetricPoint third = store.Get(SeriesNames.TrafficDown)[2];
+        Assert.Equal((T0.AddSeconds(30), 63.33, "peak=70.00"), (third.Timestamp, third.Value, third.Metadata));
     }
 
     [Fact]
@@ -76,7 +107,7 @@ public sealed class HistoryRecorderTests : IDisposable
         await using var store = new MetricStore(TimeSpan.FromDays(1), _directory);
         await store.Loaded;
 
-        HistoryRecorder.Record(store, new StepSnapshot([Result(StepId.Gateway, StepState.Failed, null)], T0));
+        HistoryRecorder.Record(store, new StepSnapshot([Result(StepId.Gateway, StepState.Failed, null)], T0), new TrafficAccumulator());
 
         Assert.Empty(store.SeriesIds);
     }

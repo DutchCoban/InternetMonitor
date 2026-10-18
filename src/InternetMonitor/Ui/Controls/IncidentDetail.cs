@@ -17,6 +17,7 @@ public sealed class IncidentDetail : ThemedControl
 {
     private readonly TextBox _note;
     private Incident? _incident;
+    private IncidentThroughput? _throughput;
     private int _scrollOffset;
     private int _contentHeight;
     private bool _loadingNote;
@@ -40,10 +41,12 @@ public sealed class IncidentDetail : ThemedControl
 
     protected override Color BehindColor => Theme.Current.Surface;
 
-    public void Show(Incident? incident)
+    /// <param name="throughput">The traffic picture to show under the incident - resolved by the page, which has the history; null leaves the section out.</param>
+    public void Show(Incident? incident, IncidentThroughput? throughput = null)
     {
         CommitNote();
         _incident = incident;
+        _throughput = throughput;
         _scrollOffset = 0;
 
         _loadingNote = true;
@@ -119,6 +122,11 @@ public sealed class IncidentDetail : ThemedControl
         if (incident.RecentChanges.Count > 0)
         {
             y = DrawList(g, p, loc.Get("incidents.recentChanges"), incident.RecentChanges, width, y);
+        }
+
+        if (_throughput is { } traffic)
+        {
+            y = DrawList(g, p, loc.Get("incidents.traffic"), traffic.Describe(loc.Get, loc.Format), width, y);
         }
 
         if (incident.Timeline.Count > 0)

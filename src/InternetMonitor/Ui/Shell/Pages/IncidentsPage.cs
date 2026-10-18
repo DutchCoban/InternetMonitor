@@ -35,7 +35,7 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
     protected override void Build()
     {
         _list = new IncidentList { Dock = DockStyle.Fill };
-        _list.SelectionChanged += incident => _detail.Show(incident);
+        _list.SelectionChanged += incident => _detail.Show(incident, incident is null ? null : TrafficAround(incident));
 
         _search = new TextBox { BorderStyle = BorderStyle.FixedSingle, Dock = DockStyle.Top, Font = Theme.Font(FontRole.Body) };
         _search.TextChanged += (_, _) =>
@@ -198,9 +198,17 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
 
         if (_detail is not null && _list.Selected is { } selected)
         {
-            _detail.Show(selected);
+            _detail.Show(selected, TrafficAround(selected));
         }
     }
+
+    /// <summary>
+    /// The traffic picture for an incident: what was captured with it, completed from history
+    /// where that still reaches back far enough (an incident from before this existed, or one the
+    /// app did not stay up long enough to finish).
+    /// </summary>
+    private IncidentThroughput? TrafficAround(Incident incident) =>
+        IncidentThroughputSummary.Resolve(incident, Services.History.Get, DateTimeOffset.UtcNow, Services.History.MinimumSampleInterval);
 
     private void OnExportClicked(object? sender, EventArgs e)
     {
@@ -209,7 +217,7 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
             return;
         }
 
-        string report = IncidentReportBuilder.Build(incident);
+        string report = IncidentReportBuilder.Build(incident, TrafficAround(incident));
 
         using var dialog = new SaveFileDialog
         {

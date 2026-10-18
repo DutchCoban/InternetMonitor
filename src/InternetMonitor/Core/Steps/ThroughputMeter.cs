@@ -7,7 +7,8 @@ namespace InternetMonitor.Core.Steps;
 /// The busier direction as a fraction of what the line can carry (0..1, can exceed 1 briefly), or
 /// null when there is nothing to compare against.
 /// </param>
-public sealed record ThroughputSample(double DownMbps, double UpMbps, double? Utilization)
+/// <param name="IntervalSeconds">How long the interval the rates are averaged over was; 0 when unknown.</param>
+public sealed record ThroughputSample(double DownMbps, double UpMbps, double? Utilization, double IntervalSeconds = 0)
 {
     /// <summary>At or above this the line is "busy": queues in the router start to fill, and latency rises with them.</summary>
     public const double BusyUtilization = 0.7;
@@ -93,7 +94,7 @@ public sealed class ThroughputMeter
                     upCapacity is > 0 ? up / upCapacity.Value : 0)
                 : null;
 
-            return new ThroughputSample(down, up, utilization);
+            return new ThroughputSample(down, up, utilization, seconds);
         }
     }
 }

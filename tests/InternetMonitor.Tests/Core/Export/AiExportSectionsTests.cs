@@ -53,6 +53,57 @@ public sealed class AiExportSectionsTests
     }
 
     [Fact]
+    public void An_incident_shows_the_traffic_around_it_and_an_older_one_its_load_before()
+    {
+        DateTimeOffset start = Now.AddHours(-1);
+        var window = new ThroughputWindow(start.AddMinutes(-5), start, 20, 41, 4.1, 140, 14, start.AddSeconds(-45), 0.205, 0.7);
+        var traffic = new IncidentThroughput(window with { AverageDownMbps = 20, PeakDownMbps = 20, PeakUtilization = 0.1 }, window, window with { AverageDownMbps = 0, PeakDownMbps = 0, PeakUtilization = 0 }, window, 200, 20, ThroughputCapacitySource.SpeedTest);
+        // More incidents than any detail level writes in full, so the oldest lands in the one-line table.
+        List<Incident> incidents = [.. Enumerable.Range(0, 25).Select(i => new Incident
+        {
+            Id = $"INC-{i:00}",
+            Cause = RootCause.Internet,
+            StartUtc = start.AddMinutes(-i * 10),
+            EndUtc = start.AddMinutes(-i * 10).AddMinutes(3),
+            Status = IncidentStatus.Resolved,
+            Headline = "down",
+            Throughput = i == 24 ? traffic with { Before = window with { PeakUtilization = 0.95 } } : traffic,
+        })];
+
+        string md = Export(incidents, []);
+
+        Assert.Contains("- This computer's own traffic around it (Mbit/s download / upload; only this computer is visible):", md);
+        Assert.Contains("  - 5 min before: average 41.0 / 4.1 Mbit/s (21% of capacity), peak 140.0 / 14.0 Mbit/s (70%) at ", md);
+        Assert.Contains("  - Capacity: 200.0 / 20.0 Mbit/s, from the last speed test", md);
+        Assert.Matches(new System.Text.RegularExpressions.Regex(@"\|\s*Load before\s*\|"), md);
+        Assert.Matches(new System.Text.RegularExpressions.Regex(@"\|\s*95%\s*\|"), md);
+        Assert.Contains("A high load just before a fault points at the router", md);
+    }
+
+    [Fact]
+    public void The_traffic_around_an_incident_recorded_without_it_comes_from_history_while_that_reaches_back()
+    {
+        DateTimeOffset start = Now.AddHours(-1);
+        var incident = new Incident { Id = "INC-1", Cause = RootCause.Internet, StartUtc = start, EndUtc = start.AddMinutes(2), Status = IncidentStatus.Resolved, Headline = "down" };
+        var history = new Dictionary<string, IReadOnlyList<MetricPoint>>
+        {
+            [SeriesNames.TrafficDown] = [.. Enumerable.Range(0, 120).Select(i => new MetricPoint(start.AddMinutes(-25).AddSeconds(15 * i), 30, TrafficHistory.Metadata(i == 95 ? 90 : 30)))],
+            [SeriesNames.TrafficUp] = [.. Enumerable.Range(0, 120).Select(i => new MetricPoint(start.AddMinutes(-25).AddSeconds(15 * i), 3, null))],
+            [SeriesNames.SpeedTestDownload] = [new MetricPoint(start.AddHours(-3), 100, null)],
+            [SeriesNames.SpeedTestUpload] = [new MetricPoint(start.AddHours(-3), 10, null)],
+        };
+
+        string md = Export([incident], history);
+
+        Assert.Contains("  - Normal (the 15 min before that): average 30.0 / 3.0 Mbit/s (30% of capacity), peak 30.0 / 3.0 Mbit/s (30%) (60 samples)", md);
+        Assert.Contains("  - 5 min before: average 30.0 / 3.0 Mbit/s (30% of capacity), peak 90.0 / 3.0 Mbit/s (90%) at ", md);
+        Assert.Contains("  - Capacity: 100.0 / 10.0 Mbit/s, from the last speed test", md);
+        Assert.Contains("- Fastest single cycle: download 90.0, upload 3.0", md);
+
+        Assert.DoesNotContain("This computer's own traffic around it", Export([incident with { StartUtc = Now.AddDays(-40), EndUtc = Now.AddDays(-40).AddMinutes(2) }], history));
+    }
+
+    [Fact]
     public void Packet_loss_jitter_traffic_and_warnings_render_their_tables()
     {
         var history = new Dictionary<string, IReadOnlyList<MetricPoint>>

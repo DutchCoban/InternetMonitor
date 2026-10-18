@@ -69,6 +69,23 @@ public sealed class IncidentExtrasTests
 
         Assert.DoesNotContain("\"Note\"", json);
         Assert.DoesNotContain("\"Traceroute\"", json);
+        Assert.DoesNotContain("\"Throughput\"", json);
+    }
+
+    [Fact]
+    public void The_text_export_lists_the_traffic_around_the_incident_when_given_it()
+    {
+        var incident = new Incident { Id = "INC-1", Cause = RootCause.Dns, StartUtc = DateTimeOffset.UtcNow, Headline = "x" };
+        var traffic = new IncidentThroughput(null, new ThroughputWindow(incident.StartUtc.AddMinutes(-5), incident.StartUtc, 20, 41, 4.1, 140, 14, incident.StartUtc.AddSeconds(-45), 0.205, 0.7), null, null, 200, 20, ThroughputCapacitySource.SpeedTest);
+
+        string without = IncidentReportBuilder.Build(incident);
+        string with = IncidentReportBuilder.Build(incident, traffic);
+
+        Assert.DoesNotContain("TRAFFIC", without);
+        Assert.Contains("THIS COMPUTER'S TRAFFIC", with);
+        Assert.Contains("- 5 min before: average 41.0 / 4.1 Mbit/s (21% of capacity), peak 140.0 / 14.0 Mbit/s (70%) at ", with);
+        Assert.Contains("- Capacity: 200.0 / 20.0 Mbit/s, from the last speed test", with);
+        Assert.Contains("- Only this computer's traffic is visible", with);
     }
 
     [Fact]

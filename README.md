@@ -144,6 +144,8 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   (provider, home network, this computer) and when (ongoing, 24 hours, 7 or 30 days). Each
   incident takes a note of your own (a ticket number, what the provider said), and a provider-side
   incident records a traceroute the moment it opens, so its detail shows where the packets stopped.
+  Every incident also records this computer's own traffic before, during and after it, next to
+  what was normal just before (see [Latency under load](#latency-under-load)).
 - **Tools**: a live-filling **Traceroute** (each hop optionally annotated with who owns it - your
   own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings - and,
   when ICMP doesn't reach the destination at all, a plain TCP connect to the destination to tell
@@ -197,6 +199,17 @@ from the adapter's byte counters, so it costs no traffic. When a latency warning
 the line being 70%+ full (judged against the last speed test, else the link speed), the warning
 says so: your own downloads queueing in the router (bufferbloat) is a different fix from a slow
 provider. Only this computer's traffic is visible; another device filling the line is not.
+
+Each stored traffic point is the average over the whole recording interval (15 seconds by
+default), with the fastest single cycle inside it kept as the point's peak, so a short burst
+between two points is not lost. Every incident records this traffic around it, for an
+investigator: a baseline (the 15 minutes before the 5 minutes before it opened), those 5 minutes
+with the moment of the peak, the incident itself, and the 5 minutes after it closed - average and
+peak in Mbit/s and as a share of the line's capacity (the last speed test, else the adapter's link
+speed). A line being pushed hard just before a fault points at the router or at bufferbloat; an
+idle line that fails points at the provider. The picture appears in the incident detail, the
+incident export, the AI export and the provider report, always with the note that only this
+computer is visible. The Status page shows the current download / upload rate every cycle.
 
 ## Packet loss and jitter
 
@@ -260,7 +273,8 @@ and opens it in your browser (print it to PDF to send it on), or saves it. It sh
 - availability, counting only outages on the provider's side (the internet beyond the router, the
   provider's DNS); outages in this computer, the home network or a captive portal are listed
   separately, so the report can't be dismissed over a local problem;
-- every outage, and a summary per cause;
+- every outage, and a summary per cause - each outage with how much of the line this computer
+  itself was using in the five minutes before it, so the provider can see the line was idle;
 - latency per day (average and 95th percentile), and packet loss and jitter per day;
 - time spent on a metered connection (a phone's hotspot), which does not count against the line,
   and how often IPv6 failed, if the network offers it;
@@ -285,7 +299,8 @@ Reports → Export covers three kinds of export, and two more are available else
   to look for, how to structure its answer) and everything the provider report has, plus: every
   incident with its timeline, the changes recorded just before it and each step's measurements;
   when outages start by hour and weekday; latency per day and by hour of day; Wi-Fi signal and
-  access-point switches; this computer's traffic; and statistics for every recorded series.
+  access-point switches; this computer's traffic, over the period and around every incident; and
+  statistics for every recorded series.
   Wi-Fi network names, access points, MAC addresses and any public IPv4 address this computer
   itself has (a line without NAT) are replaced by stable stand-ins ("Wi-Fi network A", "AP-1",
   "MAC-1", "IP-1"), so it can be pasted into any AI tool. Private addresses, the app's own ping
@@ -423,8 +438,8 @@ report for your provider; configurable history retention (up to 90 days); networ
 traceroute hop ownership; LAN-scan manufacturer lookup with a TCP fallback; an AI-ready export;
 signed self-update; a webhook; notes on incidents and a route traced when an incident opens; named
 ping targets with their own charts; a report over any period with a comparison; adapter choice; a
-path-MTU tool; a clock check; a network scan that remembers; a command-line export; and a portable
-mode.
+path-MTU tool; a clock check; a network scan that remembers; a command-line export; a portable
+mode; and this computer's own traffic before, during and after every incident.
 
 Everything v1 did is back. Quiet hours were dropped on purpose: a pop-up suppressed while you are at
 the keyboard and shown when you are not would defeat the point - pop-ups can simply be switched off.
@@ -522,7 +537,7 @@ argument sets the AI export's detail level; without it the level chosen on the R
 dotnet test tests/InternetMonitor.Tests/InternetMonitor.Tests.csproj
 ```
 
-Around 470 tests (xUnit, no other packages) cover about 69% of the app's lines: the seven checks'
+Around 500 tests (xUnit, no other packages) cover about 69% of the app's lines: the seven checks'
 verdicts over made-up adapters, substituted DNS answers and a listener on 127.0.0.1; the pipeline,
 incident tracker, cadence and history store; the network-health monitor over substituted counters;
 the lookups over played-back HTTP; every page built, localised in all eight languages, laid out

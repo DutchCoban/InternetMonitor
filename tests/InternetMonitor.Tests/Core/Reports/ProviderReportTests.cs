@@ -121,6 +121,41 @@ public sealed class ProviderReportTests
         }
     }
 
+    [Fact]
+    public void An_outage_carries_this_computers_load_before_it_from_the_incident_or_from_history()
+    {
+        DateTimeOffset first = From.AddHours(1);
+        DateTimeOffset second = From.AddHours(5);
+        DateTimeOffset third = From.AddHours(9);
+        Incident captured = Incident(RootCause.Internet, first, TimeSpan.FromMinutes(10));
+        captured.Throughput = new IncidentThroughput(null, new ThroughputWindow(first.AddMinutes(-5), first, 20, 41, 4.1, 190, 14, first.AddMinutes(-1), 0.2, 0.95), null, null, 200, 20, ThroughputCapacitySource.SpeedTest);
+        Incident fromHistory = Incident(RootCause.Internet, second, TimeSpan.FromMinutes(10));
+        Incident unknown = Incident(RootCause.Internet, third, TimeSpan.FromMinutes(10));
+
+        IReadOnlyList<MetricPoint> adapter = Samples(From, TimeSpan.FromHours(12));
+        IReadOnlyList<MetricPoint> History(string series) =>
+            series == SeriesNames.For(InternetMonitor.Core.Steps.StepId.Adapter) || series == SeriesNames.For(InternetMonitor.Core.Steps.StepId.PublicIp) ? adapter
+            : series == SeriesNames.TrafficDown ? Samples(second.AddMinutes(-6), TimeSpan.FromMinutes(6), value: 50)
+            : series == SeriesNames.TrafficUp ? Samples(second.AddMinutes(-6), TimeSpan.FromMinutes(6), value: 5)
+            : series == SeriesNames.SpeedTestDownload ? [new MetricPoint(From, 100, null)]
+            : series == SeriesNames.SpeedTestUpload ? [new MetricPoint(From, 10, null)]
+            : [];
+
+        ProviderReportData data = ProviderReportData.Compute([captured, fromHistory, unknown], History, From, To, TimeZoneInfo.Utc);
+
+        Assert.Equal(3, data.Outages.Count);
+        Assert.Equal(0.95, data.Outages[0].LoadBeforeUtilization);
+        Assert.Equal(0.5, data.Outages[1].LoadBeforeUtilization!.Value, 6);   // 50 of 100 down, 5 of 10 up
+        Assert.Null(data.Outages[2].LoadBeforeUtilization);                   // no traffic recorded around it
+
+        string html = ProviderReportHtml.Render(data, new ProviderReportOptions(100, 20, "2.4.0", To, TimeZoneInfo.Utc), LocalizationManager.Instance);
+        Assert.Contains("This computer&#39;s load before", html.Replace("'", "&#39;"));
+        Assert.Contains("<td class=\"num\">95%</td>", html);
+        Assert.Contains("<td class=\"num\">50%</td>", html);
+        Assert.Contains("<td class=\"num\">-</td>", html);
+        Assert.Contains("Only this computer is visible", html);
+    }
+
     private static ProviderReportData Compute(IReadOnlyList<MetricPoint> adapterAndLatency, params Incident[] incidents) =>
         Compute(adapterAndLatency, [], incidents);
 

@@ -34,7 +34,15 @@ public enum OutageSide
 /// <param name="ConditionKey">Set for a network-health warning, which only the incident list knows about.</param>
 public sealed record OutageSpan(DateTimeOffset StartUtc, DateTimeOffset EndUtc, RootCause Cause, string? IncidentId, string? ConditionKey, bool Ongoing);
 
-public sealed record OutageEntry(DateTimeOffset StartUtc, TimeSpan Duration, RootCause Cause, OutageSide Side, bool Ongoing);
+public sealed record OutageEntry(DateTimeOffset StartUtc, TimeSpan Duration, RootCause Cause, OutageSide Side, bool Ongoing)
+{
+    /// <summary>
+    /// How much of the line this computer itself was using in the five minutes before the outage -
+    /// the peak, as a share of the last speed test - or null when neither the incident nor the
+    /// history can say. Only this computer's traffic is visible.
+    /// </summary>
+    public double? LoadBeforeUtilization { get; init; }
+}
 
 public sealed record OutageGroup(RootCause Cause, OutageSide Side, int Count, TimeSpan Total, TimeSpan Longest);
 
@@ -119,6 +127,7 @@ public sealed record ProviderReportData(
         List<(DateTimeOffset From, DateTimeOffset To)> metered = MeteredStretches(InPeriod(history(SeriesNames.Metered), fromUtc, toUtc));
         TimeSpan meteredTime = metered.Aggregate(TimeSpan.Zero, (sum, s) => sum + (s.To - s.From));
         bool OnMetered(DateTimeOffset at) => metered.Any(s => at >= s.From && at <= s.To);
+        Dictionary<string, Incident> byId = incidents.GroupBy(i => i.Id).ToDictionary(g => g.Key, g => g.First());
 
         List<OutageEntry> outages =
         [
@@ -130,7 +139,10 @@ public sealed record ProviderReportData(
                     DateTimeOffset start = s.StartUtc < fromUtc ? fromUtc : s.StartUtc;
                     DateTimeOffset end = s.EndUtc < toUtc ? s.EndUtc : toUtc;
                     OutageSide side = OnMetered(s.StartUtc) ? OutageSide.MeteredConnection : SideOf(s.Cause);
-                    return new OutageEntry(s.StartUtc, end - start, s.Cause, side, s.Ongoing);
+                    return new OutageEntry(s.StartUtc, end - start, s.Cause, side, s.Ongoing)
+                    {
+                        LoadBeforeUtilization = LoadBefore(s, byId, history),
+                    };
                 })
                 .OrderBy(o => o.StartUtc),
         ];
@@ -174,6 +186,27 @@ public sealed record ProviderReportData(
                 InPeriod(history(SeriesNames.Jitter), fromUtc, toUtc),
                 timeZone),
         };
+    }
+
+    /// <summary>
+    /// This computer's peak load in the five minutes before an outage, as a share of capacity: what
+    /// the incident captured, else computed from history against the last speed test before it.
+    /// </summary>
+    private static double? LoadBefore(OutageSpan span, Dictionary<string, Incident> byId, Func<string, IReadOnlyList<MetricPoint>> history)
+    {
+        Incident? incident = span.IncidentId is { } id ? byId.GetValueOrDefault(id) : null;
+        if (incident?.Throughput?.Before?.PeakUtilization is { } captured)
+        {
+            return captured;
+        }
+
+        (double? down, double? up) = IncidentThroughputSummary.SpeedTestCapacityBefore(history, span.StartUtc);
+        if (down is null && up is null)
+        {
+            return null;
+        }
+
+        return IncidentThroughputSummary.Window(history, span.StartUtc - IncidentThroughputSummary.BeforeWindow, span.StartUtc, down, up)?.PeakUtilization;
     }
 
     /// <summary>

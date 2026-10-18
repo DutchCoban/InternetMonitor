@@ -20,7 +20,8 @@ namespace InternetMonitor.Core.Diagnosis;
 /// </summary>
 public static class IncidentReportBuilder
 {
-    public static string Build(Incident incident)
+    /// <param name="throughput">This computer's traffic around the incident, resolved by the caller (which has the history); null leaves the section out.</param>
+    public static string Build(Incident incident, IncidentThroughput? throughput = null)
     {
         LocalizationManager loc = LocalizationManager.Instance;
         var sb = new StringBuilder();
@@ -49,6 +50,11 @@ public static class IncidentReportBuilder
         if (incident.RecentChanges.Count > 0)
         {
             AppendList(sb, loc.Get("incidents.recentChanges"), incident.RecentChanges);
+        }
+
+        if (throughput is { } traffic)
+        {
+            AppendList(sb, loc.Get("incidents.traffic"), traffic.Describe(loc.Get, loc.Format));
         }
 
         if (incident.Traceroute is { } route)

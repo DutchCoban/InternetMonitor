@@ -31,6 +31,17 @@ public sealed class IncidentStoreTests
         ConditionKey = null,
         Note = "Ticket 4711",
         Traceroute = new IncidentTraceroute("9.9.9.9", Start, false, [new IncidentHop(1, "10.0.0.1", "router.lan", null, 1.5), new IncidentHop(2, null, null, null, null)]),
+        Throughput = new IncidentThroughput(
+            new ThroughputWindow(Start.AddMinutes(-20), Start.AddMinutes(-5), 60, 20.5, 2.1, 24, 2.5, Start.AddMinutes(-12), 0.1, 0.12),
+            new ThroughputWindow(Start.AddMinutes(-5), Start, 20, 41, 4.1, 140, 14, Start.AddSeconds(-45), 0.205, 0.7),
+            new ThroughputWindow(Start, Start.AddMinutes(4), 16, 0, 0, 0, 0, Start, 0, 0),
+            null,
+            200,
+            20,
+            ThroughputCapacitySource.SpeedTest)
+        {
+            AfterPending = true,
+        },
     };
 
     [Fact]
@@ -57,6 +68,9 @@ public sealed class IncidentStoreTests
         Assert.Equal("Ticket 4711", loaded.Note);
         Assert.Equal(incident.Traceroute!.Target, loaded.Traceroute!.Target);
         Assert.Equal(incident.Traceroute.Hops, loaded.Traceroute.Hops);
+        Assert.Equal(incident.Throughput, loaded.Throughput);
+        Assert.True(loaded.Throughput!.AfterPending);
+        Assert.Null(loaded.Throughput.After);
         StepSnapshotEntry step = Assert.Single(loaded.StepsAtStart);
         Assert.Equal(StepId.PublicIp, step.Step);
         Assert.Equal("- ms", step.Measurements["Latency"]);
