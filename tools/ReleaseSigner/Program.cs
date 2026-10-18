@@ -230,11 +230,21 @@ internal static class VirusTotalScan
             target = url.RootElement.GetProperty("data").GetString() ?? throw new InvalidOperationException("VirusTotal returned no upload URL.");
         }
 
+        // .NET quotes the boundary in the Content-Type header and adds an RFC 5987 filename*
+        // parameter to the part; VirusTotal's upload endpoint answers "Malformed multipart body"
+        // to both, so the headers are written the plain way every browser writes them.
+        string boundary = "----ReleaseSigner" + Guid.NewGuid().ToString("N");
         await using FileStream stream = File.OpenRead(file);
-        using var form = new MultipartFormDataContent();
+        using var form = new MultipartFormDataContent(boundary);
+        form.Headers.ContentType = new MediaTypeHeaderValue("multipart/form-data") { Parameters = { new NameValueHeaderValue("boundary", boundary) } };
         using var content = new StreamContent(stream);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        form.Add(content, "file", Path.GetFileName(file));
+        content.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
+        {
+            Name = "\"file\"",
+            FileName = "\"" + Path.GetFileName(file) + "\"",
+        };
+        form.Add(content);
 
         using HttpResponseMessage response = await http.PostAsync(target, form).ConfigureAwait(false);
         await EnsureOkAsync(response, "uploading the file").ConfigureAwait(false);
