@@ -847,7 +847,7 @@
   "incidents.traffic.capacity.link": "Kapazität: {0} Mbit/s, die Link-Geschwindigkeit des Adapters (eine Obergrenze)",
   "incidents.traffic.capacity.unknown": "Kapazität unbekannt - einen Geschwindigkeitstest ausführen, um die Auslastung zu sehen",
   "incidents.traffic.onlyThisComputer": "Nur der Datenverkehr dieses Computers ist sichtbar; andere Geräte an derselben Leitung nicht.",
-  "hero.stat.traffic": "Dieser Computer",
+  "hero.stat.traffic": "Aktueller Download und Upload",
   "hero.stat.traffic.value": "{0} / {1} Mbit/s",
   "report.p.col.loadBefore": "Last durch diesen Computer davor",
   "report.p.loadBefore.note": "Wie viel der Leitung dieser Computer selbst in den 5 Minuten vor der Störung nutzte (Spitze, gemessen am letzten Geschwindigkeitstest). Nur dieser Computer ist sichtbar; andere Geräte an derselben Leitung nicht."

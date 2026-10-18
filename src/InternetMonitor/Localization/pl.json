@@ -847,7 +847,7 @@
   "incidents.traffic.capacity.link": "Pojemność łącza: {0} Mbit/s, link speed adaptera (górna granica)",
   "incidents.traffic.capacity.unknown": "Pojemność łącza nieznana - uruchom test prędkości, aby zobaczyć wykorzystanie",
   "incidents.traffic.onlyThisComputer": "Widoczny jest tylko ruch tego komputera; inne urządzenia na tym samym łączu nie.",
-  "hero.stat.traffic": "Ten komputer",
+  "hero.stat.traffic": "Bieżący download i upload",
   "hero.stat.traffic.value": "{0} / {1} Mbit/s",
   "report.p.col.loadBefore": "Obciążenie przez ten komputer przed",
   "report.p.loadBefore.note": "Jaką część łącza ten komputer sam wykorzystywał w ciągu 5 minut przed awarią (szczyt, względem ostatniego testu prędkości). Widoczny jest tylko ten komputer; inne urządzenia na tym samym łączu nie."

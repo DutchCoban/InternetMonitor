@@ -847,7 +847,7 @@
   "incidents.traffic.capacity.link": "Capacity: {0} Mbit/s, the adapter's link speed (an upper bound)",
   "incidents.traffic.capacity.unknown": "Capacity unknown - run a speed test to see utilization",
   "incidents.traffic.onlyThisComputer": "Only this computer's traffic is visible; other devices on the same line are not.",
-  "hero.stat.traffic": "This computer",
+  "hero.stat.traffic": "Current download and upload",
   "hero.stat.traffic.value": "{0} / {1} Mbit/s",
   "report.p.col.loadBefore": "This computer's load before",
   "report.p.loadBefore.note": "How much of the line this computer itself was using in the 5 minutes before the outage (peak, against the last speed test). Only this computer is visible; other devices on the same line are not."

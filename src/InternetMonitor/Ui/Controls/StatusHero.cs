@@ -235,7 +235,7 @@ public sealed class StatusHero : ThemedControl
 
         // The stats to the right are dropped, not squeezed, when the card is too narrow for them.
         int trafficLeft = textLeft + Dp(240);
-        int trafficWidth = Dp(150);
+        int trafficWidth = Dp(190);
         if (trafficLeft + trafficWidth <= right)
         {
             Color trafficColor = _trafficBusy ? SeverityColors.Strong(Severity.Warning) : p.TextPrimary;

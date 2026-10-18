@@ -847,7 +847,7 @@
   "incidents.traffic.capacity.link": "Capaciteit: {0} Mbit/s, de linksnelheid van de adapter (een bovengrens)",
   "incidents.traffic.capacity.unknown": "Capaciteit onbekend - voer een snelheidstest uit om de benutting te zien",
   "incidents.traffic.onlyThisComputer": "Alleen het verkeer van deze computer is zichtbaar; andere apparaten op dezelfde lijn niet.",
-  "hero.stat.traffic": "Deze computer",
+  "hero.stat.traffic": "Huidige download en upload",
   "hero.stat.traffic.value": "{0} / {1} Mbit/s",
   "report.p.col.loadBefore": "Belasting door deze computer ervoor",
   "report.p.loadBefore.note": "Hoeveel van de lijn deze computer zelf gebruikte in de 5 minuten voor de storing (piek, tegenover de laatste snelheidstest). Alleen deze computer is zichtbaar; andere apparaten op dezelfde lijn niet."

@@ -847,7 +847,7 @@
   "incidents.traffic.capacity.link": "Capacité : {0} Mbit/s, le link speed de l'adaptateur (une limite haute)",
   "incidents.traffic.capacity.unknown": "Capacité inconnue - lancez un test de vitesse pour voir l'utilisation",
   "incidents.traffic.onlyThisComputer": "Seul le trafic de cet ordinateur est visible ; pas celui des autres appareils sur la même ligne.",
-  "hero.stat.traffic": "Cet ordinateur",
+  "hero.stat.traffic": "Download et upload actuels",
   "hero.stat.traffic.value": "{0} / {1} Mbit/s",
   "report.p.col.loadBefore": "Charge de cet ordinateur avant",
   "report.p.loadBefore.note": "Quelle part de la ligne cet ordinateur utilisait lui-même dans les 5 minutes précédant la panne (pic, par rapport au dernier test de vitesse). Seul cet ordinateur est visible ; pas les autres appareils sur la même ligne."
