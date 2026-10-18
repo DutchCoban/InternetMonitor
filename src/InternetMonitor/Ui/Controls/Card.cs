@@ -138,11 +138,27 @@ public class Card : ThemedControl
 
             if (_subtitle.Length > 0)
             {
-                height += Dp(2) + GdiExtensions.MeasureCrisp(_subtitle, Theme.Font(FontRole.Small)).Height;
+                height += Dp(2) + GdiExtensions.MeasureCrisp(_subtitle, Theme.Font(FontRole.Small), SubtitleWidth).Height;
             }
 
             return height;
         }
+    }
+
+    /// <summary>
+    /// The subtitle wraps to the card's width rather than being cut off with an ellipsis: a
+    /// sentence that explains a tool is worth a second line in a narrow window. Zero (no wrapping)
+    /// until the card has a width.
+    /// </summary>
+    private int SubtitleWidth => Math.Max(0, Width - (Inset * 2));
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+
+        // A narrower card may need another subtitle line, which moves everything under the header.
+        PerformLayout();
+        Invalidate();
     }
 
     protected override void OnThemeChanged() => ApplySurfaceColor();
@@ -209,12 +225,13 @@ public class Card : ThemedControl
 
         if (_subtitle.Length > 0)
         {
-            Size size = GdiExtensions.MeasureCrisp(_subtitle, Theme.Font(FontRole.Small));
+            Size size = GdiExtensions.MeasureCrisp(_subtitle, Theme.Font(FontRole.Small), SubtitleWidth);
             g.DrawTextCrisp(
                 _subtitle,
                 Theme.Font(FontRole.Small),
                 p.TextMuted,
-                new Rectangle(Inset, y, Math.Max(0, right - Inset), size.Height));
+                new Rectangle(Inset, y, Math.Max(0, right - Inset), size.Height),
+                TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.WordBreak);
         }
     }
 }

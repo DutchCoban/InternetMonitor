@@ -229,7 +229,8 @@ public sealed class StatusHero : ThemedControl
             return;
         }
 
-        int statsTop = (int)bounds.Bottom - Sp(5) - Dp(28);
+        // The label's box is as tall as its font, descenders included, so a "g" is not cut off.
+        int statsTop = (int)bounds.Bottom - Sp(5) - StatLabelHeight - Dp(1) - Dp(18);
         DrawStat(g, p, loc.Get("hero.stat.latency"), _latency, p.TextPrimary, textLeft, statsTop);
         DrawStat(g, p, loc.Get("hero.stat.lastCheck"), _lastCheck, p.TextPrimary, textLeft + Dp(120), statsTop);
 
@@ -253,10 +254,13 @@ public sealed class StatusHero : ThemedControl
         }
     }
 
+    private int StatLabelHeight => GdiExtensions.MeasureCrisp("Hg", Theme.Font(FontRole.Small)).Height;
+
     private void DrawStat(Graphics g, Palette p, string label, string value, Color valueColor, int x, int y, int? width = null)
     {
         int w = width ?? Dp(116);
-        g.DrawTextCrisp(label, Theme.Font(FontRole.Small), p.TextMuted, new Rectangle(x, y, w, Dp(14)));
-        g.DrawTextCrisp(value, Theme.Font(FontRole.BodyStrong), valueColor, new Rectangle(x, y + Dp(14), w, Dp(18)));
+        int labelHeight = StatLabelHeight;
+        g.DrawTextCrisp(label, Theme.Font(FontRole.Small), p.TextMuted, new Rectangle(x, y, w, labelHeight), TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.EndEllipsis);
+        g.DrawTextCrisp(value, Theme.Font(FontRole.BodyStrong), valueColor, new Rectangle(x, y + labelHeight + Dp(1), w, Dp(18)));
     }
 }
