@@ -71,6 +71,11 @@ The screenshots below show the app on a small home network; the incidents and hi
 <p align="center"><em><strong>The tools are built in.</strong> A traceroute that says what each hop is - still your own network, inside the provider, or a third party - and a speed test that also measures how much the ping grows while the line is full, graded A to F.</em></p>
 
 <p align="center">
+  <img src="docs/screenshots/mtu.png" alt="The Path MTU tool: the largest packet that reaches the target unfragmented" width="92%">
+</p>
+<p align="center"><em>The Path MTU tool tells a normal line (1500) from a PPPoE line (1492) and from a tunnel or VPN in the path.</em></p>
+
+<p align="center">
   <img src="docs/screenshots/reports.png" alt="The Reports page: the provider report with its period, comparison and subscription speed, and the exports including the one for AI analysis" width="49%">
   <img src="docs/screenshots/settings-network.png" alt="Settings: network changes and network health, each condition with its own switch" width="49%">
 </p>
@@ -206,6 +211,11 @@ analysis notices another network, another access point (a roam), and a sharp sig
 points below the best of the last five minutes). An outage that starts over a weak signal is
 explained as most likely caused by that signal rather than by the router or the provider.
 
+<p align="center">
+  <img src="docs/screenshots/history-wifi.png" alt="The Wi-Fi signal over 24 hours, with a diamond wherever the connection switched to another access point" width="92%">
+</p>
+<p align="center"><em>The Wi-Fi signal over a day. Each diamond marks a switch to another access point - here to the office one in the morning and back in the evening.</em></p>
+
 Since Windows 11 24H2 the network name and access point count as location data: Windows only
 reveals them when location access is on (Settings → Privacy & security → Location). With location
 services off, Windows withholds the connection details altogether - but it still reports the signal
@@ -237,6 +247,11 @@ the line being 70%+ full (judged against the last speed test, else the link spee
 says so: your own downloads queueing in the router (bufferbloat) is a different fix from a slow
 provider. Only this computer's traffic is visible; another device filling the line is not.
 
+<p align="center">
+  <img src="docs/screenshots/history-traffic.png" alt="This computer's own download traffic over 24 hours, one point per recording interval with the fastest cycle as its peak" width="92%">
+</p>
+<p align="center"><em>This computer's own traffic over a day, from the adapter's byte counters. A latency warning that coincides with a full line is reported as bufferbloat rather than as a slow provider.</em></p>
+
 Each stored traffic point is the average over the whole recording interval (15 seconds by
 default), with the fastest single cycle inside it kept as the point's peak, so a short burst
 between two points is not lost. Every incident records this traffic around it, for an
@@ -256,6 +271,11 @@ is the jitter - the numbers that explain choppy calls and stuttering games on a 
 technically up. Both are charted in History and summarised per day in the provider report. A minute
 in which nothing came back at all is not recorded: that is an outage (recorded as one) or a network
 that filters ping. This runs always, independent of the network-health monitoring below.
+
+<p align="center">
+  <img src="docs/screenshots/history-packet-loss.png" alt="Packet loss per minute over seven days: mostly zero, with one bad evening" width="92%">
+</p>
+<p align="center"><em>Packet loss per minute over a week: the occasional lost ping, and one evening that was genuinely bad - the kind of thing a connection that is "up" never tells you.</em></p>
 
 ## IPv6
 
@@ -287,6 +307,11 @@ Every condition has its own switch under Settings → Network health, all off by
 monitoring runs as soon as one is on. It flags packet-level conditions that sit
 below what the seven steps measure: TCP retransmissions, packet loss, TTL-exceeded responses, and
 an unexpected (rogue) DHCP server on the network - each with its own threshold and time window.
+
+<p align="center">
+  <img src="docs/screenshots/incident-packet-loss.png" alt="A network-health warning: high packet loss in five minutes, with the explanation and this computer's traffic at the time" width="92%">
+</p>
+<p align="center"><em>A network-health warning is an incident like any other - explained, with this computer's traffic at the time - but it never counts against the line's availability.</em></p>
 
 ## Network changes
 
@@ -334,6 +359,11 @@ optional automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default)
 metered connection unless allowed. Either way, a
 result is recorded into History (download, upload, ping and the extra ping under load) and
 included in "Export all data" and the provider report.
+
+<p align="center">
+  <img src="docs/screenshots/history-speedtest.png" alt="Every speed test's download result over a month, against a 500 Mbit/s subscription" width="92%">
+</p>
+<p align="center"><em>A month of automatic speed tests. The dips are what the provider report counts as "below 80% of the subscription".</em></p>
 
 ## Report for your provider
 
@@ -484,6 +514,11 @@ your report - and the Status page and the tray tooltip say so.
 
 Every setting and button shows a short explanation when the mouse rests on it for a second.
 
+<p align="center">
+  <img src="docs/screenshots/status-dark.png" alt="The Status screen in the dark theme and in Dutch" width="92%">
+</p>
+<p align="center"><em>The dark theme follows Windows, and the whole app speaks eight languages - Dutch here.</em></p>
+
 - **Language** (General) - English, Dutch, German, Polish, French, Spanish, Italian or Portuguese. A new installation starts in the
   Windows display language when it is one of these. Switching takes effect immediately across the
   whole app, including an already-open Settings window.
@@ -561,6 +596,10 @@ switchable live from Settings; there is no hardcoded UI language anywhere in the
 layer. Every colour, spacing step, corner radius and font comes from `Ui/Theming/Theme.cs` - no
 control names a color of its own.
 
+Outside the app: `tools/ReleaseSigner` (plain .NET) signs a release and checks it on VirusTotal,
+and `tools/Screenshots` regenerates the pictures in this README for each release (see
+[Releasing](#releasing)).
+
 ## Building and running
 
 Requires the .NET 10 SDK (`winget install Microsoft.DotNet.SDK.10`).
@@ -580,6 +619,22 @@ The result, `publish/InternetMonitor.exe`, can be copied to and run on any Windo
 machine. This intentionally skips `PublishReadyToRun` (which roughly doubles framework assembly
 sizes by embedding precompiled native code) to keep the download small - a slightly slower JIT
 cold start is an easy trade for a tray app that starts once and runs for days.
+
+### Releasing
+
+Every release goes through the same steps, in this order; none is skipped:
+
+1. Bump the version in `src/InternetMonitor/InternetMonitorV2.csproj` - the self-update compares
+   it with the tag.
+2. Build, and run the test suite until it is green three times in a row.
+3. **Refresh the screenshots** with `tools\Screenshots\Make-Screenshots.ps1` (see
+   [tools/Screenshots/README.md](tools/Screenshots/README.md)) and check them: the pictures in
+   this README show the version being shipped, not an older one.
+4. Publish the single-file executable (above), sign it, verify the signature, and run
+   `InternetMonitor.exe --selftest <file>` against the published file.
+5. Check the executable on VirusTotal and put the verdict line in the release notes.
+6. Push the branch, create the GitHub release with `InternetMonitor.exe` and
+   `InternetMonitor.exe.sig`, and fast-forward `master`.
 
 ### Signing a release
 
