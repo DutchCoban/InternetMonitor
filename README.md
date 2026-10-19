@@ -45,10 +45,36 @@ one `.exe`, nothing to install, free and open source.
 - **It stays out of your way.** A single `.exe` that runs without admin rights, follows Windows'
   light or dark theme, speaks eight European languages, and can keep itself up to date.
 
+The screenshots below show the app on a small home network; the incidents and history are an example set, and addresses that would identify a real network are blurred.
+
 <p align="center">
-  <img src="docs/screenshots/provider-report.png" alt="A report for your provider: availability, outages and where they originated" width="49%">
-  <img src="docs/screenshots/reports.png" alt="The Reports page: the provider report and the data exports" width="49%">
+  <img src="docs/screenshots/incidents.png" alt="An incident, explained: what happened, the likely cause, what you can do - with the route to the DNS server and this computer's own traffic around the moment" width="92%">
 </p>
+<p align="center"><em><strong>Every incident is explained in plain language</strong> - what happened, the likely cause and what to do - with the checks at that moment, the route the packets took, and how busy this computer's own line was. Here a DNS server that was reachable but silent on port 53.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/provider-report.png" alt="The report for your provider: availability, outages on the provider's side, speed tests against the subscription, and the change since the period before" width="49%">
+  <img src="docs/screenshots/incident-outage.png" alt="A provider-side outage: the traceroute that stopped at the provider, the note with the ticket number, and an idle line before it" width="49%">
+</p>
+<p align="center"><em><strong>Evidence for your provider.</strong> Left: the report - availability counting only outages on the provider's side, every outage with its cause, speed tests against your subscription, and the change since the period before. Right: one of those outages - the route stopped two hops out at the provider, the line was idle, and your note holds the ticket number.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/incident-network-change.png" alt="A network change recorded as an incident: the connection moved from Ethernet to Wi-Fi, with the moment Ethernet was usable again and when the traffic moved back" width="49%">
+  <img src="docs/screenshots/history.png" alt="The History page: a group, a series in it and a range; the DNS chart marks every unanswered lookup" width="49%">
+</p>
+<p align="center"><em><strong>It catches what other tools miss.</strong> Left: the environment <em>moving</em> rather than breaking - the connection quietly went over Wi-Fi after the cable adapter lost its DHCP server, and the timeline says when Ethernet was back and when the traffic returned. Right: History, with every unanswered DNS lookup marked on the chart - a resolver that goes quiet for a few seconds at a time is visible even when it never lasts long enough to become an incident.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/traceroute.png" alt="Traceroute with every hop annotated: your own network, the provider's, and who owns the rest" width="49%">
+  <img src="docs/screenshots/speedtest.png" alt="The speed test: ping, jitter, download, upload and the extra ping under load with its bufferbloat grade" width="49%">
+</p>
+<p align="center"><em><strong>The tools are built in.</strong> A traceroute that says what each hop is - still your own network, inside the provider, or a third party - and a speed test that also measures how much the ping grows while the line is full, graded A to F.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/reports.png" alt="The Reports page: the provider report with its period, comparison and subscription speed, and the exports including the one for AI analysis" width="49%">
+  <img src="docs/screenshots/settings-network.png" alt="Settings: network changes and network health, each condition with its own switch" width="49%">
+</p>
+<p align="center"><em><strong>Ready for AI, and tunable.</strong> Left: one document with instructions and everything the monitor recorded, pseudonymised, to paste into the AI assistant of your choice. Right: the switches for network changes and packet-level network health.</em></p>
 
 ## Get started in a minute
 
@@ -121,7 +147,7 @@ the slower, background rate regardless, so retention and chart density don't cha
 whether you happen to have the window open. History is kept for 30 days by default; Settings →
 Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
 
-## Six screens
+## Seven screens
 
 - **Status** (left-click the tray icon): a simple green/red/amber overview with a plain-language
   explanation, the last 24 hours in quarter-hour blocks and the last seven days with their
@@ -166,6 +192,11 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   tunnel or VPN in the path apart.
 - **Reports**: the [report for your provider](#report-for-your-provider) and the
   [data exports](#exporting-data).
+
+<p align="center">
+  <img src="docs/screenshots/diagnostics.png" alt="The Diagnostics page: the network-health conditions, the clock check, and every step's raw measurements" width="92%">
+</p>
+<p align="center"><em>Diagnostics: every measurement behind the verdict, the packet-level network-health conditions and the clock check.</em></p>
 
 ## Wi-Fi details
 
