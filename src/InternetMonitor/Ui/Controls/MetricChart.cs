@@ -37,6 +37,10 @@ public sealed class MetricChart : ThemedControl
 
     /// <summary>Where the metadata key changes, found once per series rather than by walking every point on every paint.</summary>
     private IReadOnlyList<DateTimeOffset> _changeMarkers = [];
+
+    /// <summary>Moments from another series marked along this one - unanswered lookups under the DNS line - with the footer text that counts them.</summary>
+    private IReadOnlyList<DateTimeOffset> _eventMarkers = [];
+    private string? _eventFooterKey;
     private int _stateBucketCount = 1;
     private bool _compact;
 
@@ -91,6 +95,8 @@ public sealed class MetricChart : ThemedControl
     /// <summary>
     /// Shows a new series in the current view window, or in a fresh one when there is none yet. Callers
     /// that want a particular range call <see cref="SetRange"/> afterwards, as the History page does.
+    /// <paramref name="eventMarkers"/> are moments to mark along the line that are not points of
+    /// it (a failed lookup has no latency), counted in the footer with <paramref name="eventFooterKey"/>.
     /// </summary>
     public void SetSeries(
         IReadOnlyList<MetricPoint> points,
@@ -98,13 +104,17 @@ public sealed class MetricChart : ThemedControl
         bool stateSeries = false,
         double? warnThreshold = null,
         double? errorThreshold = null,
-        Func<string?, string?>? metadataChangeKey = null)
+        Func<string?, string?>? metadataChangeKey = null,
+        IReadOnlyList<DateTimeOffset>? eventMarkers = null,
+        string? eventFooterKey = null)
     {
         _points = points;
         _unit = unit;
         _stateSeries = stateSeries;
         _metadataChangeKey = metadataChangeKey;
         _changeMarkers = metadataChangeKey is null ? [] : FindChangeMarkers(points, metadataChangeKey);
+        _eventMarkers = eventMarkers ?? [];
+        _eventFooterKey = eventFooterKey;
         _warnThreshold = warnThreshold;
         _errorThreshold = errorThreshold;
 
@@ -463,6 +473,11 @@ public sealed class MetricChart : ThemedControl
             DrawMetadataChanges(g, p, plot);
         }
 
+        if (_eventMarkers.Count > 0 && !Compact)
+        {
+            DrawEventMarkers(g, p, plot);
+        }
+
         if (!Compact)
         {
             DrawTimeAxis(g, p, plot);
@@ -628,6 +643,36 @@ public sealed class MetricChart : ThemedControl
         }
     }
 
+    /// <summary>
+    /// A small triangle in the error colour standing on the time axis at every event moment in
+    /// view - distinct from the metadata diamonds at the top, which mean "something changed"
+    /// rather than "something failed". No line up the plot: a run of failures a few seconds apart
+    /// would otherwise paint the chart solid.
+    /// </summary>
+    private void DrawEventMarkers(Graphics g, Palette p, Rectangle plot)
+    {
+        SolidBrush brush = GdiExtensions.BrushFor(p.Error);
+        float size = DpF(4f);
+
+        foreach (DateTimeOffset at in _eventMarkers)
+        {
+            if (at < _viewStart || at > _viewEnd)
+            {
+                continue;
+            }
+
+            float x = ToX(at);
+            g.FillPolygon(brush, new[]
+            {
+                new PointF(x, plot.Bottom - (size * 2)), new PointF(x + size, plot.Bottom),
+                new PointF(x - size, plot.Bottom),
+            });
+        }
+    }
+
+    /// <summary>How many event markers fall inside the current view, for the footer.</summary>
+    private int EventMarkersInView() => _eventMarkers.Count(at => at >= _viewStart && at <= _viewEnd);
+
     /// <summary>The timestamps at which the metadata key differs from the previous point's.</summary>
     private static List<DateTimeOffset> FindChangeMarkers(IReadOnlyList<MetricPoint> points, Func<string?, string?> keyOf)
     {
@@ -748,12 +793,24 @@ public sealed class MetricChart : ThemedControl
     /// </summary>
     private void DrawFooter(Graphics g, Palette p)
     {
+        LocalizationManager loc = LocalizationManager.Instance;
+        int events = _eventFooterKey is null ? 0 : EventMarkersInView();
         if (Downsample.Summarize(_visible) is not { } stats)
         {
+            if (events == 0)
+            {
+                return;
+            }
+
+            // Nothing answered in view, only failures: the count is the whole story.
+            g.DrawTextCrisp(
+                loc.Format(_eventFooterKey!, events),
+                Theme.Font(FontRole.Small),
+                p.TextMuted,
+                new Rectangle(AxisLeft, Height - FooterHeight, Math.Max(0, Width - AxisLeft), FooterHeight));
             return;
         }
 
-        LocalizationManager loc = LocalizationManager.Instance;
         string text = _stateSeries
             ? loc.Format("chart.footer.uptime", $"{stats.Average * 100:F1}")
             : loc.Format(
@@ -763,6 +820,10 @@ public sealed class MetricChart : ThemedControl
                 $"{stats.Max:F0}",
                 $"{stats.P95:F0}",
                 _unit);
+        if (events > 0)
+        {
+            text += "  ·  " + loc.Format(_eventFooterKey!, events);
+        }
 
         g.DrawTextCrisp(
             text,

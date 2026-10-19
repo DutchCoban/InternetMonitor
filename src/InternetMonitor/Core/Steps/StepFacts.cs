@@ -114,7 +114,13 @@ public sealed record DnsFacts(
 
     // True when no server answered plain DNS but Windows' own resolver did resolve the name -
     // encrypted DNS, most likely. Browsing works; the adapter's servers are not usable directly.
-    bool SystemResolverWorked = false) : StepFacts;
+    bool SystemResolverWorked = false,
+
+    // Whether the adapter's own DNS server accepted (or refused) a connection on port 443 while
+    // it gave no DNS answer: reachable but silent means something on the way drops DNS traffic,
+    // or the server's DNS service stalled, rather than the server being gone. Null when the own
+    // servers answered, so no probe was needed, or when the adapter has none.
+    bool? OwnServersReachable = null) : StepFacts;
 
 public sealed record TargetEndpointResult(
     string Name,

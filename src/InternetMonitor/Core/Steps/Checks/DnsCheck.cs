@@ -30,6 +30,12 @@ public sealed class DnsCheck : IStepCheck
     /// <summary>Every public resolver in the chain also serves HTTPS, so 443 is a fair "is the server there at all" probe.</summary>
     private const int ReachabilityProbePort = 443;
 
+    /// <summary>
+    /// How many of the adapter's own servers are probed on 443 alongside the query. Windows
+    /// lists at most a handful; two covers the primary and secondary that matter.
+    /// </summary>
+    private const int MaxOwnServerProbes = 2;
+
     public StepId Id => StepId.Dns;
 
     public bool IsLocal => false;
@@ -70,12 +76,23 @@ public sealed class DnsCheck : IStepCheck
             new(loc.Get("measure.dnsServers"), servers.Count > 0 ? string.Join(", ", servers) : "-"),
         };
 
+        // The own servers are probed on 443 at the same moment as the query, so when the query
+        // goes unanswered, "is the server there at all?" is already known at no extra cost - the
+        // difference between a server that is gone and one that is reachable but silent on
+        // port 53, which points at something on the way dropping DNS traffic.
+        using var ownProbeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        List<(IPAddress Server, Task<TcpOutcome> Probe)> ownProbes =
+        [
+            .. servers.Take(MaxOwnServerProbes).Select(s => (s, _probes.Reach(s, ReachabilityProbePort, context.Targets.DnsTimeout, ownProbeCts.Token, context.LocalAddress))),
+        ];
+
         (IPAddress? answeredBy, DnsQueryResult result) = await _probes
             .AskAll(servers, hostname, context.Targets.DnsTimeout, cancellationToken, context.LocalAddress)
             .ConfigureAwait(false);
 
         if (answeredBy is not null)
         {
+            await DropAsync(ownProbes, ownProbeCts, cancellationToken).ConfigureAwait(false);
             measurements.Add(new Measurement(loc.Get("measure.dnsAnsweredBy"), answeredBy.ToString()));
             measurements.Add(new Measurement(loc.Get("measure.resolved"), string.Join(", ", result.Addresses.Take(3))));
             measurements.Add(new Measurement(loc.Get("measure.latency"), $"{result.ElapsedMs:F0} ms"));
@@ -101,8 +118,16 @@ public sealed class DnsCheck : IStepCheck
             };
         }
 
-        // The adapter's own DNS failed: walk the public resolvers in order, stopping at the first
-        // that resolves the name.
+        // The adapter's own DNS failed: what did the probes on 443 make of those servers?
+        bool? ownReachable = null;
+        foreach ((IPAddress server, Task<TcpOutcome> probe) in ownProbes)
+        {
+            bool answered = (await probe.ConfigureAwait(false)).Answered;
+            ownReachable = ownReachable == true || answered;
+            measurements.Add(new Measurement(server.ToString(), loc.Get(answered ? "measure.dnsTry.blocked" : "measure.dnsTry.noAnswer")));
+        }
+
+        // Then walk the public resolvers in order, stopping at the first that resolves the name.
         IReadOnlyList<IPAddress> publicResolvers = [.. context.Targets.PublicResolvers.Where(r => !servers.Contains(r))];
         List<Attempt> publicAttempts = await WalkAsync(publicResolvers, hostname, context, probeReachability: true, cancellationToken)
             .ConfigureAwait(false);
@@ -143,7 +168,7 @@ public sealed class DnsCheck : IStepCheck
                     watch.Elapsed,
                     DateTimeOffset.UtcNow,
                     measurements,
-                    new DnsFacts(hostname, system.Addresses, system.ElapsedMs, servers, false, portBlocked, customWorked, SystemResolverWorked: true))
+                    new DnsFacts(hostname, system.Addresses, system.ElapsedMs, servers, false, portBlocked, customWorked, SystemResolverWorked: true, OwnServersReachable: ownReachable))
                 {
                     HeadlineKey = "step.dns.systemOnly",
                     DetailKey = "step.dns.systemOnly.detail",
@@ -152,11 +177,13 @@ public sealed class DnsCheck : IStepCheck
             }
         }
 
-        var facts = new DnsFacts(hostname, [], result.ElapsedMs, servers, publicWinner is not null, portBlocked, customWorked);
+        var facts = new DnsFacts(hostname, [], result.ElapsedMs, servers, publicWinner is not null, portBlocked, customWorked, OwnServersReachable: ownReachable);
 
         (string headlineKey, object[] headlineArgs, string detailKey, object[] detailArgs) =
             publicWinner is not null && servers.Count == 0
                 ? ("step.dns.noServers", Array.Empty<object>(), "step.dns.noServers.detail", new object[] { publicWinner.Server })
+            : publicWinner is not null && ownReachable == true
+                ? ("step.dns.ownResolverFailed", Array.Empty<object>(), "step.dns.ownResolverSilent.detail", new object[] { serverList, hostname, publicWinner.Server })
             : publicWinner is not null
                 ? ("step.dns.ownResolverFailed", Array.Empty<object>(), "step.dns.ownResolverFailed.detail", new object[] { serverList, hostname, publicWinner.Server })
             : customWinner is not null
@@ -183,6 +210,28 @@ public sealed class DnsCheck : IStepCheck
             DetailKey = detailKey,
             DetailArgs = detailArgs,
         };
+    }
+
+    /// <summary>
+    /// The own servers answered, so their probes are no longer needed: cancelled and awaited, so
+    /// that nothing of them outlives the step.
+    /// </summary>
+    private static async Task DropAsync(List<(IPAddress Server, Task<TcpOutcome> Probe)> probes, CancellationTokenSource cts, CancellationToken cancellationToken)
+    {
+        if (probes.All(p => p.Probe.IsCompleted))
+        {
+            return;
+        }
+
+        cts.Cancel();
+        try
+        {
+            await Task.WhenAll(probes.Select(p => p.Probe)).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Only needed if the query had gone unanswered.
+        }
     }
 
     /// <summary>Asks each server in turn, stopping at the first that resolves the name.</summary>

@@ -895,5 +895,10 @@
   "settings.networkChanges.networkChanged": "Zmienia się gateway, sieć, DNS, serwer DHCP, prefix IPv6 lub sieć Wi-Fi",
   "settings.networkChanges.networkChanged.help": "Na tym samym adapterze jedna z tych wartości zmieniła się ze znanej na inną - ktoś zmienił sieć albo odpowiedział inny serwer DHCP. Pojawienie się lub zniknięcie wartości nie jest zmianą (to łączenie lub awaria). Zapisane jako moment: początek i koniec są takie same.",
   "settings.networkChanges.gatewayHardware": "Router odpowiada z innego adresu sprzętowego",
-  "settings.networkChanges.gatewayHardware.help": "Ten sam adres gateway odpowiedział z innego adresu MAC, odczytanego z tablicy ARP systemu Windows po sprawdzeniu gateway - nic dodatkowego nie jest wysyłane. Wymieniony router, failover albo urządzenie podszywające się pod router. Zapisane jako moment."
+  "settings.networkChanges.gatewayHardware.help": "Ten sam adres gateway odpowiedział z innego adresu MAC, odczytanego z tablicy ARP systemu Windows po sprawdzeniu gateway - nic dodatkowego nie jest wysyłane. Wymieniony router, failover albo urządzenie podszywające się pod router. Zapisane jako moment.",
+  "step.dns.ownResolverSilent.detail": "Serwer DNS tej karty ({0}) nie odpowiedział na porcie 53, ale przyjął połączenie na porcie 443, a {2} wykonał resolve {1}. Serwer jest osiągalny; ruch DNS do niego jest po drodze odrzucany albo jego usługa DNS się zawiesiła.",
+  "explain.dns.ownResolverReachable.what": "Serwer DNS używany przez ten komputer jest osiągalny, ale nie daje odpowiedzi DNS, a reszta połączenia działa.",
+  "explain.dns.ownResolverReachable.cause": "Rozwiązanie {0} nie powiodło się przez serwer DNS tej karty ({1}), który w tym samym momencie przyjął połączenie na porcie 443; publiczny serwer DNS odpowiedział bez problemu. Coś między tym komputerem a tym serwerem odrzuca ruch DNS (port 53) albo usługa DNS serwera się zawiesiła.",
+  "explain.dns.ownResolverReachable.todo": "Sprawdź filtrowanie DNS lub funkcje bezpieczeństwa routera i sieci oraz czy powtarza się to o tych samych porach. Drugi serwer DNS w ustawieniach sieci da Windows w międzyczasie rezerwę.",
+  "history.dnsFailures.footer": "{0} lookupów bez odpowiedzi w widoku"
 }

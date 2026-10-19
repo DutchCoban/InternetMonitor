@@ -35,6 +35,14 @@ internal static class HistoryRecorder
             history.Sample(series, result.TimestampUtc, value);
         }
 
+        // A failed lookup measured no latency, so the DNS series gets nothing - and a server that
+        // goes quiet for a few seconds at a time would leave no trace but a gap. The failure itself
+        // is therefore recorded, with what the step concluded, so it can be marked and counted.
+        if (snapshot[StepId.Dns] is { State: StepState.Failed } dns)
+        {
+            history.Sample(SeriesNames.DnsFailures, dns.TimestampUtc, 1, DnsOutcomeOf(dns));
+        }
+
         // The Wi-Fi signal is not step 2's chart value (that stays the 0/1 link state), so it gets
         // its own series. The access point goes along as metadata: the History chart marks where it
         // changed, which is how a roam between access points becomes visible after the fact.
@@ -93,6 +101,10 @@ internal static class HistoryRecorder
             traffic.Reset();
         }
     }
+
+    /// <summary>The step's conclusion as a short key - "ownResolverFailed", "portBlocked" - for the failure point's metadata.</summary>
+    private static string? DnsOutcomeOf(StepResult dns) =>
+        dns.HeadlineKey is { } key && key.StartsWith("step.dns.", StringComparison.Ordinal) ? key["step.dns.".Length..] : null;
 
     /// <summary>
     /// Whether an incident is open, as a history series (see <see cref="SeriesNames.Outage"/>).

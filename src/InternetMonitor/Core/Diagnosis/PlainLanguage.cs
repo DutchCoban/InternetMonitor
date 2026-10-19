@@ -63,6 +63,10 @@ public static class PlainLanguage
 
         RootCause.IpConfiguration when snapshot.FactsFor<IpAddressFacts>(StepId.IpAddress) is { IsApipa: true } => ".apipa",
 
+        // The own server took a connection on port 443 while it gave no DNS answer: the path to
+        // it is fine and the server is up, so DNS traffic specifically is being dropped - a
+        // different thing to check than a server that is simply gone.
+        RootCause.Dns when snapshot.FactsFor<DnsFacts>(StepId.Dns) is { PublicResolversWorked: true, OwnServersReachable: true } => ".ownResolverReachable",
         RootCause.Dns when snapshot.FactsFor<DnsFacts>(StepId.Dns) is { PublicResolversWorked: true } => ".ownResolver",
         RootCause.Dns when snapshot.FactsFor<DnsFacts>(StepId.Dns) is { CustomServersWorked: true } => ".customOnly",
         RootCause.Dns when snapshot.FactsFor<DnsFacts>(StepId.Dns) is { DnsPortBlockedSuspected: true } => ".blocked",

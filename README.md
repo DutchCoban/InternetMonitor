@@ -92,8 +92,10 @@ is attributed to its most likely cause instead of being reported as a generic "i
    outage. If they fail, the app works down a fixed chain and stops at the first server that
    resolves the name: `9.9.9.9`, then `1.1.1.1`, then `8.8.8.8`, skipping any the adapter already
    uses - if one answers, it's this adapter's DNS server
-   that's at fault. A public server that gives no DNS answer is also tried on port 443; reachable
-   there but silent on DNS means DNS traffic (port 53) is most likely being blocked. As a last
+   that's at fault. The adapter's own server, and any public server that gives no DNS answer, is
+   also tried on port 443 (the adapter's own at the same moment as the query, so it costs no
+   time); reachable there but silent on DNS means DNS traffic (port 53) is being dropped on the
+   way, or the server's DNS service stalled, rather than the server being gone. As a last
    resort, up to two DNS servers of your own (Settings → Public internet, optional) are tried. The
    step reports which link in the chain failed or worked.
 7. **Target** - a built-in general-reachability check (a `generate_204` endpoint, chosen specifically because it isn't scored/throttled like a normal website behind a CDN - see the doc comment on `CheckTargets.Targets` for why that matters), plus any HTTPS or TCP/UDP port endpoints you've configured in Settings. Every URL target gets a full, per-stage-timed DNS → TCP → TLS → HTTP request. When the built-in check fails, one plain-HTTP request for Windows' own connectivity test page tells a **login page** (hotel, train, guest Wi-Fi) apart from a dead connection - see [Login pages](#login-pages). With IPv6 on offer, one more request goes out over IPv6 - see [IPv6](#ipv6).
@@ -143,7 +145,8 @@ Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
   opens it later. A search box and filters narrow the list down by where an incident originated
   (provider, home network, this computer) and when (ongoing, 24 hours, 7 or 30 days). Each
   incident takes a note of your own (a ticket number, what the provider said), and a provider-side
-  incident records a traceroute the moment it opens, so its detail shows where the packets stopped.
+  incident records a traceroute the moment it opens - to the adapter's DNS server for a DNS
+  incident, to the reachability host otherwise - so its detail shows where the packets stopped.
   Every incident also records this computer's own traffic before, during and after it, next to
   what was normal just before (see [Latency under load](#latency-under-load)). Besides faults,
   the list records the environment *moving*: the connection going over another adapter, an
@@ -652,7 +655,10 @@ shared tools folder. The `INTERNETMONITOR_DATA_DIR` environment variable, when s
   (DNS over HTTPS) with plain DNS blocked gets a warning rather than a failure: when no server
   answers plain DNS, the step asks Windows' own resolver, and when that resolves the name it says
   so instead of calling DNS broken. An adapter that has no DNS server at all is reported as exactly
-  that.
+  that. A lookup that goes unanswered leaves a gap in the DNS latency series, so every such
+  moment is also recorded on its own (`history\dns-failures.csv`): the DNS chart marks them, and
+  the AI export counts and lists them - a server that goes quiet for a few seconds at a time
+  shows up even when it never lasts long enough to become an incident.
 - Application endpoints are entirely user-configured with no target allowlist, by design (this
   is a local, single-user tool) - see [Security notes](#security-notes) below.
 - The self-update only installs a release that carries both `InternetMonitor.exe` and

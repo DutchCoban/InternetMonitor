@@ -895,5 +895,10 @@
   "settings.networkChanges.networkChanged": "Gateway, network, DNS, DHCP server, IPv6 prefix or Wi-Fi network changes",
   "settings.networkChanges.networkChanged.help": "On the same adapter, one of these went from one known value to another - someone changed the network, or a different DHCP server answered. A value appearing or disappearing is not a change (that is connecting, or an outage). Recorded as a moment: start and end are the same.",
   "settings.networkChanges.gatewayHardware": "Router answers from a different hardware address",
-  "settings.networkChanges.gatewayHardware.help": "The same gateway address answered from a different MAC address, read from Windows' ARP table after the gateway check - nothing extra is sent. A replaced router, a failover, or a device impersonating the router. Recorded as a moment."
+  "settings.networkChanges.gatewayHardware.help": "The same gateway address answered from a different MAC address, read from Windows' ARP table after the gateway check - nothing extra is sent. A replaced router, a failover, or a device impersonating the router. Recorded as a moment.",
+  "step.dns.ownResolverSilent.detail": "This adapter's DNS server ({0}) gave no answer on port 53 but did accept a connection on port 443, while {2} resolved {1}. The server is reachable; DNS traffic to it is being dropped on the way, or its DNS service has stalled.",
+  "explain.dns.ownResolverReachable.what": "The DNS server this computer uses is reachable but gives no DNS answer, while the rest of the connection is fine.",
+  "explain.dns.ownResolverReachable.cause": "Looking up {0} failed through this adapter's DNS server ({1}), which did accept a connection on port 443 at that moment; a public DNS server answered the same question without trouble. Something between this computer and that server drops DNS traffic (port 53), or the server's DNS service stalled.",
+  "explain.dns.ownResolverReachable.todo": "Check the router's and the network's DNS filtering or security features, and whether this repeats at the same times of day. A second DNS server in the network settings gives Windows a fallback in the meantime.",
+  "history.dnsFailures.footer": "{0} unanswered lookups in view"
 }

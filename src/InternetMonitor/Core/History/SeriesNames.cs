@@ -85,6 +85,15 @@ public static class SeriesNames
     public const string Ipv6 = "ipv6";
 
     /// <summary>
+    /// 1 at every sample moment where step 6 failed, with the step's outcome as metadata
+    /// ("ownResolverFailed", "portBlocked", ...). A failed lookup writes nothing into the DNS
+    /// latency series, so without this a run of unanswered queries was only a gap in the chart -
+    /// invisible, and impossible to count afterwards. Not charted on its own: the DNS chart marks
+    /// these moments along its line.
+    /// </summary>
+    public const string DnsFailures = "dns-failures";
+
+    /// <summary>
     /// 1 while the step pipeline had an incident open, else 0; the metadata is the incident's
     /// cause key and id, "dns|INC-20261015-0002". This is what availability is computed from, so
     /// clearing the incident list leaves the uptime strip and the provider report as they were.

@@ -895,5 +895,10 @@
   "settings.networkChanges.networkChanged": "Gateway, netwerk, DNS, DHCP-server, IPv6-prefix of Wi-Fi-netwerk verandert",
   "settings.networkChanges.networkChanged.help": "Op dezelfde adapter ging een van deze van een bekende waarde naar een andere - iemand veranderde het netwerk, of een andere DHCP-server antwoordde. Een waarde die verschijnt of verdwijnt is geen wijziging (dat is verbinden, of een storing). Vastgelegd als moment: begin en einde zijn gelijk.",
   "settings.networkChanges.gatewayHardware": "Router antwoordt vanaf een ander hardware-adres",
-  "settings.networkChanges.gatewayHardware.help": "Hetzelfde gateway-adres antwoordde vanaf een ander MAC-adres, gelezen uit de ARP-tabel van Windows na de gateway-controle - er wordt niets extra's verstuurd. Een vervangen router, een failover, of een apparaat dat zich voordoet als de router. Vastgelegd als moment."
+  "settings.networkChanges.gatewayHardware.help": "Hetzelfde gateway-adres antwoordde vanaf een ander MAC-adres, gelezen uit de ARP-tabel van Windows na de gateway-controle - er wordt niets extra's verstuurd. Een vervangen router, een failover, of een apparaat dat zich voordoet als de router. Vastgelegd als moment.",
+  "step.dns.ownResolverSilent.detail": "De DNS-server van deze adapter ({0}) gaf geen antwoord op poort 53 maar accepteerde wel een verbinding op poort 443, terwijl {2} {1} kon resolven. De server is bereikbaar; het DNS-verkeer ernaartoe wordt onderweg weggegooid, of zijn DNS-dienst hangt.",
+  "explain.dns.ownResolverReachable.what": "De DNS-server die deze computer gebruikt is bereikbaar maar geeft geen DNS-antwoord, terwijl de rest van de verbinding in orde is.",
+  "explain.dns.ownResolverReachable.cause": "Het opzoeken van {0} mislukte via de DNS-server van deze adapter ({1}), die op dat moment wel een verbinding op poort 443 accepteerde; een publieke DNS-server beantwoordde dezelfde vraag zonder problemen. Iets tussen deze computer en die server gooit DNS-verkeer (poort 53) weg, of de DNS-dienst van de server hing.",
+  "explain.dns.ownResolverReachable.todo": "Controleer de DNS-filtering of beveiligingsfuncties van de router en het netwerk, en of dit op dezelfde tijdstippen terugkomt. Een tweede DNS-server in de netwerkinstellingen geeft Windows intussen een uitwijk.",
+  "history.dnsFailures.footer": "{0} onbeantwoorde lookups in beeld"
 }

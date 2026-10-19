@@ -260,10 +260,9 @@ public sealed class AppHost : ApplicationContext
     private static string AppVersion => (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0)).ToString(3);
 
     /// <summary>
-    /// A provider-side incident just opened: trace the route to the reachability target now, while
-    /// the problem is there, and hang the result on the incident. The host's address from the last
-    /// cycle is used when it is known - during a DNS incident the name itself may not resolve - and
-    /// the first public ping address otherwise; either shows where the packets stop.
+    /// A provider-side incident just opened: trace the route to where the fault is now, while the
+    /// problem is there, and hang the result on the incident - see
+    /// <see cref="IncidentTracerouteTarget"/> for which address that is.
     /// </summary>
     private async Task AttachTracerouteAsync(Incident incident)
     {
@@ -272,8 +271,7 @@ public sealed class AppHost : ApplicationContext
             return;
         }
 
-        string? target = _pipeline.LatestSnapshot?.FactsFor<TargetFacts>(StepId.Target)?.Endpoints.FirstOrDefault(e => e.IsReachabilityCheck)?.RemoteAddress?.ToString()
-            ?? _settings.ParsedPublicIpTargets().FirstOrDefault()?.ToString();
+        string? target = IncidentTracerouteTarget.For(incident.Cause, _pipeline.LatestSnapshot, _settings.ParsedPublicIpTargets());
         if (target is null)
         {
             return;

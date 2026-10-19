@@ -53,6 +53,37 @@ public sealed class AiExportSectionsTests
     }
 
     [Fact]
+    public void Unanswered_dns_lookups_are_counted_against_the_answered_ones_and_listed_newest_first()
+    {
+        var history = new Dictionary<string, IReadOnlyList<MetricPoint>>
+        {
+            [SeriesNames.For(StepId.Dns)!] = [.. Enumerable.Range(0, 98).Select(i => new MetricPoint(Now.AddMinutes(-i), 30, null))],
+            [SeriesNames.DnsFailures] =
+            [
+                new MetricPoint(Now.AddHours(-3), 1, "ownResolverFailed"),
+                new MetricPoint(Now.AddHours(-1), 1, "portBlocked"),
+                new MetricPoint(Now.AddDays(-40), 1, "ownResolverFailed"),
+            ],
+        };
+
+        string md = Export([], history);
+
+        Assert.Contains("## DNS lookups that went unanswered", md);
+        Assert.Contains("- Unanswered: 2 of 100 sample moments (2.0%)", md);
+        Assert.Contains("- By outcome: ownResolverFailed 1, portBlocked 1", md);
+        Assert.Contains("  - 2026-10-17 19:00:00 (portBlocked)", md);
+        Assert.Contains("  - 2026-10-17 17:00:00 (ownResolverFailed)", md);
+        Assert.Contains("| DNS lookup unanswered (step 6)", md);
+        Assert.True(md.IndexOf("19:00:00 (portBlocked)", StringComparison.Ordinal) < md.IndexOf("17:00:00 (ownResolverFailed)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Without_dns_history_the_unanswered_lookups_section_says_so()
+    {
+        Assert.Contains("## DNS lookups that went unanswered\n\nNot measured in this period.", Export([], []).Replace("\r\n", "\n"));
+    }
+
+    [Fact]
     public void An_incident_shows_the_traffic_around_it_and_an_older_one_its_load_before()
     {
         DateTimeOffset start = Now.AddHours(-1);

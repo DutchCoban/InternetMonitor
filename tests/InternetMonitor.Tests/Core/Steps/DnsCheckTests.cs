@@ -40,6 +40,8 @@ public sealed class DnsCheckTests
 
         public List<IPAddress> AskedOneByOne { get; } = [];
 
+        public List<IPAddress> ProbedOn443 { get; } = [];
+
         public DnsProbes Probes => new(
             (servers, _, _, _, _) =>
             {
@@ -57,9 +59,13 @@ public sealed class DnsCheckTests
                 AskedOneByOne.Add(server);
                 return Task.FromResult(Answers.GetValueOrDefault(server, Silent));
             },
-            (server, _, _, _, _) => Task.FromResult(ReachableOn443.Contains(server)
-                ? new TcpOutcome(true, false, 5, null)
-                : new TcpOutcome(false, false, null, SocketError.TimedOut)),
+            (server, _, _, _, _) =>
+            {
+                ProbedOn443.Add(server);
+                return Task.FromResult(ReachableOn443.Contains(server)
+                    ? new TcpOutcome(true, false, 5, null)
+                    : new TcpOutcome(false, false, null, SocketError.TimedOut));
+            },
             (_, _, _) => Task.FromResult(System));
     }
 
@@ -95,8 +101,46 @@ public sealed class DnsCheckTests
         var facts = (DnsFacts)result.Facts!;
         Assert.Equal([Resolved], facts.ResolvedAddresses);
         Assert.Null(facts.PublicResolversWorked);
+        Assert.Null(facts.OwnServersReachable);
         Assert.Contains(result.Measurements, m => m.Value == OwnServer.ToString());
         Assert.Contains(result.Measurements, m => m.Value == "18 ms");
+        Assert.DoesNotContain(result.Measurements, m => m.Label == OwnServer.ToString());
+    }
+
+    [Fact]
+    public async Task An_own_server_silent_on_dns_but_reachable_on_443_means_dns_traffic_is_dropped()
+    {
+        var world = new World();
+        world.ReachableOn443.Add(OwnServer);
+        world.Answers[Quad9] = Answer();
+
+        StepResult result = await Run(world, Context());
+
+        Assert.Equal(StepState.Failed, result.State);
+        Assert.Equal("step.dns.ownResolverFailed", result.HeadlineKey);
+        Assert.Equal("step.dns.ownResolverSilent.detail", result.DetailKey);
+        Assert.Equal([OwnServer.ToString(), Hostname, Quad9], result.DetailArgs!);
+        Assert.Equal([OwnServer, Quad9], world.ProbedOn443.Distinct());
+        var facts = (DnsFacts)result.Facts!;
+        Assert.True(facts.PublicResolversWorked);
+        Assert.True(facts.OwnServersReachable);
+        Assert.Contains(result.Measurements, m => m.Label == OwnServer.ToString() && m.Value.Contains("443", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Only_the_first_two_own_servers_are_probed_on_443()
+    {
+        var world = new World();
+        IPAddress second = IPAddress.Parse("192.168.1.2");
+        IPAddress third = IPAddress.Parse("192.168.1.3");
+        world.ReachableOn443.Add(third);
+        world.Answers[Quad9] = Answer();
+
+        StepResult result = await Run(world, Context(own: [OwnServer, second, third]));
+
+        Assert.Equal([OwnServer, second], world.ProbedOn443.Where(s => s != Quad9));
+        Assert.False(((DnsFacts)result.Facts!).OwnServersReachable);
+        Assert.Equal("step.dns.ownResolverFailed.detail", result.DetailKey);
     }
 
     [Fact]
@@ -128,7 +172,9 @@ public sealed class DnsCheckTests
         Assert.Equal([Quad9], world.AskedOneByOne);
         Assert.True(((DnsFacts)result.Facts!).PublicResolversWorked);
         Assert.Null(((DnsFacts)result.Facts!).CustomServersWorked);
+        Assert.False(((DnsFacts)result.Facts!).OwnServersReachable);
         Assert.Contains(result.Measurements, m => m.Label == Quad9.ToString());
+        Assert.Contains(result.Measurements, m => m.Label == OwnServer.ToString() && m.Value == "No answer");
     }
 
     [Fact]

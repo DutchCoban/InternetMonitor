@@ -57,6 +57,7 @@ public sealed class HistoryRecorderTests : IDisposable
 
         Assert.Equal([12], store.Get(SeriesNames.For(StepId.Gateway)!).Select(p => p.Value));
         Assert.Empty(store.Get(SeriesNames.For(StepId.Dns)!));
+        Assert.Empty(store.Get(SeriesNames.DnsFailures));
         Assert.Empty(store.Get(SeriesNames.For(StepId.PublicIp)!));
         Assert.Equal([1], store.Get(SeriesNames.For(StepId.Link)!).Select(p => p.Value));
 
@@ -99,6 +100,22 @@ public sealed class HistoryRecorderTests : IDisposable
         HistoryRecorder.Record(store, new StepSnapshot([], T0.AddSeconds(30)) { Throughput = new ThroughputSample(70, 7, null, 6) }, traffic);
         MetricPoint third = store.Get(SeriesNames.TrafficDown)[2];
         Assert.Equal((T0.AddSeconds(30), 63.33, "peak=70.00"), (third.Timestamp, third.Value, third.Metadata));
+    }
+
+    [Fact]
+    public async Task A_failed_dns_step_is_recorded_as_an_unanswered_lookup_with_the_steps_conclusion()
+    {
+        await using var store = new MetricStore(TimeSpan.FromDays(1), _directory);
+        await store.Loaded;
+        StepResult failed = Result(StepId.Dns, StepState.Failed, null) with { HeadlineKey = "step.dns.ownResolverFailed" };
+
+        HistoryRecorder.Record(store, new StepSnapshot([failed], T0), new TrafficAccumulator());
+        HistoryRecorder.Record(store, new StepSnapshot([Result(StepId.Dns, StepState.Ok, 31) with { TimestampUtc = T0.AddSeconds(30) }], T0.AddSeconds(30)), new TrafficAccumulator());
+
+        MetricPoint point = Assert.Single(store.Get(SeriesNames.DnsFailures));
+        Assert.Equal((T0, 1, "ownResolverFailed"), (point.Timestamp, point.Value, point.Metadata));
+        Assert.DoesNotContain(store.Get(SeriesNames.For(StepId.Dns)!), p => p.Timestamp == T0);
+        Assert.Equal([31], store.Get(SeriesNames.For(StepId.Dns)!).Select(p => p.Value));
     }
 
     [Fact]

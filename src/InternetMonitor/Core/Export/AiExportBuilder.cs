@@ -43,14 +43,14 @@ public enum AiExportDetail
 public static class AiExportBuilder
 {
     /// <summary>What a detail level allows; <see cref="int.MaxValue"/> means no limit.</summary>
-    private sealed record Limits(int FullIncidents, int TimelineHead, int TimelineTail, int SpeedTestRows)
+    private sealed record Limits(int FullIncidents, int TimelineHead, int TimelineTail, int SpeedTestRows, int DnsFailureRows)
     {
         public static Limits For(AiExportDetail detail) => detail switch
         {
-            AiExportDetail.Compact => new(10, 10, 10, 30),
-            AiExportDetail.Standard => new(20, 20, 20, 60),
+            AiExportDetail.Compact => new(10, 10, 10, 30, 20),
+            AiExportDetail.Standard => new(20, 20, 20, 60, 60),
             // Head and tail are added together, so they stay far from int.MaxValue.
-            _ => new(int.MaxValue, 1_000_000, 1_000_000, int.MaxValue),
+            _ => new(int.MaxValue, 1_000_000, 1_000_000, int.MaxValue, int.MaxValue),
         };
     }
 
@@ -182,7 +182,9 @@ public static class AiExportBuilder
         **Series units.** Latency series in milliseconds; adapter/link are 1 (up) or 0 (down);
         Wi-Fi signal is Windows' signal quality in percent; traffic and speed tests in Mbit/s;
         "extra ping under load" is how many milliseconds the round trip grew while a speed test
-        filled the line (A under 5 ms, B under 30, C under 60, D under 200, F 200 or more).
+        filled the line (A under 5 ms, B under 30, C under 60, D under 200, F 200 or more). The
+        "DNS lookup unanswered" series has a point (1) at every sample moment where step 6 got no
+        usable answer, and nothing otherwise; the DNS latency series has a gap at those moments.
 
         **IPv6.** Only tested when the network hands out a global IPv6 address: a ping to public
         IPv6 resolvers in step 5 and a plain HTTP request over IPv6 in step 7. The "IPv6" series is
@@ -267,6 +269,7 @@ public static class AiExportBuilder
         AppendOutagePatterns(doc, report);
         AppendIncidents(doc, incidents, limits, Series, to, TimeSpan.FromSeconds(settings.BackgroundIntervalSeconds));
         AppendLatency(doc, Series, from, to);
+        AppendDnsFailures(doc, Series(SeriesNames.DnsFailures), Series(SeriesNames.For(StepId.Dns)!), from, to, limits);
         AppendLineQuality(doc, report);
         AppendSpeedTests(doc, report, settings, limits);
         AppendWifi(doc, Series(SeriesNames.WifiSignal), from, to);
@@ -617,6 +620,44 @@ public static class AiExportBuilder
         }
     }
 
+    /// <summary>
+    /// The sample moments at which step 6 got no usable answer, counted against the answered ones
+    /// and listed with the step's conclusion - a resolver that goes quiet for seconds at a time
+    /// rarely lasts long enough to become an incident, and this is where that still shows.
+    /// </summary>
+    private static void AppendDnsFailures(Doc doc, IReadOnlyList<MetricPoint> failures, IReadOnlyList<MetricPoint> answered, DateTimeOffset from, DateTimeOffset to, Limits limits)
+    {
+        doc.Line("## DNS lookups that went unanswered").Blank();
+        List<MetricPoint> inPeriod = [.. failures.Where(p => p.Timestamp >= from && p.Timestamp <= to).OrderByDescending(p => p.Timestamp)];
+        int answeredInPeriod = answered.Count(p => p.Timestamp >= from && p.Timestamp <= to);
+        if (inPeriod.Count == 0 && answeredInPeriod == 0)
+        {
+            doc.Line("Not measured in this period.").Blank();
+            return;
+        }
+
+        doc.Line("Sample moments at which the query to the adapter's own DNS server (sent twice) got no usable answer; the DNS latency series has a gap there. The other steps of the same cycle usually passed, so these are not outages - they are the moments a DNS server or the path to it dropped queries.").Blank();
+        int total = inPeriod.Count + answeredInPeriod;
+        doc.Item("Unanswered", I($"{inPeriod.Count} of {total} sample moments ({(total == 0 ? 0 : 100.0 * inPeriod.Count / total):F1}%)"));
+        if (inPeriod.Count == 0)
+        {
+            doc.Blank();
+            return;
+        }
+
+        doc.Item("By outcome", string.Join(", ", inPeriod
+            .GroupBy(p => p.Metadata ?? "unknown")
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => I($"{g.Key} {g.Count()}"))));
+        doc.Item("Moments (local time, newest first)", inPeriod.Count > limits.DnsFailureRows ? I($"the most recent {limits.DnsFailureRows} of {inPeriod.Count}") : I($"{inPeriod.Count}"));
+        foreach (MetricPoint point in inPeriod.Take(limits.DnsFailureRows))
+        {
+            doc.Line($"  - {doc.LocalTime(point.Timestamp)} ({point.Metadata ?? "unknown"})");
+        }
+
+        doc.Blank();
+    }
+
     /// <summary>Packet loss and jitter per day, from the provider report's figures. Left out before the series existed.</summary>
     private static void AppendLineQuality(Doc doc, ProviderReportData report)
     {
@@ -912,6 +953,7 @@ public static class AiExportBuilder
             {
                 SeriesNames.Metered => "Metered connection (mobile data / hotspot)",
                 SeriesNames.Outage => "Incident open (step pipeline)",
+                SeriesNames.DnsFailures => "DNS lookup unanswered (step 6)",
                 "ip" => "IP address (v1)",
                 "time" => "Time sync (v1)",
                 _ when seriesId.StartsWith("internet:", StringComparison.Ordinal) => $"Ping to {seriesId["internet:".Length..]} (v1)",
@@ -925,6 +967,7 @@ public static class AiExportBuilder
         "time" => "s (clock offset)",
         SeriesNames.Metered => "1 = metered, 0 = not",
         SeriesNames.Outage => "1 = incident open, 0 = not",
+        SeriesNames.DnsFailures => "1 = unanswered",
         _ => "-",
     };
 

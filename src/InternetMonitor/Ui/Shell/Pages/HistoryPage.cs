@@ -1,5 +1,6 @@
 using InternetMonitor.App;
 using InternetMonitor.Core.History;
+using InternetMonitor.Core.Steps;
 using InternetMonitor.Ui.Controls;
 using InternetMonitor.Ui.Theming;
 
@@ -185,13 +186,19 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
         // The good/warning/bad bands are latency thresholds, so they only belong under a round
         // trip - not under a speed, a signal, a loss percentage or a jitter.
         bool latency = series.LatencyBands;
+
+        // A failed lookup has no latency and so no point on the DNS line; the moments it happened
+        // are recorded in a series of their own and marked along the line instead.
+        bool dns = series.Id == SeriesNames.For(StepId.Dns);
         _chart.SetSeries(
             Services.History.Get(series.Id),
             series.Unit,
             series.IsState,
             latency ? Services.Targets.LatencyWarningMs : null,
             latency ? Services.Targets.LatencyErrorMs : null,
-            series.MetadataChangeKey);
+            series.MetadataChangeKey,
+            dns ? [.. Services.History.Get(SeriesNames.DnsFailures).Select(p => p.Timestamp)] : null,
+            dns ? "history.dnsFailures.footer" : null);
 
         _chart.SetRange(_selectedRange);
     }

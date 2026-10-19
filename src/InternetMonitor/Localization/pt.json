@@ -895,5 +895,10 @@
   "settings.networkChanges.networkChanged": "Gateway, rede, DNS, servidor DHCP, prefix IPv6 ou rede Wi-Fi muda",
   "settings.networkChanges.networkChanged.help": "No mesmo adaptador, um destes passou de um valor conhecido para outro - alguém alterou a rede, ou outro servidor DHCP respondeu. Um valor que aparece ou desaparece não é uma alteração (isso é ligar, ou uma falha). Registado como um instante: início e fim são iguais.",
   "settings.networkChanges.gatewayHardware": "O router responde a partir de outro endereço de hardware",
-  "settings.networkChanges.gatewayHardware.help": "O mesmo endereço de gateway respondeu a partir de outro endereço MAC, lido da tabela ARP do Windows após a verificação do gateway - nada extra é enviado. Um router substituído, um failover, ou um dispositivo a fazer-se passar pelo router. Registado como um instante."
+  "settings.networkChanges.gatewayHardware.help": "O mesmo endereço de gateway respondeu a partir de outro endereço MAC, lido da tabela ARP do Windows após a verificação do gateway - nada extra é enviado. Um router substituído, um failover, ou um dispositivo a fazer-se passar pelo router. Registado como um instante.",
+  "step.dns.ownResolverSilent.detail": "O servidor DNS deste adaptador ({0}) não respondeu na porta 53 mas aceitou uma ligação na porta 443, enquanto {2} fez resolve de {1}. O servidor está acessível; o tráfego DNS até ele está a ser descartado pelo caminho, ou o seu serviço DNS bloqueou.",
+  "explain.dns.ownResolverReachable.what": "O servidor DNS que este computador usa está acessível mas não dá resposta DNS, enquanto o resto da ligação está bem.",
+  "explain.dns.ownResolverReachable.cause": "A pesquisa de {0} falhou através do servidor DNS deste adaptador ({1}), que nesse momento aceitou uma ligação na porta 443; um servidor DNS público respondeu à mesma pergunta sem problemas. Algo entre este computador e esse servidor descarta o tráfego DNS (porta 53), ou o serviço DNS do servidor bloqueou.",
+  "explain.dns.ownResolverReachable.todo": "Verifique a filtragem DNS ou as funções de segurança do router e da rede, e se isto se repete às mesmas horas. Um segundo servidor DNS nas definições de rede dá entretanto ao Windows uma alternativa.",
+  "history.dnsFailures.footer": "{0} lookups sem resposta à vista"
 }
