@@ -26,3 +26,12 @@ report and the finishing step.
 
 Click positions in `Make-Screenshots.ps1` are window-image coordinates at the 1164x852 window
 `capture.ps1` opens. When a page's layout changes, update them there and check the picture.
+`capture.ps1` sends every click twice (a synthetic click is occasionally lost while a page is
+still laying out; a third field of `1` sends it once, for buttons that start something) and
+scrolls a page by dragging its scrollbar thumb (`-Drag "x1,y1,x2,y2"`), because wheel notches go
+to the focused control rather than to the page. A picture whose clicks missed is redone with
+`-Only`.
+
+Two pictures the README describes in words only: the captive-portal state cannot be staged, and
+the incident pop-up does not appear while the main window is open. The network scan is left out
+because it can only show real devices.
