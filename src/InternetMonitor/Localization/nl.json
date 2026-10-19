@@ -900,5 +900,12 @@
   "explain.dns.ownResolverReachable.what": "De DNS-server die deze computer gebruikt is bereikbaar maar geeft geen DNS-antwoord, terwijl de rest van de verbinding in orde is.",
   "explain.dns.ownResolverReachable.cause": "Het opzoeken van {0} mislukte via de DNS-server van deze adapter ({1}), die op dat moment wel een verbinding op poort 443 accepteerde; een publieke DNS-server beantwoordde dezelfde vraag zonder problemen. Iets tussen deze computer en die server gooit DNS-verkeer (poort 53) weg, of de DNS-dienst van de server hing.",
   "explain.dns.ownResolverReachable.todo": "Controleer de DNS-filtering of beveiligingsfuncties van de router en het netwerk, en of dit op dezelfde tijdstippen terugkomt. Een tweede DNS-server in de netwerkinstellingen geeft Windows intussen een uitwijk.",
-  "history.dnsFailures.footer": "{0} onbeantwoorde lookups in beeld"
+  "history.dnsFailures.footer": "{0} onbeantwoorde lookups in beeld",
+  "history.caption.group": "Groep",
+  "history.group.connection": "Verbinding",
+  "history.group.latency": "Latency",
+  "history.group.quality": "Lijnkwaliteit",
+  "history.group.traffic": "Verkeer",
+  "history.group.speedtest": "Snelheidstest",
+  "history.group.endpoints": "Eigen doelen"
 }

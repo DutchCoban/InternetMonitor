@@ -900,5 +900,12 @@
   "explain.dns.ownResolverReachable.what": "O servidor DNS que este computador usa está acessível mas não dá resposta DNS, enquanto o resto da ligação está bem.",
   "explain.dns.ownResolverReachable.cause": "A pesquisa de {0} falhou através do servidor DNS deste adaptador ({1}), que nesse momento aceitou uma ligação na porta 443; um servidor DNS público respondeu à mesma pergunta sem problemas. Algo entre este computador e esse servidor descarta o tráfego DNS (porta 53), ou o serviço DNS do servidor bloqueou.",
   "explain.dns.ownResolverReachable.todo": "Verifique a filtragem DNS ou as funções de segurança do router e da rede, e se isto se repete às mesmas horas. Um segundo servidor DNS nas definições de rede dá entretanto ao Windows uma alternativa.",
-  "history.dnsFailures.footer": "{0} lookups sem resposta à vista"
+  "history.dnsFailures.footer": "{0} lookups sem resposta à vista",
+  "history.caption.group": "Grupo",
+  "history.group.connection": "Ligação",
+  "history.group.latency": "Latency",
+  "history.group.quality": "Qualidade da linha",
+  "history.group.traffic": "Tráfego",
+  "history.group.speedtest": "Teste de velocidade",
+  "history.group.endpoints": "Os seus alvos"
 }

@@ -900,5 +900,12 @@
   "explain.dns.ownResolverReachable.what": "The DNS server this computer uses is reachable but gives no DNS answer, while the rest of the connection is fine.",
   "explain.dns.ownResolverReachable.cause": "Looking up {0} failed through this adapter's DNS server ({1}), which did accept a connection on port 443 at that moment; a public DNS server answered the same question without trouble. Something between this computer and that server drops DNS traffic (port 53), or the server's DNS service stalled.",
   "explain.dns.ownResolverReachable.todo": "Check the router's and the network's DNS filtering or security features, and whether this repeats at the same times of day. A second DNS server in the network settings gives Windows a fallback in the meantime.",
-  "history.dnsFailures.footer": "{0} unanswered lookups in view"
+  "history.dnsFailures.footer": "{0} unanswered lookups in view",
+  "history.caption.group": "Group",
+  "history.group.connection": "Connection",
+  "history.group.latency": "Latency",
+  "history.group.quality": "Line quality",
+  "history.group.traffic": "Traffic",
+  "history.group.speedtest": "Speed test",
+  "history.group.endpoints": "Your targets"
 }

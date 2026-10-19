@@ -900,5 +900,12 @@
   "explain.dns.ownResolverReachable.what": "Der DNS-Server dieses Rechners ist erreichbar, gibt aber keine DNS-Antwort, während der Rest der Verbindung in Ordnung ist.",
   "explain.dns.ownResolverReachable.cause": "Die Auflösung von {0} schlug über den DNS-Server dieses Adapters ({1}) fehl, der im selben Moment eine Verbindung auf Port 443 annahm; ein öffentlicher DNS-Server beantwortete dieselbe Anfrage problemlos. Etwas zwischen diesem Rechner und dem Server verwirft DNS-Verkehr (Port 53), oder der DNS-Dienst des Servers hing.",
   "explain.dns.ownResolverReachable.todo": "Prüfen Sie DNS-Filter oder Sicherheitsfunktionen des Routers und des Netzwerks, und ob sich das zu denselben Uhrzeiten wiederholt. Ein zweiter DNS-Server in den Netzwerkeinstellungen gibt Windows inzwischen eine Ausweichmöglichkeit.",
-  "history.dnsFailures.footer": "{0} unbeantwortete Lookups im Bild"
+  "history.dnsFailures.footer": "{0} unbeantwortete Lookups im Bild",
+  "history.caption.group": "Gruppe",
+  "history.group.connection": "Verbindung",
+  "history.group.latency": "Latency",
+  "history.group.quality": "Leitungsqualität",
+  "history.group.traffic": "Verkehr",
+  "history.group.speedtest": "Geschwindigkeitstest",
+  "history.group.endpoints": "Eigene Ziele"
 }

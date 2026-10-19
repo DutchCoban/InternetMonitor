@@ -18,7 +18,22 @@ namespace InternetMonitor.Core.History;
 /// Whether the chart shades the good/warning/bad latency bands under it. Only for round trips: a
 /// jitter of 150 ms is awful, while the same number as a latency is merely "warning".
 /// </param>
-public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState, Func<string?, string?>? MetadataChangeKey = null, bool LatencyBands = false);
+/// <param name="Group">
+/// Which row of the History page's picker the series sits in. Seventeen chips in one block were
+/// too many to scan; grouped, the page shows the groups and then only the handful in the chosen one.
+/// </param>
+public sealed record ChartableSeries(string Id, string NameKey, string Unit, bool IsState, Func<string?, string?>? MetadataChangeKey = null, bool LatencyBands = false, SeriesGroup Group = SeriesGroup.Connection);
+
+/// <summary>The History page's series groups, in display order. <see cref="Endpoints"/> holds the user's own step-7 targets and only shows when there are any.</summary>
+public enum SeriesGroup
+{
+    Connection,
+    Latency,
+    Quality,
+    Traffic,
+    SpeedTest,
+    Endpoints,
+}
 
 /// <summary>
 /// Maps a step onto the history series it records into.
@@ -135,21 +150,42 @@ public static class SeriesNames
     /// </summary>
     public static IReadOnlyList<ChartableSeries> Chartable { get; } =
     [
-        new(For(StepId.Adapter)!, "step.adapter.name", UnitFor(StepId.Adapter), IsStateSeries(StepId.Adapter)),
-        new(For(StepId.Link)!, "step.link.name", UnitFor(StepId.Link), IsStateSeries(StepId.Link)),
-        new(WifiSignal, "series.wifiSignal", "%", false, WifiHistory.AccessPointOf),
-        new(For(StepId.Gateway)!, "step.gateway.name", UnitFor(StepId.Gateway), IsStateSeries(StepId.Gateway), LatencyBands: true),
-        new(For(StepId.PublicIp)!, "step.publicIp.name", UnitFor(StepId.PublicIp), IsStateSeries(StepId.PublicIp), LatencyBands: true),
-        new(PacketLoss, "series.packetLoss", "%", false),
-        new(Jitter, "series.jitter", "ms", false),
-        new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns), LatencyBands: true),
-        new(For(StepId.Target)!, "step.target.name", UnitFor(StepId.Target), IsStateSeries(StepId.Target), LatencyBands: true),
-        new(Ipv6, "series.ipv6", string.Empty, true),
-        new(TrafficDown, "series.trafficDown", "Mbps", false),
-        new(TrafficUp, "series.trafficUp", "Mbps", false),
-        new(SpeedTestDownload, "speedtest.download.name", "Mbps", false),
-        new(SpeedTestUpload, "speedtest.upload.name", "Mbps", false),
-        new(SpeedTestPing, "series.speedTestPing", "ms", false, LatencyBands: true),
-        new(SpeedTestBufferbloat, "series.speedTestBufferbloat", "ms", false),
+        new(For(StepId.Adapter)!, "step.adapter.name", UnitFor(StepId.Adapter), IsStateSeries(StepId.Adapter), Group: SeriesGroup.Connection),
+        new(For(StepId.Link)!, "step.link.name", UnitFor(StepId.Link), IsStateSeries(StepId.Link), Group: SeriesGroup.Connection),
+        new(WifiSignal, "series.wifiSignal", "%", false, WifiHistory.AccessPointOf, Group: SeriesGroup.Connection),
+        new(Ipv6, "series.ipv6", string.Empty, true, Group: SeriesGroup.Connection),
+        new(For(StepId.Gateway)!, "step.gateway.name", UnitFor(StepId.Gateway), IsStateSeries(StepId.Gateway), LatencyBands: true, Group: SeriesGroup.Latency),
+        new(For(StepId.PublicIp)!, "step.publicIp.name", UnitFor(StepId.PublicIp), IsStateSeries(StepId.PublicIp), LatencyBands: true, Group: SeriesGroup.Latency),
+        new(For(StepId.Dns)!, "step.dns.name", UnitFor(StepId.Dns), IsStateSeries(StepId.Dns), LatencyBands: true, Group: SeriesGroup.Latency),
+        new(For(StepId.Target)!, "step.target.name", UnitFor(StepId.Target), IsStateSeries(StepId.Target), LatencyBands: true, Group: SeriesGroup.Latency),
+        new(PacketLoss, "series.packetLoss", "%", false, Group: SeriesGroup.Quality),
+        new(Jitter, "series.jitter", "ms", false, Group: SeriesGroup.Quality),
+        new(TrafficDown, "series.trafficDown", "Mbps", false, Group: SeriesGroup.Traffic),
+        new(TrafficUp, "series.trafficUp", "Mbps", false, Group: SeriesGroup.Traffic),
+        new(SpeedTestDownload, "speedtest.download.name", "Mbps", false, Group: SeriesGroup.SpeedTest),
+        new(SpeedTestUpload, "speedtest.upload.name", "Mbps", false, Group: SeriesGroup.SpeedTest),
+        new(SpeedTestPing, "series.speedTestPing", "ms", false, LatencyBands: true, Group: SeriesGroup.SpeedTest),
+        new(SpeedTestBufferbloat, "series.speedTestBufferbloat", "ms", false, Group: SeriesGroup.SpeedTest),
     ];
+
+    /// <summary>The localization key of a group's chip label.</summary>
+    public static string GroupKey(SeriesGroup group) => group switch
+    {
+        SeriesGroup.Connection => "history.group.connection",
+        SeriesGroup.Latency => "history.group.latency",
+        SeriesGroup.Quality => "history.group.quality",
+        SeriesGroup.Traffic => "history.group.traffic",
+        SeriesGroup.SpeedTest => "history.group.speedtest",
+        _ => "history.group.endpoints",
+    };
+
+    /// <summary>
+    /// The group a series id belongs to: a configured endpoint's series to <see cref="SeriesGroup.Endpoints"/>,
+    /// a built-in one to the group it is listed under, anything unknown (a removed endpoint, an
+    /// old setting) to <see cref="SeriesGroup.Latency"/>, where the default series lives.
+    /// </summary>
+    public static SeriesGroup GroupOf(string? seriesId) =>
+        seriesId is not null && EndpointOf(seriesId) is not null
+            ? SeriesGroup.Endpoints
+            : Chartable.FirstOrDefault(s => s.Id == seriesId)?.Group ?? SeriesGroup.Latency;
 }

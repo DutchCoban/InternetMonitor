@@ -900,5 +900,12 @@
   "explain.dns.ownResolverReachable.what": "Le serveur DNS utilisé par cet ordinateur est joignable mais ne donne aucune réponse DNS, alors que le reste de la connexion va bien.",
   "explain.dns.ownResolverReachable.cause": "La recherche de {0} a échoué via le serveur DNS de cette carte ({1}), qui acceptait pourtant une connexion sur le port 443 à ce moment-là ; un serveur DNS public a répondu à la même question sans difficulté. Quelque chose entre cet ordinateur et ce serveur perd le trafic DNS (port 53), ou le service DNS du serveur s'est bloqué.",
   "explain.dns.ownResolverReachable.todo": "Vérifiez le filtrage DNS ou les fonctions de sécurité du routeur et du réseau, et si cela se répète aux mêmes heures. Un second serveur DNS dans les paramètres réseau donne entre-temps une solution de repli à Windows.",
-  "history.dnsFailures.footer": "{0} lookups sans réponse dans la vue"
+  "history.dnsFailures.footer": "{0} lookups sans réponse dans la vue",
+  "history.caption.group": "Groupe",
+  "history.group.connection": "Connexion",
+  "history.group.latency": "Latency",
+  "history.group.quality": "Qualité de ligne",
+  "history.group.traffic": "Trafic",
+  "history.group.speedtest": "Test de vitesse",
+  "history.group.endpoints": "Vos cibles"
 }

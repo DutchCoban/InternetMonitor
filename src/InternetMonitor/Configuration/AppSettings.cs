@@ -91,6 +91,9 @@ public sealed class AppSettings
 
     public string AdapterName { get; set; } = string.Empty;
 
+    /// <summary>The series the History page showed last, so it opens where the user left it rather than on the default.</summary>
+    public string HistorySeriesId { get; set; } = "internet";
+
     /// <summary>
     /// A brief pop-up when a new incident opens. On by default, matching v1's equivalent
     /// (ShowOutagePopups) - a connectivity tool that stays silent about a connectivity problem

@@ -900,5 +900,12 @@
   "explain.dns.ownResolverReachable.what": "Serwer DNS używany przez ten komputer jest osiągalny, ale nie daje odpowiedzi DNS, a reszta połączenia działa.",
   "explain.dns.ownResolverReachable.cause": "Rozwiązanie {0} nie powiodło się przez serwer DNS tej karty ({1}), który w tym samym momencie przyjął połączenie na porcie 443; publiczny serwer DNS odpowiedział bez problemu. Coś między tym komputerem a tym serwerem odrzuca ruch DNS (port 53) albo usługa DNS serwera się zawiesiła.",
   "explain.dns.ownResolverReachable.todo": "Sprawdź filtrowanie DNS lub funkcje bezpieczeństwa routera i sieci oraz czy powtarza się to o tych samych porach. Drugi serwer DNS w ustawieniach sieci da Windows w międzyczasie rezerwę.",
-  "history.dnsFailures.footer": "{0} lookupów bez odpowiedzi w widoku"
+  "history.dnsFailures.footer": "{0} lookupów bez odpowiedzi w widoku",
+  "history.caption.group": "Grupa",
+  "history.group.connection": "Połączenie",
+  "history.group.latency": "Latency",
+  "history.group.quality": "Jakość łącza",
+  "history.group.traffic": "Ruch",
+  "history.group.speedtest": "Test prędkości",
+  "history.group.endpoints": "Własne cele"
 }
