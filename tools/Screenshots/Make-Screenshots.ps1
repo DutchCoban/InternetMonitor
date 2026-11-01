@@ -96,8 +96,10 @@ Shot "mtu"                     $live @{ Page = "tools"; Clicks = "625,132;545,23
 
 Write-Host "Provider report..."
 $env:INTERNETMONITOR_DATA_DIR = $data
-& $exe --export report (Join-Path $Work "provider-report.html")
-if ($LASTEXITCODE -ne 0) { throw "Report export failed" }
+# Start-Process -Wait: a windowed executable returns to the shell at once, and Edge would then
+# look for a report that has not been written yet.
+$export = Start-Process -FilePath $exe -ArgumentList "--export", "report", "`"$(Join-Path $Work 'provider-report.html')`"" -Wait -PassThru -NoNewWindow
+if ($export.ExitCode -ne 0) { throw "Report export failed" }
 # Start-Process rather than a direct call: Edge writes to stderr even when it succeeds, and under
 # $ErrorActionPreference = "Stop" a redirected native stderr line becomes a terminating error.
 $url = "file:///" + (Join-Path $Work "provider-report.html").Replace("\", "/")

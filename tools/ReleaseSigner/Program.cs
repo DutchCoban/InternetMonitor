@@ -148,10 +148,20 @@ internal static class VirusTotalScan
         if (report is null)
         {
             Console.WriteLine($"VirusTotal has not seen this file yet; uploading {Path.GetFileName(file)} ({new FileInfo(file).Length / (1024 * 1024)} MB)...");
-            string analysisId = await UploadAsync(http, file).ConfigureAwait(false);
-            await WaitForAnalysisAsync(http, analysisId).ConfigureAwait(false);
-            report = await TryGetReportAsync(http, sha256).ConfigureAwait(false)
-                ?? throw new InvalidOperationException("The analysis finished but VirusTotal has no report for the file.");
+            string? analysisId = await UploadAsync(http, file).ConfigureAwait(false);
+            if (analysisId is not null)
+            {
+                await WaitForAnalysisAsync(http, analysisId).ConfigureAwait(false);
+            }
+
+            report = await WaitForReportAsync(http, sha256).ConfigureAwait(false);
+        }
+        else if (!HasVerdict(report))
+        {
+            // Uploaded earlier (an interrupted run), still being analysed.
+            report.Dispose();
+            Console.WriteLine("VirusTotal is still analysing this file...");
+            report = await WaitForReportAsync(http, sha256).ConfigureAwait(false);
         }
 
         Verdict verdict;
@@ -218,8 +228,54 @@ internal static class VirusTotalScan
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
     }
 
-    /// <summary>Uploads the file, directly or - above 32 MB - through the one-time upload URL the API hands out, and returns the analysis id.</summary>
-    private static async Task<string> UploadAsync(HttpClient http, string file)
+    /// <summary>
+    /// The file report, waiting for it when the upload (this one, or an earlier one that was still
+    /// being processed) has not produced it yet.
+    /// </summary>
+    private static async Task<JsonDocument> WaitForReportAsync(HttpClient http, string sha256)
+    {
+        DateTime deadline = DateTime.UtcNow + AnalysisBudget;
+        while (true)
+        {
+            JsonDocument? report = await TryGetReportAsync(http, sha256).ConfigureAwait(false);
+            if (report is not null)
+            {
+                if (HasVerdict(report))
+                {
+                    return report;
+                }
+
+                report.Dispose();
+            }
+
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new InvalidOperationException($"VirusTotal has no finished report for the file after {AnalysisBudget.TotalMinutes:F0} minutes; look it up later at https://www.virustotal.com/gui/file/{sha256}.");
+            }
+
+            Console.WriteLine(report is null ? "  report not ready yet..." : "  analysis still running...");
+            await Task.Delay(PollInterval).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Whether at least one engine has looked. A report can exist before any has: the stats are
+    /// then empty, and "0 of 0 engines" is not a verdict.
+    /// </summary>
+    private static bool HasVerdict(JsonDocument report)
+    {
+        JsonElement attributes = report.RootElement.GetProperty("data").GetProperty("attributes");
+        return attributes.TryGetProperty("last_analysis_stats", out JsonElement stats)
+            && attributes.TryGetProperty("last_analysis_results", out JsonElement results)
+            && Summarise(stats, results).Engines > 0;
+    }
+
+    /// <summary>
+    /// Uploads the file, directly or - above 32 MB - through the one-time upload URL the API hands
+    /// out, and returns the analysis id - or null when VirusTotal is still processing an earlier
+    /// upload of the same bytes (an interrupted run), in which case the file report is what to wait for.
+    /// </summary>
+    private static async Task<string?> UploadAsync(HttpClient http, string file)
     {
         string target = $"{Api}/files";
         if (new FileInfo(file).Length > DirectUploadLimit)
@@ -247,6 +303,12 @@ internal static class VirusTotalScan
         form.Add(content);
 
         using HttpResponseMessage response = await http.PostAsync(target, form).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            Console.WriteLine("  VirusTotal is still processing an earlier upload of this file; waiting for its report...");
+            return null;
+        }
+
         await EnsureOkAsync(response, "uploading the file").ConfigureAwait(false);
         using JsonDocument json = JsonDocument.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
         return json.RootElement.GetProperty("data").GetProperty("id").GetString() ?? throw new InvalidOperationException("VirusTotal returned no analysis id.");
@@ -259,6 +321,14 @@ internal static class VirusTotalScan
         {
             await Task.Delay(PollInterval).ConfigureAwait(false);
             using HttpResponseMessage response = await http.GetAsync($"{Api}/analyses/{analysisId}").ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.NotFound && DateTime.UtcNow <= deadline)
+            {
+                // Right after a large upload the analysis id can take a while to become visible to
+                // the API; a 404 at that point means "not yet", not "never".
+                Console.WriteLine("  analysis not listed yet...");
+                continue;
+            }
+
             await EnsureOkAsync(response, "polling the analysis").ConfigureAwait(false);
             using JsonDocument json = JsonDocument.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
             string status = json.RootElement.GetProperty("data").GetProperty("attributes").GetProperty("status").GetString() ?? string.Empty;
