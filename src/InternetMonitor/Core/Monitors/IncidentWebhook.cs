@@ -57,7 +57,12 @@ public sealed class IncidentWebhook : IAsyncDisposable
     private DateTimeOffset _nextAttemptUtc = DateTimeOffset.MinValue;
 
     public IncidentWebhook(string appVersion)
-        : this(appVersion, new HttpClientHandler())
+        : this(appVersion, new HttpClientHandler
+        {
+            // A 307/308 would re-POST the message - with the network name and the gateway's
+            // hardware address in it - to wherever the endpoint points. The user chose one address.
+            AllowAutoRedirect = false,
+        })
     {
     }
 
@@ -288,7 +293,10 @@ public sealed class IncidentWebhook : IAsyncDisposable
         WebhookDeliveryStatus status;
         try
         {
-            using HttpResponseMessage response = await _httpClient.PostAsJsonAsync(url, payload, Json, cancellationToken).ConfigureAwait(false);
+            // Only the status code is read, so the body is never buffered - a receiver that answers
+            // with a large page costs nothing here.
+            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(payload, options: Json) };
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             status = new WebhookDeliveryStatus(DateTimeOffset.UtcNow, !response.IsSuccessStatusCode, $"HTTP {(int)response.StatusCode}");
         }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException or InvalidOperationException or NotSupportedException)

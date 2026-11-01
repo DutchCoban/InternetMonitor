@@ -79,7 +79,7 @@ public sealed class DiagnosticLoggerTests : IDisposable
         {
             DiagnosticLogLevel = DiagnosticLogLevel.Basic,
             DiagnosticLogDirectory = _directory,
-            MaxDiagnosticLogFileSizeBytes = 400,
+            MaxDiagnosticLogFileSizeBytes = 1024,
             MaxDiagnosticLogFiles = 2,
         };
         var logger = new DiagnosticLogger(settings);
@@ -94,6 +94,6 @@ public sealed class DiagnosticLoggerTests : IDisposable
         Assert.True(File.Exists(logger.LogPath + ".1"));
         Assert.True(File.Exists(logger.LogPath + ".2"));
         Assert.False(File.Exists(logger.LogPath + ".3"));
-        Assert.True(new FileInfo(logger.LogPath + ".1").Length >= 400);
+        Assert.True(new FileInfo(logger.LogPath + ".1").Length >= 1024);
     }
 }

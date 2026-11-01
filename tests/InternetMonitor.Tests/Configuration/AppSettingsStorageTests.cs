@@ -2,6 +2,7 @@ using System.Globalization;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Core.Export;
+using InternetMonitor.Localization;
 using Xunit;
 
 namespace InternetMonitor.Tests.Configuration;
@@ -73,7 +74,8 @@ public sealed class AppSettingsStorageTests
         Assert.Equal(new AppSettings().Language, AppSettings.Load().Language);
 
         File.Delete(AppPaths.SettingsFile);
-        Assert.Equal(AppSettings.LanguageFor(CultureInfo.CurrentUICulture), AppSettings.Load().Language);
+        Assert.Equal(AppSettings.LanguageForThisWindows(), AppSettings.Load().Language);
+        Assert.Contains(AppSettings.LanguageForThisWindows(), LocalizationManager.SupportedLanguages.Select(l => l.Code));
     }
 
     [Fact]

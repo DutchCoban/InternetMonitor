@@ -661,7 +661,7 @@
   "networkHealth.packetLoss.speedTest.cause": "{0}% de packet loss em média nos últimos {1} minutos, enquanto decorria um teste de velocidade. Com a linha cheia de propósito, os pings ficam em fila atrás do tráfego do teste e alguns são descartados - isto é esperado e não é uma avaria.",
   "networkHealth.packetLoss.speedTest.todo": "Nada, se só aconteceu durante o teste. Se também voltar sem teste de velocidade, verifique o sinal Wi-Fi e os cabos.",
   "settings.endpoint.warn.httpHeaders": "Este URL usa http:// simples, por isso estes valores de cabeçalho (chaves API, tokens) são enviados sem encriptação. Use https:// sempre que puder.",
-  "settings.backup.note": "A exportação contém o URL do Uptime Kuma e os cabeçalhos dos endpoints tal como estão, por isso guarde o ficheiro só para si.",
+  "settings.backup.note": "A exportação contém o URL do Uptime Kuma, o URL do webhook e os cabeçalhos dos endpoints como texto legível, por isso guarde o ficheiro só para si.",
   "incident.toast.resolved.title": "Ligação restabelecida",
   "incident.toast.resolved.text": "De volta após {0}.",
   "menu.pause": "Pausar a monitorização",
@@ -907,5 +907,13 @@
   "history.group.quality": "Qualidade da linha",
   "history.group.traffic": "Tráfego",
   "history.group.speedtest": "Teste de velocidade",
-  "history.group.endpoints": "Os seus alvos"
+  "history.group.endpoints": "Os seus alvos",
+  "settings.secrets.protect": "Proteger as credenciais com a sua conta Windows",
+  "settings.secrets.protect.help": "O URL do webhook, o URL do Uptime Kuma e os cabeçalhos dos endpoints ficam guardados em settings.json. Ligado: são aí cifrados, de modo que só a sua conta Windows neste computador os consegue ler; desligado: texto legível. Uma credencial escrita à mão no ficheiro é reconhecida em ambos os casos e cifrada na próxima gravação enquanto isto estiver ligado.",
+  "settings.secrets.warning": "As credenciais estão guardadas como texto legível em settings.json. Ligue a proteção acima para as cifrar com a sua conta Windows.",
+  "settings.secrets.warning.endpoints": "Os cabeçalhos dos endpoints estão guardados como texto legível em settings.json - veja Integrações para os proteger.",
+  "settings.backup.importFailed": "Não foi possível importar o ficheiro de definições. {0}",
+  "settings.backup.exportFailed": "Não foi possível escrever as definições nesse ficheiro. {0}",
+  "secrets.prompt.title": "Proteger as credenciais?",
+  "secrets.prompt.message": "settings.json contém credenciais como texto legível: um URL de webhook, um URL do Uptime Kuma ou um cabeçalho de endpoint.\n\nProtegê-las com a sua conta Windows? Ficam então cifradas de modo que só você, neste computador, as consegue ler. Escolha Não para as manter legíveis; pode alterar isto mais tarde em Definições → Integrações."
 }

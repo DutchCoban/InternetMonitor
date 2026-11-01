@@ -57,6 +57,7 @@ public sealed class AppHost : ApplicationContext
         _settings = AppSettings.Load();
 
         LocalizationManager.Initialize(_settings.Language);
+        SecretProtectionPrompt.ApplyAtStartup(_settings);
 
         // Both lines matter, in this order. Setting Mode only re-resolves the palette when the
         // value actually changes, so with the default (System) it would do nothing at all and the
@@ -79,7 +80,7 @@ public sealed class AppHost : ApplicationContext
         }
 
         _pipeline = new StepPipeline(BuildTargets);
-        _cadence = new CadenceController(_pipeline, () => _settings);
+        _cadence = new CadenceController(_pipeline, () => _settings) { IsMetered = IsMetered };
 
         _history = new MetricStore(TimeSpan.FromDays(_settings.HistoryRetentionDays))
         {

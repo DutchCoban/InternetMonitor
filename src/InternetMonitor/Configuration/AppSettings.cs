@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using InternetMonitor.Core.Diagnosis;
 using InternetMonitor.Ui.Theming;
@@ -77,7 +78,8 @@ public sealed class AppSettings
 
     // ---- General -----------------------------------------------------------------------------
 
-    public string Language { get; set; } = "nl";
+    /// <summary>English unless chosen otherwise - also what a damaged settings file falls back to; a first start picks the Windows display language instead (see <see cref="Load"/>).</summary>
+    public string Language { get; set; } = "en";
 
     /// <summary>System (follow Windows), Light or Dark.</summary>
     public ThemeMode Theme { get; set; } = ThemeMode.System;
@@ -358,10 +360,11 @@ public sealed class AppSettings
     /// </summary>
     public string KumaPushUrl { get; set; } = string.Empty;
 
+    /// <summary>Clamped to a minute up to a day: the Settings field offers the same range, and a timer period of weeks would throw and silently end the push loop.</summary>
     public int KumaIntervalSeconds
     {
         get => _kumaIntervalSeconds;
-        set => _kumaIntervalSeconds = Math.Max(Core.Monitors.KumaPusher.MinimumIntervalSeconds, value);
+        set => _kumaIntervalSeconds = Math.Clamp(value, Core.Monitors.KumaPusher.MinimumIntervalSeconds, 86_400);
     }
 
     /// <summary>Where an incident opening or closing is POSTed as JSON (see <see cref="Core.Monitors.IncidentWebhook"/>). Empty means off; only https is ever called.</summary>
@@ -374,6 +377,95 @@ public sealed class AppSettings
     /// </summary>
     public string WebhookLabel { get; set; } = string.Empty;
 
+    // ---- Credentials ----------------------------------------------------------------------------
+
+    /// <summary>The settings whose value is a credential by itself: a push URL and a webhook URL carry their token. Endpoint header values are the third kind.</summary>
+    public static readonly IReadOnlyList<string> SecretUrlProperties = [nameof(KumaPushUrl), nameof(WebhookUrl)];
+
+    /// <summary>
+    /// Whether <see cref="Save"/> writes credentials protected with the user's Windows account
+    /// (<see cref="SecretProtection"/>) or as readable text. Null until the user has been asked,
+    /// which happens on the first start that finds a readable credential in the file - see
+    /// <c>App.SecretProtectionPrompt</c>. False is a deliberate choice, and Settings then warns.
+    /// </summary>
+    public bool? ProtectSecrets { get; set; }
+
+    /// <summary>Whether any credential is set at all - what the warning about readable credentials hinges on.</summary>
+    [JsonIgnore]
+    public bool HasSecrets =>
+        KumaPushUrl.Length > 0 || WebhookUrl.Length > 0 || ApplicationEndpoints.Any(e => e.Headers.Any(h => h.Value.Length > 0));
+
+    /// <summary>Whether the file <see cref="Load"/> read held at least one credential as readable text.</summary>
+    [JsonIgnore]
+    public bool LoadedPlaintextSecrets { get; private set; }
+
+    /// <summary>
+    /// Turns every protected credential back into its plain text, in place, so the rest of the app
+    /// only ever sees plain values. A protected value that cannot be read here (another user's
+    /// file) becomes empty. Returns whether any credential was found as readable text.
+    /// </summary>
+    private bool UnprotectSecrets()
+    {
+        bool plaintext = false;
+
+        string Plain(string value)
+        {
+            if (SecretProtection.IsProtected(value))
+            {
+                return SecretProtection.Unprotect(value) ?? string.Empty;
+            }
+
+            plaintext |= value.Length > 0;
+            return value;
+        }
+
+        KumaPushUrl = Plain(KumaPushUrl);
+        WebhookUrl = Plain(WebhookUrl);
+        for (int i = 0; i < ApplicationEndpoints.Count; i++)
+        {
+            EndpointConfig endpoint = ApplicationEndpoints[i];
+            if (endpoint.Headers.Count > 0)
+            {
+                ApplicationEndpoints[i] = endpoint with { Headers = [.. endpoint.Headers.Select(h => h with { Value = Plain(h.Value) })] };
+            }
+        }
+
+        return plaintext;
+    }
+
+    /// <summary>Applies <paramref name="transform"/> to every credential in a serialized settings object - the one place that knows where they all are.</summary>
+    internal static void ForEachSecret(JsonObject root, Func<string, string> transform)
+    {
+        foreach (string property in SecretUrlProperties)
+        {
+            if (root[property]?.GetValue<string>() is { Length: > 0 } value)
+            {
+                root[property] = transform(value);
+            }
+        }
+
+        if (root["ApplicationEndpoints"] is not JsonArray endpoints)
+        {
+            return;
+        }
+
+        foreach (JsonNode? endpointNode in endpoints)
+        {
+            if (endpointNode is not JsonObject endpoint || endpoint["Headers"] is not JsonArray headers)
+            {
+                continue;
+            }
+
+            foreach (JsonNode? headerNode in headers)
+            {
+                if (headerNode is JsonObject header && header["Value"]?.GetValue<string>() is { Length: > 0 } value)
+                {
+                    header["Value"] = transform(value);
+                }
+            }
+        }
+    }
+
     // ---- Diagnostics ----------------------------------------------------------------------------
 
     /// <summary>Off by default - this is troubleshooting output, not something a monitor needs running to do its job.</summary>
@@ -383,17 +475,63 @@ public sealed class AppSettings
 
     public bool LogDetailedMeasurements { get; set; }
 
-    public int MaxDiagnosticLogFiles { get; set; } = 5;
+    private int _maxDiagnosticLogFiles = 5;
+    private long _maxDiagnosticLogFileSizeBytes = 5 * 1024 * 1024;
+    private string _diagnosticLogDirectory = string.Empty;
 
-    public long MaxDiagnosticLogFileSizeBytes { get; set; } = 5 * 1024 * 1024;
+    // The two rotation values and the directory are also clamped here, not only in the UI they do
+    // not have: a settings file is a trust boundary once it can be imported from someone else.
+
+    /// <summary>How many rotated log files are kept. Clamped to 1-50: rotation renames every one of them before each write past the size limit.</summary>
+    public int MaxDiagnosticLogFiles
+    {
+        get => _maxDiagnosticLogFiles;
+        set => _maxDiagnosticLogFiles = Math.Clamp(value, 1, 50);
+    }
+
+    /// <summary>Clamped to 1 KB - 1 GB; below that the log would rotate on nearly every write.</summary>
+    public long MaxDiagnosticLogFileSizeBytes
+    {
+        get => _maxDiagnosticLogFileSizeBytes;
+        set => _maxDiagnosticLogFileSizeBytes = Math.Clamp(value, 1024, 1024L * 1024 * 1024);
+    }
 
     /// <summary>
     /// Where diagnostics.log is written. Empty means "use the default logs folder" - the same
     /// empty-means-default convention WindowWidth/WindowHeight already use, kept distinct from
     /// AppPaths.Root (settings/incidents/history/cache all stay put regardless of this setting;
-    /// only the diagnostic log moves).
+    /// only the diagnostic log moves). Only a full local path is accepted: a network path would
+    /// have every cycle's log line - and the user's Windows credentials - go to whoever the share
+    /// belongs to, which is not what anyone importing a settings file means to agree to.
     /// </summary>
-    public string DiagnosticLogDirectory { get; set; } = string.Empty;
+    public string DiagnosticLogDirectory
+    {
+        get => _diagnosticLogDirectory;
+        set => _diagnosticLogDirectory = IsLocalDirectoryPath(value) ? value : string.Empty;
+    }
+
+    /// <summary>Empty, or a fully qualified path on a local drive - no UNC path and no network drive.</summary>
+    public static bool IsLocalDirectoryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            if (!Path.IsPathFullyQualified(path) || path.StartsWith(@"\\", StringComparison.Ordinal) || path.StartsWith("//", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return new DriveInfo(Path.GetPathRoot(path)!).DriveType != DriveType.Network;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 
     // ---- Network changes -----------------------------------------------------------------------
 
@@ -439,12 +577,31 @@ public sealed class AppSettings
     // The defaults below are deliberately uncalibrated - there is no measurement baseline in this
     // codebase to set them from - and every condition starts disabled regardless, so they only
     // matter once a user turns one on and have not yet typed their own numbers.
-    public NetworkHealthThreshold TcpRetransmissions { get; set; } = new(false, 500, 5);
+    // Every window is clamped to a minute up to a day, the range the Settings fields offer: a
+    // timer period of weeks would throw and silently end the monitor's loop.
+    private NetworkHealthThreshold _tcpRetransmissions = new(false, 500, 5);
+    private NetworkHealthThreshold _packetLoss = new(false, 20, 5);
+    private NetworkHealthThreshold _ttlExceeded = new(false, 50, 5);
+    private NetworkHealthThreshold _rogueDhcp = new(false, 0, 15);
+
+    public NetworkHealthThreshold TcpRetransmissions
+    {
+        get => _tcpRetransmissions;
+        set => _tcpRetransmissions = ClampWindow(value);
+    }
 
     /// <summary>MaxOccurrences here is a percentage (0-100), not a count.</summary>
-    public NetworkHealthThreshold PacketLoss { get; set; } = new(false, 20, 5);
+    public NetworkHealthThreshold PacketLoss
+    {
+        get => _packetLoss;
+        set => _packetLoss = ClampWindow(value);
+    }
 
-    public NetworkHealthThreshold TtlExceeded { get; set; } = new(false, 50, 5);
+    public NetworkHealthThreshold TtlExceeded
+    {
+        get => _ttlExceeded;
+        set => _ttlExceeded = ClampWindow(value);
+    }
 
     /// <summary>
     /// MaxOccurrences is unused for this condition - any server other than the known gateway is
@@ -453,7 +610,14 @@ public sealed class AppSettings
     /// for a made-up client (see <see cref="Net.DhcpDiscoverProbe"/>), so the default is deliberately
     /// a quarter of an hour, not the five minutes the other windows use.
     /// </summary>
-    public NetworkHealthThreshold RogueDhcp { get; set; } = new(false, 0, 15);
+    public NetworkHealthThreshold RogueDhcp
+    {
+        get => _rogueDhcp;
+        set => _rogueDhcp = ClampWindow(value);
+    }
+
+    private static NetworkHealthThreshold ClampWindow(NetworkHealthThreshold threshold) =>
+        threshold with { MaxOccurrences = Math.Max(0, threshold.MaxOccurrences), WindowMinutes = Math.Clamp(threshold.WindowMinutes, 1, 1440) };
 
     // ---- Persistence --------------------------------------------------------------------------
 
@@ -465,11 +629,13 @@ public sealed class AppSettings
             if (!File.Exists(AppPaths.SettingsFile))
             {
                 // A first start: speak the language Windows does, when it is one of ours.
-                return new AppSettings { Language = LanguageFor(CultureInfo.CurrentUICulture) };
+                return new AppSettings { Language = LanguageForThisWindows() };
             }
 
             string json = File.ReadAllText(AppPaths.SettingsFile);
-            return JsonSerializer.Deserialize<AppSettings>(json, Json) ?? new AppSettings();
+            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, Json) ?? new AppSettings();
+            settings.LoadedPlaintextSecrets = settings.UnprotectSecrets();
+            return settings;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -477,17 +643,25 @@ public sealed class AppSettings
         }
     }
 
+    /// <summary>The app language for the language Windows displays itself in: its code when supported, otherwise English.</summary>
+    public static string LanguageForThisWindows() => LanguageFor(WindowsLanguage.PreferredTag());
+
     /// <summary>The app language for a Windows UI culture: its two-letter code when supported, otherwise English.</summary>
-    public static string LanguageFor(CultureInfo culture)
+    public static string LanguageFor(CultureInfo culture) => LanguageFor(culture.TwoLetterISOLanguageName);
+
+    /// <summary>The app language for a BCP-47 tag or a two-letter code ("nl-NL", "nl"): its two-letter code when supported, otherwise English.</summary>
+    public static string LanguageFor(string languageTag)
     {
-        string code = culture.TwoLetterISOLanguageName.ToLowerInvariant();
+        int dash = languageTag.IndexOf('-');
+        string code = (dash < 0 ? languageTag : languageTag[..dash]).ToLowerInvariant();
         return Localization.LocalizationManager.SupportedLanguages.Any(l => l.Code == code) ? code : "en";
     }
 
     /// <summary>
     /// Writes to a temporary file and moves it over the real one, so an interrupted write (or a
     /// crash mid-save) cannot leave a half-written settings file behind. Returns false rather than
-    /// throwing: a failed save must not take the UI down.
+    /// throwing: a failed save must not take the UI down. With <see cref="ProtectSecrets"/> on,
+    /// every credential goes to disk protected; the object itself keeps the plain values.
     /// </summary>
     public bool Save()
     {
@@ -495,7 +669,7 @@ public sealed class AppSettings
         {
             AppPaths.TryEnsureDirectory(AppPaths.Root);
             string tempPath = AppPaths.SettingsFile + ".tmp";
-            File.WriteAllText(tempPath, JsonSerializer.Serialize(this, Json));
+            File.WriteAllText(tempPath, ToJson(protectSecrets: ProtectSecrets == true));
             File.Move(tempPath, AppPaths.SettingsFile, overwrite: true);
             return true;
         }
@@ -513,11 +687,31 @@ public sealed class AppSettings
     /// restore anything. Throws on failure, unlike <see cref="Save"/> - this is a user-initiated
     /// action with its own dialog and its own error handling, not a background autosave.
     /// </summary>
-    public void ExportTo(string path) => File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
+    public void ExportTo(string path) => File.WriteAllText(path, ToJson(protectSecrets: false));
 
-    /// <summary>Reads a settings file exported by <see cref="ExportTo"/> (or the regular on-disk settings.json). Throws on a missing or malformed file - the caller decides how to tell the user.</summary>
-    public static AppSettings? ImportFrom(string path) =>
-        JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json);
+    private string ToJson(bool protectSecrets)
+    {
+        if (!protectSecrets)
+        {
+            return JsonSerializer.Serialize(this, Json);
+        }
+
+        var root = (JsonObject)JsonSerializer.SerializeToNode(this, Json)!;
+        ForEachSecret(root, SecretProtection.Protect);
+        return root.ToJsonString(Json);
+    }
+
+    /// <summary>
+    /// Reads a settings file exported by <see cref="ExportTo"/> (or the regular on-disk
+    /// settings.json). Throws on a missing or malformed file - the caller decides how to tell the
+    /// user. A protected credential from another user's file comes back empty.
+    /// </summary>
+    public static AppSettings? ImportFrom(string path)
+    {
+        AppSettings? imported = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json);
+        imported?.UnprotectSecrets();
+        return imported;
+    }
 
     /// <summary>
     /// Copies every readable/writable property from <paramref name="source"/> onto this instance

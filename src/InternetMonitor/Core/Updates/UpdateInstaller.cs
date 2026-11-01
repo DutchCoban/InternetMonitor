@@ -30,6 +30,9 @@ public sealed class UpdateInstaller
     /// <summary>A signature asset is under a hundred bytes of base64.</summary>
     private const long MaxSignatureBytes = 4096;
 
+    /// <summary>A build is tens of MB; the download stops here rather than filling the disk on a server's say-so.</summary>
+    private const long MaxAssetBytes = 200L * 1024 * 1024;
+
     /// <summary>What the download is called while it waits next to the executable it will replace.</summary>
     public const string PendingSuffix = ".new";
 
@@ -116,7 +119,12 @@ public sealed class UpdateInstaller
             await using (Stream source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
             await using (FileStream destination = File.Create(downloadPath))
             {
-                await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+                if (!await CopyBoundedAsync(source, destination, MaxAssetBytes, cancellationToken).ConfigureAwait(false))
+                {
+                    // Far larger than any build of this app: not a release, whatever the server says.
+                    TryDelete(downloadPath);
+                    return null;
+                }
             }
 
             if (!IsAcceptable(downloadPath, signature, expected))
@@ -219,6 +227,26 @@ public sealed class UpdateInstaller
 
     /// <summary>PowerShell's single-quoted strings only need the quote itself escaped (doubled), which is all a Windows file path could ever contain from this set.</summary>
     private static string EscapeSingleQuotes(string value) => value.Replace("'", "''");
+
+    /// <summary>Copies at most <paramref name="maxBytes"/>; false when the source had more than that.</summary>
+    private static async Task<bool> CopyBoundedAsync(Stream source, Stream destination, long maxBytes, CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            total += read;
+            if (total > maxBytes)
+            {
+                return false;
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
+    }
 
     private static void TryDelete(string path)
     {

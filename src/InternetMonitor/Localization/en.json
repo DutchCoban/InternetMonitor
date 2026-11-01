@@ -661,7 +661,7 @@
   "networkHealth.packetLoss.speedTest.cause": "{0}% packet loss on average over the last {1} minutes, while a speed test was running. With the line filled on purpose, pings queue behind the test's traffic and some are dropped - this is expected and not a fault.",
   "networkHealth.packetLoss.speedTest.todo": "Nothing, if it only happened during the test. If it also comes back without a speed test, check the Wi-Fi signal and cables.",
   "settings.endpoint.warn.httpHeaders": "This URL uses plain http://, so these header values (API keys, tokens) are sent unencrypted. Use https:// where you can.",
-  "settings.backup.note": "The export contains the Uptime Kuma URL and endpoint headers as they are, so keep the file to yourself.",
+  "settings.backup.note": "The export contains the Uptime Kuma URL, the webhook URL and endpoint headers as readable text, so keep the file to yourself.",
   "incident.toast.resolved.title": "Connection restored",
   "incident.toast.resolved.text": "Back after {0}.",
   "menu.pause": "Pause monitoring",
@@ -907,5 +907,13 @@
   "history.group.quality": "Line quality",
   "history.group.traffic": "Traffic",
   "history.group.speedtest": "Speed test",
-  "history.group.endpoints": "Your targets"
+  "history.group.endpoints": "Your targets",
+  "settings.secrets.protect": "Protect credentials with your Windows account",
+  "settings.secrets.protect.help": "The webhook URL, the Uptime Kuma URL and endpoint headers are stored in settings.json. On, they are encrypted there so that only your Windows account on this computer can read them; off, they are readable text. A credential you type into the file by hand is recognised either way, and encrypted on the next save while this is on.",
+  "settings.secrets.warning": "Credentials are stored as readable text in settings.json. Turn on the protection above to encrypt them with your Windows account.",
+  "settings.secrets.warning.endpoints": "Endpoint headers are stored as readable text in settings.json - see Integrations to protect them.",
+  "settings.backup.importFailed": "The settings file could not be imported. {0}",
+  "settings.backup.exportFailed": "The settings could not be written to that file. {0}",
+  "secrets.prompt.title": "Protect credentials?",
+  "secrets.prompt.message": "settings.json contains credentials as readable text: a webhook URL, an Uptime Kuma URL or an endpoint header.\n\nProtect them with your Windows account? They are then encrypted so that only you, on this computer, can read them. Choose No to keep them readable; you can change this later under Settings → Integrations."
 }

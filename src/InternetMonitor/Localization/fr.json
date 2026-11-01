@@ -661,7 +661,7 @@
   "networkHealth.packetLoss.speedTest.cause": "{0}% de packet loss en moyenne sur les {1} dernières minutes, pendant qu'un test de vitesse tournait. La ligne étant remplie volontairement, les pings font la queue derrière le trafic du test et certains sont perdus - c'est attendu et ce n'est pas une panne.",
   "networkHealth.packetLoss.speedTest.todo": "Rien, si cela ne s'est produit que pendant le test. Si cela revient aussi sans test de vitesse, vérifiez le signal Wi-Fi et les câbles.",
   "settings.endpoint.warn.httpHeaders": "Cette URL utilise du simple http://, donc ces valeurs d'en-tête (clés API, tokens) sont envoyées en clair. Utilisez https:// quand vous le pouvez.",
-  "settings.backup.note": "L'export contient l'URL Uptime Kuma et les en-têtes des endpoints tels quels ; gardez donc ce fichier pour vous.",
+  "settings.backup.note": "L'export contient l'URL Uptime Kuma, l'URL du webhook et les en-têtes des endpoints en texte lisible ; gardez donc ce fichier pour vous.",
   "incident.toast.resolved.title": "Connexion rétablie",
   "incident.toast.resolved.text": "De retour après {0}.",
   "menu.pause": "Suspendre la surveillance",
@@ -907,5 +907,13 @@
   "history.group.quality": "Qualité de ligne",
   "history.group.traffic": "Trafic",
   "history.group.speedtest": "Test de vitesse",
-  "history.group.endpoints": "Vos cibles"
+  "history.group.endpoints": "Vos cibles",
+  "settings.secrets.protect": "Protéger les identifiants avec votre compte Windows",
+  "settings.secrets.protect.help": "L'URL du webhook, l'URL Uptime Kuma et les en-têtes des endpoints sont enregistrés dans settings.json. Activé : ils y sont chiffrés, de sorte que seul votre compte Windows sur cet ordinateur peut les lire ; désactivé : texte lisible. Un identifiant saisi à la main dans le fichier est reconnu dans les deux cas et chiffré au prochain enregistrement tant que ceci est activé.",
+  "settings.secrets.warning": "Les identifiants sont enregistrés en texte lisible dans settings.json. Activez la protection ci-dessus pour les chiffrer avec votre compte Windows.",
+  "settings.secrets.warning.endpoints": "Les en-têtes des endpoints sont enregistrés en texte lisible dans settings.json - voir Intégrations pour les protéger.",
+  "settings.backup.importFailed": "Le fichier de paramètres n'a pas pu être importé. {0}",
+  "settings.backup.exportFailed": "Les paramètres n'ont pas pu être écrits dans ce fichier. {0}",
+  "secrets.prompt.title": "Protéger les identifiants ?",
+  "secrets.prompt.message": "settings.json contient des identifiants en texte lisible : une URL de webhook, une URL Uptime Kuma ou un en-tête d'endpoint.\n\nLes protéger avec votre compte Windows ? Ils seront alors chiffrés de sorte que vous seul, sur cet ordinateur, puissiez les lire. Choisissez Non pour les laisser lisibles ; vous pourrez changer cela plus tard dans Paramètres → Intégrations."
 }

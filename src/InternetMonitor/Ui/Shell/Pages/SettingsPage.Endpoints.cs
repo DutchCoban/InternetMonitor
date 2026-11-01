@@ -24,10 +24,24 @@ public sealed partial class SettingsPage
         _addEndpoint = new AppButton { Variant = ButtonVariant.Secondary, Glyph = Glyph.Target, Dock = DockStyle.Top };
         _addEndpoint.Click += (_, _) => OpenEndpointEditor(null);
 
+        // Shown while an endpoint header is stored as readable text - see SecretProtection and the
+        // switch on the integrations card.
+        _endpointsSecretsWarning = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.TopLeft,
+            Font = Theme.Font(FontRole.Small),
+            Height = Dp(32),
+            Dock = DockStyle.Top,
+            Visible = false,
+        };
+
         // Fill before Top within this card: the button sits above a list whose height tracks the
-        // number of endpoints, so the button is added last to land above it.
+        // number of endpoints, so the button is added last to land above it - and the warning
+        // last of all, to sit above the button.
         _endpointsCard.Controls.Add(_endpoints);
         _endpointsCard.Controls.Add(_addEndpoint);
+        _endpointsCard.Controls.Add(_endpointsSecretsWarning);
     }
 
     private void OnEndpointEditRequested(EndpointConfig endpoint) => OpenEndpointEditor(endpoint);
@@ -138,7 +152,7 @@ public sealed partial class SettingsPage
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Not worth surfacing further for a manual export the user can just retry.
+            ShowBackupError("settings.backup.exportFailed", ex);
         }
     }
 
@@ -157,20 +171,20 @@ public sealed partial class SettingsPage
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
         {
-            // Not worth surfacing further for a manual import the user can just retry with a
-            // known-good file.
+            ShowBackupError("settings.backup.importFailed", ex);
             return;
         }
 
         if (imported is null)
         {
+            ShowBackupError("settings.backup.importFailed", null);
             return;
         }
 
         // ApplyFrom only copies properties - every setting that also has a live side effect
-        // (autostart's registry key, the active language/theme, Kuma's running pusher, the
-        // network-health monitor) needs that side effect re-applied explicitly, the same way each
-        // one's own change handler already does when the user edits it directly.
+        // (autostart's registry key, the active language/theme, every running monitor that is
+        // configured by Reconfigure) needs that side effect re-applied explicitly, the same way
+        // each one's own change handler already does when the user edits it directly.
         Services.Settings.ApplyFrom(imported);
         Services.Settings.Save();
 
@@ -178,8 +192,18 @@ public sealed partial class SettingsPage
         LocalizationManager.Instance.SetLanguage(Services.Settings.Language);
         Theme.Mode = Services.Settings.Theme;
         Services.Kuma.Reconfigure(Services.Settings.KumaPushUrl, Services.Settings.KumaIntervalSeconds);
+        Services.Webhook.Reconfigure(Services.Settings.WebhookUrl, Services.Settings.WebhookLabel);
+        Services.UpdateChecker.Reconfigure(Services.Settings.CheckForUpdates);
+        Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
         ReconfigureNetworkHealth();
 
         LoadFromSettings();
+    }
+
+    /// <summary>A manual backup or restore that failed says so - silently doing nothing reads as "it worked".</summary>
+    private void ShowBackupError(string key, Exception? ex)
+    {
+        string detail = ex?.Message ?? string.Empty;
+        MessageBox.Show(FindForm(), Loc.Format(key, detail), Loc.Get("settings.section.configBackup"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 }

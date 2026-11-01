@@ -110,8 +110,16 @@ public sealed partial class SettingsPage
     }
 
     // The folder may not exist yet (nothing has logged there) - not worth surfacing for a
-    // convenience shortcut the user can open themselves via Explorer.
-    private void OpenLogFolder() => ShellOpen.OpenPath(Services.DiagnosticLog.ResolvedDirectory());
+    // convenience shortcut the user can open themselves via Explorer. Only a folder is ever handed
+    // to the shell: a settings file could name a file here, and the shell would run it.
+    private void OpenLogFolder()
+    {
+        string directory = Services.DiagnosticLog.ResolvedDirectory();
+        if (Directory.Exists(directory))
+        {
+            ShellOpen.OpenPath(directory);
+        }
+    }
 
     private void RefreshLogDirectoryText() => _logDirectory.Text = Services.DiagnosticLog.ResolvedDirectory();
 }

@@ -38,7 +38,7 @@ public sealed class LocalizationManager
     ];
 
     private const string FallbackLanguageCode = "en";
-    private const string DefaultLanguageCode = "nl";
+    private const string DefaultLanguageCode = "en";
 
     private static readonly Lazy<Dictionary<string, string>> FallbackStrings =
         new(() => LoadLanguageFile(FallbackLanguageCode));

@@ -68,10 +68,11 @@ public static class DataExportBuilder
     }
 
     /// <summary>
-    /// Replaces the Uptime Kuma push URL and every custom endpoint header value with
-    /// <see cref="Redacted"/> before serializing - both are real credentials (a push URL is a
-    /// bearer token in disguise; a header is frequently an API key), and nothing in this export is
-    /// worth sending those out unencrypted for.
+    /// Replaces every credential with <see cref="Redacted"/> before serializing: the Uptime Kuma
+    /// push URL and the webhook URL (for Slack, Discord, Home Assistant or ntfy the URL itself is
+    /// the token), every custom endpoint header value (frequently an API key), and the query string
+    /// of every endpoint URL (where an API key tends to travel). Nothing in this export is worth
+    /// sending those out for.
     /// </summary>
     private static string RedactSettings(AppSettings settings)
     {
@@ -81,24 +82,17 @@ public static class DataExportBuilder
             return "{}";
         }
 
-        if (root["KumaPushUrl"]?.GetValue<string>() is { Length: > 0 })
-        {
-            root["KumaPushUrl"] = Redacted;
-        }
+        AppSettings.ForEachSecret(root, _ => Redacted);
 
         if (root["ApplicationEndpoints"] is JsonArray endpoints)
         {
             foreach (JsonNode? endpointNode in endpoints)
             {
-                if (endpointNode is JsonObject endpoint && endpoint["Headers"] is JsonArray headers)
+                if (endpointNode is JsonObject endpoint
+                    && endpoint["Url"]?.GetValue<string>() is { Length: > 0 } url
+                    && url.IndexOf('?') is var query and >= 0)
                 {
-                    foreach (JsonNode? headerNode in headers)
-                    {
-                        if (headerNode is JsonObject header && header.ContainsKey("Value"))
-                        {
-                            header["Value"] = Redacted;
-                        }
-                    }
+                    endpoint["Url"] = url[..query] + "?" + Redacted;
                 }
             }
         }

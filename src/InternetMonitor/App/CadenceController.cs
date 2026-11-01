@@ -36,6 +36,17 @@ public sealed class CadenceController : IDisposable
     /// <summary>Raised on whichever thread changed it when monitoring is paused or resumed; UI subscribers must marshal.</summary>
     public event Action? PauseChanged;
 
+    /// <summary>On a metered connection (mobile data, a phone's hotspot) the background interval is stretched by this much.</summary>
+    public const int MeteredSlowdown = 4;
+
+    /// <summary>
+    /// Whether the connection being monitored is metered right now. Step 2 knows; the host wires it
+    /// in. While nobody is watching, a metered connection is checked four times less often: every
+    /// cycle costs a few kilobytes (a TLS handshake among them), which is nothing on a line and
+    /// something on a data plan.
+    /// </summary>
+    public Func<bool> IsMetered { get; set; } = static () => false;
+
     public bool Foreground
     {
         get => _foreground;
@@ -159,7 +170,13 @@ public sealed class CadenceController : IDisposable
     private TimeSpan CurrentInterval()
     {
         AppSettings settings = _settings();
-        return TimeSpan.FromSeconds(_foreground ? settings.ForegroundIntervalSeconds : settings.BackgroundIntervalSeconds);
+        if (_foreground)
+        {
+            return TimeSpan.FromSeconds(settings.ForegroundIntervalSeconds);
+        }
+
+        int seconds = settings.BackgroundIntervalSeconds;
+        return TimeSpan.FromSeconds(IsMetered() ? seconds * MeteredSlowdown : seconds);
     }
 
     private void OnNetworkChanged(object? sender, EventArgs e) => RunNow();

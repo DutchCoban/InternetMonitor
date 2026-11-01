@@ -13,17 +13,20 @@ namespace InternetMonitor.Ui.Shell.Pages;
 /// Settings, in place rather than in its own window - one of thirteen separate forms in v1, here
 /// just another page, which is most of why it needed no navigation chrome of its own.
 ///
-/// Scoped to what v2 actually has behind it. Language, theme, auto-start, cadence, the traceroute
-/// ownership lookup and the step-7 endpoint list are all real, working settings with something
-/// listening on the other end. v1's ping targets, quiet hours, update checking, SLA exclusions,
-/// speed test scheduling, diagnostic log levels and Uptime Kuma push are deliberately not here:
-/// none of those have a monitor behind them yet in v2, and a setting that controls nothing is
-/// worse than a screen that says plainly it is not built yet.
+/// Scoped to what the app actually has behind it: every setting here has a monitor, a check or a
+/// tool listening on the other end. Two of v1's settings are deliberately absent - quiet hours
+/// (a pop-up suppressed while you are at the keyboard and shown when you are not would defeat the
+/// point; pop-ups can simply be switched off) and SLA exclusions (the provider report leaves time
+/// on a metered connection out by itself). The log rotation limits (MaxDiagnosticLogFiles,
+/// MaxDiagnosticLogFileSizeBytes) have no row either: they are clamped on load and only matter to
+/// someone editing settings.json by hand.
 ///
 /// Every change here applies immediately and saves immediately - no separate "Apply" button,
 /// matching v1's live-reconfiguration behaviour. Cadence and the traceroute lookup are read fresh
 /// by whatever uses them on their very next cycle; language and theme propagate through the
-/// existing LocalizationManager/Theme change events the rest of the app already listens for.
+/// existing LocalizationManager/Theme change events the rest of the app already listens for; the
+/// monitors with a Reconfigure(...) get it called from their row's change handler - and again,
+/// all of them, after a settings import.
 /// </summary>
 public sealed partial class SettingsPage(AppServices services) : PageBase(services)
 {
@@ -83,6 +86,9 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
     private Label _settingsBackupNote = null!;
+    private Toggle _protectSecrets = null!;
+    private Label _secretsWarning = null!;
+    private Label _endpointsSecretsWarning = null!;
     private AppButton _kumaAbout = null!;
     private Panel _integrationsDivider = null!;
     private EndpointList _endpoints = null!;
@@ -214,6 +220,16 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         Rectangle content = _integrationsCard.DisplayRectangle;
         int width = Math.Max(Dp(200), content.Width);
         int y = content.Top;
+
+        // The credentials switch first - it concerns both integrations below - with the warning
+        // under it while they are stored readable.
+        y = PlaceRow(_protectSecrets, y, content, width);
+        _secretsWarning.Visible = SecretsReadable;
+        if (SecretsReadable)
+        {
+            _secretsWarning.Bounds = new Rectangle(content.Left, y, content.Width, Dp(32));
+            y += Dp(34);
+        }
 
         y = PlaceRow(_kumaUrl, y, content, width);
         y = PlaceRow(_kumaInterval, y, content, width);
@@ -392,7 +408,10 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _addEndpoint.Width = content.Width;
         _endpoints.Width = content.Width;
 
-        int contentHeight = _addEndpoint.Height + Sp(2) + _endpoints.Height;
+        bool headersReadable = SecretsReadable && Services.Settings.ApplicationEndpoints.Any(e => e.Headers.Any(h => h.Value.Length > 0));
+        _endpointsSecretsWarning.Visible = headersReadable;
+        _endpointsSecretsWarning.Width = content.Width;
+        int contentHeight = _addEndpoint.Height + Sp(2) + _endpoints.Height + (headersReadable ? _endpointsSecretsWarning.Height + Sp(2) : 0);
         _endpointsCard.Height = content.Top + contentHeight + _endpointsCard.Inset;
 
         LayoutButtonRow(_settingsBackupCard, _settingsBackupButtons);
@@ -451,6 +470,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _latencyError.Value = settings.LatencyErrorMs;
         _weakWifi.Value = settings.WeakWifiSignalPercent;
         RefreshKumaStatus(Services.Kuma.LastPush);
+        _protectSecrets.SetWithoutNotify(settings.ProtectSecrets == true);
         _webhookUrl.Text = settings.WebhookUrl;
         _webhookLabel.Text = settings.WebhookLabel;
         RefreshWebhookStatus(Services.Webhook.LastDelivery);
@@ -656,6 +676,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _settingsBackupCard.Title = Loc.Get("settings.section.configBackup");
         _settingsBackupCard.Subtitle = Loc.Get("settings.section.configBackup.subtitle");
         _settingsBackupNote.Text = Loc.Get("settings.backup.note");
+        _secretsWarning.Text = Loc.Get("settings.secrets.warning");
+        _endpointsSecretsWarning.Text = Loc.Get("settings.secrets.warning.endpoints");
         RefreshKumaStatus(Services.Kuma.LastPush);
         ReloadAdapterCombos();
 
@@ -799,6 +821,10 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _webhookStatus.ForeColor = p.TextMuted;
         _settingsBackupNote.BackColor = p.Surface;
         _settingsBackupNote.ForeColor = p.TextMuted;
+        _secretsWarning.BackColor = p.Surface;
+        _secretsWarning.ForeColor = p.Warn;
+        _endpointsSecretsWarning.BackColor = p.Surface;
+        _endpointsSecretsWarning.ForeColor = p.Warn;
 
         foreach (TextBox box in new[] { _publicIpTargets, _customDnsServers, _ntpServer })
         {

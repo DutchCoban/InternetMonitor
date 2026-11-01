@@ -115,7 +115,10 @@ is attributed to its most likely cause instead of being reported as a generic "i
 3. **IP address** - does the adapter have a usable IPv4 address (vs. an APIPA `169.254.x.x` address, which means DHCP failed)?
    It also shows whether the network offers IPv6 (only the prefix is shown) and whether a VPN is
    active, carrying all traffic or only some.
-4. **Gateway** - is the default gateway known and reachable? (Races ICMP and TCP - see below.)
+4. **Gateway** - is the default gateway known and reachable? An ICMP ping first; when it has not
+   answered within 200 ms, a TCP connect to a few common router ports joins in, so a router that
+   ignores ping still counts as reachable - and a router that answers ping is never bothered with
+   connects.
 5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). They're pinged at once and the first answer settles it - a single unreachable endpoint doesn't mean internet is down, and the step doesn't wait out its timeout; the diagnosis only escalates once none of them respond. With IPv6 on offer, the same resolvers are also pinged over IPv6.
 6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved by the DNS servers
    this adapter has, obtained via DHCP or set by hand? Those servers are asked directly, and an
@@ -124,8 +127,9 @@ is attributed to its most likely cause instead of being reported as a generic "i
    resolves the name: `9.9.9.9`, then `1.1.1.1`, then `8.8.8.8`, skipping any the adapter already
    uses - if one answers, it's this adapter's DNS server
    that's at fault. The adapter's own server, and any public server that gives no DNS answer, is
-   also tried on port 443 (the adapter's own at the same moment as the query, so it costs no
-   time); reachable there but silent on DNS means DNS traffic (port 53) is being dropped on the
+   also tried on port 443 (the adapter's own as soon as the query has gone unanswered for half the
+   timeout - the moment it is re-sent - so a resolver that answers promptly is never probed);
+   reachable there but silent on DNS means DNS traffic (port 53) is being dropped on the
    way, or the server's DNS service stalled, rather than the server being gone. As a last
    resort, up to two DNS servers of your own (Settings → Public internet, optional) are tried. The
    step reports which link in the chain failed or worked.
@@ -147,10 +151,12 @@ claiming the connection is down.
 ## Adaptive cadence
 
 The check cycle runs every 3 seconds while a window is open and every 15 seconds while only the
-tray icon is live (both configurable in Settings → Check interval) - history is always sampled at
-the slower, background rate regardless, so retention and chart density don't change depending on
-whether you happen to have the window open. History is kept for 30 days by default; Settings →
-Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
+tray icon is live or the window is minimised (both configurable in Settings → Check interval) -
+history is always sampled at the slower, background rate regardless, so retention and chart
+density don't change depending on whether you happen to have the window open. On a metered
+connection (mobile data, a phone's hotspot) the background interval is four times as long: every
+cycle costs a few kilobytes, which adds up on a data plan. History is kept for 30 days by default;
+Settings → Check interval offers 7, 30, 60 or 90 days. Incidents are always kept.
 
 ## Seven screens
 
@@ -449,10 +455,30 @@ Optional, off by default. Configurable levels in Settings → Logging:
 | Extended | + every periodic probe result |
 | Full | + verbose details even for successful checks |
 
-Logs are written as JSON Lines to `%AppData%\InternetMonitor\logs\diagnostics.log`, rotated by
-size with a configurable number of retained files. A logging failure never interrupts
-monitoring. No secrets, tokens, or credentials are ever logged - only connectivity-relevant
-technical data (addresses, timings, status codes, error text).
+Logs are written as JSON Lines to `%AppData%\InternetMonitor\logs\diagnostics.log` (or a folder
+of your choice - a local one; a network path is refused), rotated by size. The limits -
+`MaxDiagnosticLogFileSizeBytes` (5 MB) and `MaxDiagnosticLogFiles` (5) - have no row in Settings
+and can be changed in `settings.json` by hand. A logging failure never interrupts monitoring. No
+secrets, tokens, or credentials are ever logged - only connectivity-relevant technical data
+(addresses, timings, status codes, error text).
+
+## Credentials in settings.json
+
+Three settings are credentials: the webhook URL and the Uptime Kuma push URL (for Slack, Discord,
+Home Assistant, ntfy and Kuma the URL *is* the token) and the headers of an HTTPS endpoint (an API
+key, most often). The first time the app starts and finds one of them as readable text in
+`settings.json`, it asks once: protect them with your Windows account, or keep them readable?
+
+- **Protected**, they are stored as `dpapi:...` - encrypted with Windows' Data Protection API, so
+  only your Windows account on this computer can read them. The app decrypts them when it loads.
+- **Readable**, they stay as they are; Settings → Integrations and Settings → Endpoints then show a
+  warning for as long as a credential is set.
+
+The switch is under Settings → Integrations and works both ways. Either way you can always paste a
+credential into `settings.json` as readable text: the app tells protected and readable values apart
+by looking at them, and with protection on it encrypts the new value on its next save. The
+settings backup (Settings → Configuration) is always written readable, so it restores on another
+machine; the "export all data" zip redacts all three.
 
 ## Configuring application endpoints
 
@@ -670,6 +696,19 @@ free API allows 4 requests a minute and 500 a day; a release needs a handful.
 
 The order of a release is therefore: publish, sign, verify, `--selftest`, virustotal, then upload
 the executable and its `.sig` to the GitHub release with the notes.
+
+### One command for steps 2, 4 and 5
+
+```powershell
+.\tools\Release\Publish-Release.ps1
+```
+
+runs the tests three times, publishes, signs, verifies, runs the self-test against the published
+file, has VirusTotal look at it, and writes the verdict line into
+`publish-v2\release-notes-v<version>.md` (replacing an earlier verdict or the placeholder under
+*Security*). It stops at the first failing step. `-SkipVirusTotal` keeps a build private;
+`-SkipTests` saves a minute when the suite was just green. The screenshots, the commit, the push
+and the GitHub release stay manual: each of those wants a human look.
 
 ### Command line
 

@@ -106,6 +106,22 @@ public sealed partial class SettingsPage
 
     private void BuildIntegrationsRows()
     {
+        // Whether the URLs and headers below go to settings.json protected by the user's Windows
+        // account or as readable text - see SecretProtection. The warning under it shows while
+        // they are readable.
+        _protectSecrets = new Toggle();
+        _protectSecrets.CheckedChanged += OnProtectSecretsChanged;
+        AddRow(_integrationsCard, "settings.secrets.protect", _protectSecrets);
+
+        _secretsWarning = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.TopLeft,
+            Font = Theme.Font(FontRole.Small),
+            Text = string.Empty,
+        };
+        _integrationsCard.Controls.Add(_secretsWarning);
+
         _kumaUrl = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(200), Font = Theme.Font(FontRole.Body) };
         _kumaUrl.Leave += OnKumaSettingsChanged;
         AddRow(_integrationsCard, "settings.kuma.pushUrl", _kumaUrl);
@@ -174,6 +190,17 @@ public sealed partial class SettingsPage
         _integrationsCard.Controls.Add(_webhookTest);
         Services.Webhook.DeliveryCompleted += OnWebhookDelivered;
         Disposed += (_, _) => Services.Webhook.DeliveryCompleted -= OnWebhookDelivered;
+    }
+
+    /// <summary>Credentials stored readable while any are set - what the two warnings and the start-up prompt hinge on.</summary>
+    private bool SecretsReadable => Services.Settings.HasSecrets && Services.Settings.ProtectSecrets != true;
+
+    /// <summary>The next save writes every credential the chosen way; the switch is the whole of the choice.</summary>
+    private void OnProtectSecretsChanged(object? sender, EventArgs e)
+    {
+        Services.Settings.ProtectSecrets = _protectSecrets.Checked;
+        Services.Settings.Save();
+        LayoutCards();
     }
 
     private void OnWebhookUrlChanged(object? sender, EventArgs e)

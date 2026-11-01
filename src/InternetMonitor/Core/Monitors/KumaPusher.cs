@@ -88,7 +88,8 @@ public sealed class KumaPusher : IAsyncDisposable
         KumaPushStatus status;
         try
         {
-            using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            // Only the status code is read, so the body is never buffered.
+            using HttpResponseMessage response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             status = new KumaPushStatus(DateTimeOffset.UtcNow, !response.IsSuccessStatusCode, $"HTTP {(int)response.StatusCode}");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

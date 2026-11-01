@@ -661,7 +661,7 @@
   "networkHealth.packetLoss.speedTest.cause": "Gemiddeld {0}% packet loss in de laatste {1} minuten, terwijl er een snelheidstest liep. Met de lijn bewust vol staan pings in de rij achter het verkeer van de test en vallen er een paar weg - dat is normaal en geen storing.",
   "networkHealth.packetLoss.speedTest.todo": "Niets, als het alleen tijdens de test gebeurde. Komt het ook zonder snelheidstest terug, controleer dan het wifi-signaal en de kabels.",
   "settings.endpoint.warn.httpHeaders": "Deze URL gebruikt gewoon http://, dus deze header-waarden (API-sleutels, tokens) gaan onversleuteld over de lijn. Gebruik waar mogelijk https://.",
-  "settings.backup.note": "De export bevat de Uptime Kuma-URL en endpoint-headers onbewerkt; deel het bestand dus niet.",
+  "settings.backup.note": "De export bevat de Uptime Kuma-URL, de webhook-URL en endpoint-headers als leesbare tekst; deel het bestand dus niet.",
   "incident.toast.resolved.title": "Verbinding hersteld",
   "incident.toast.resolved.text": "Terug na {0}.",
   "menu.pause": "Monitoring pauzeren",
@@ -907,5 +907,13 @@
   "history.group.quality": "Lijnkwaliteit",
   "history.group.traffic": "Verkeer",
   "history.group.speedtest": "Snelheidstest",
-  "history.group.endpoints": "Eigen doelen"
+  "history.group.endpoints": "Eigen doelen",
+  "settings.secrets.protect": "Inloggegevens beveiligen met je Windows-account",
+  "settings.secrets.protect.help": "De webhook-URL, de Uptime Kuma-URL en endpoint-headers staan in settings.json. Aan: ze worden daar versleuteld zodat alleen jouw Windows-account op deze computer ze kan lezen; uit: leesbare tekst. Een gegeven dat je met de hand in het bestand zet wordt in beide gevallen herkend, en bij de volgende keer opslaan versleuteld zolang dit aan staat.",
+  "settings.secrets.warning": "Inloggegevens staan als leesbare tekst in settings.json. Zet de beveiliging hierboven aan om ze met je Windows-account te versleutelen.",
+  "settings.secrets.warning.endpoints": "Endpoint-headers staan als leesbare tekst in settings.json - zie Integraties om ze te beveiligen.",
+  "settings.backup.importFailed": "Het instellingenbestand kon niet worden geïmporteerd. {0}",
+  "settings.backup.exportFailed": "De instellingen konden niet naar dat bestand worden geschreven. {0}",
+  "secrets.prompt.title": "Inloggegevens beveiligen?",
+  "secrets.prompt.message": "settings.json bevat inloggegevens als leesbare tekst: een webhook-URL, een Uptime Kuma-URL of een endpoint-header.\n\nBeveiligen met je Windows-account? Ze worden dan versleuteld zodat alleen jij, op deze computer, ze kunt lezen. Kies Nee om ze leesbaar te laten; je kunt dit later wijzigen onder Instellingen → Integraties."
 }

@@ -1,7 +1,14 @@
+using System.Runtime.InteropServices;
 using InternetMonitor.App;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Steps;
 using InternetMonitor.Localization;
+
+// Every P/Invoke in this app targets a Windows system DLL (iphlpapi, wlanapi, crypt32, dwmapi,
+// ...). Without this the runtime would look next to the executable first, so a DLL of the same
+// name dropped beside it - in a Downloads folder or a portable folder on a USB stick - would be
+// loaded instead of Windows' own.
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
 
 namespace InternetMonitor;
 

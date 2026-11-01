@@ -4,34 +4,44 @@
   "Language": "en",
   "AutoStartWithWindows": false,
 
-  "_comment_endpoints": "Application endpoints are entirely user-defined - nothing here is required by the application itself. The two examples below show how an organization would add its own APIs; delete them if you don't need them.",
+  "_comment_endpoints": "Application endpoints are entirely user-defined - nothing here is required by the application itself. The two examples below show how an organization would add its own APIs; delete them if you don't need them. Kind is Url, TcpPort or Ping; a Url endpoint may carry Headers (an API key) and an ExpectedStatusCode.",
   "ApplicationEndpoints": [
     {
       "Id": "example-api-primary",
       "Name": "Example API (primary)",
-      "Url": "https://api.example.com",
-      "Type": "Https",
-      "TimeoutMs": 5000,
-      "Enabled": true
+      "Kind": "Url",
+      "Url": "https://api.example.com/health",
+      "Enabled": true,
+      "Headers": [
+        { "Name": "X-Api-Key", "Value": "paste-your-key-here" }
+      ]
     },
     {
-      "Id": "example-api-secondary",
-      "Name": "Example API (secondary)",
-      "Url": "https://api2.example.com",
-      "Type": "Https",
-      "TimeoutMs": 5000,
+      "Id": "example-db",
+      "Name": "Example database",
+      "Kind": "TcpPort",
+      "Host": "db.example.com",
+      "Port": 5432,
       "Enabled": true
     }
   ],
 
-  "_comment_logging": "Diagnostic logging is off by default. Levels: Off, Basic, Extended, Full.",
+  "_comment_secrets": "Header values, KumaPushUrl and WebhookUrl are credentials. Type them as readable text; on its first start with a readable credential the app asks whether to protect them with your Windows account, after which they are stored as 'dpapi:...' and decrypted on load. ProtectSecrets is null until you have answered, then true or false.",
+  "ProtectSecrets": null,
+
+  "_comment_logging": "Diagnostic logging is off by default. Levels: Off, Basic, Extended, Full. The two rotation limits have no row in Settings and are clamped (1-50 files, 1 KB-1 GB). DiagnosticLogDirectory must be a local folder; empty means the default logs folder.",
   "DiagnosticLogLevel": "Off",
   "LogSuccessfulChecks": false,
   "LogDetailedMeasurements": false,
   "MaxDiagnosticLogFiles": 5,
   "MaxDiagnosticLogFileSizeBytes": 5242880,
+  "DiagnosticLogDirectory": "",
 
-  "_comment_kuma": "Uptime Kuma push heartbeat is off by default (KumaPushUrl empty). Paste your own push-monitor URL to activate it; minimum interval is 60 seconds.",
+  "_comment_kuma": "Uptime Kuma push heartbeat is off by default (KumaPushUrl empty). Paste your own push-monitor URL to activate it; the interval is clamped to 60-86400 seconds.",
   "KumaPushUrl": "",
-  "KumaIntervalSeconds": 60
+  "KumaIntervalSeconds": 60,
+
+  "_comment_webhook": "One JSON POST when an incident opens and one when it closes. https anywhere; plain http only to an address inside your own network.",
+  "WebhookUrl": "",
+  "WebhookLabel": ""
 }

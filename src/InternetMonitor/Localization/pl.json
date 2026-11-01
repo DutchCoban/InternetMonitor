@@ -661,7 +661,7 @@
   "networkHealth.packetLoss.speedTest.cause": "Średnio {0}% packet loss w ciągu ostatnich {1} minut, podczas testu prędkości. Gdy łącze jest celowo wypełnione, pingi czekają w kolejce za ruchem testu i część z nich ginie - to normalne i nie jest awarią.",
   "networkHealth.packetLoss.speedTest.todo": "Nic, jeśli wystąpiło tylko podczas testu. Jeśli powtarza się także bez testu prędkości, sprawdź sygnał Wi-Fi i kable.",
   "settings.endpoint.warn.httpHeaders": "Ten adres URL używa zwykłego http://, więc wartości nagłówków (klucze API, tokeny) są wysyłane bez szyfrowania. Jeśli to możliwe, użyj https://.",
-  "settings.backup.note": "Eksport zawiera adres URL Uptime Kuma i nagłówki endpointów w oryginalnej postaci, więc nie udostępniaj tego pliku.",
+  "settings.backup.note": "Eksport zawiera adres URL Uptime Kuma, adres URL webhooka i nagłówki endpointów jako zwykły tekst, więc nie udostępniaj tego pliku.",
   "incident.toast.resolved.title": "Połączenie przywrócone",
   "incident.toast.resolved.text": "Z powrotem po {0}.",
   "menu.pause": "Wstrzymaj monitorowanie",
@@ -907,5 +907,13 @@
   "history.group.quality": "Jakość łącza",
   "history.group.traffic": "Ruch",
   "history.group.speedtest": "Test prędkości",
-  "history.group.endpoints": "Własne cele"
+  "history.group.endpoints": "Własne cele",
+  "settings.secrets.protect": "Chroń dane logowania kontem Windows",
+  "settings.secrets.protect.help": "Adres URL webhooka, adres URL Uptime Kuma i nagłówki endpointów są zapisane w settings.json. Włączone: są tam szyfrowane, więc odczyta je tylko Twoje konto Windows na tym komputerze; wyłączone: zwykły tekst. Dane wpisane do pliku ręcznie są rozpoznawane w obu przypadkach i szyfrowane przy następnym zapisie, gdy ta opcja jest włączona.",
+  "settings.secrets.warning": "Dane logowania są zapisane w settings.json jako zwykły tekst. Włącz ochronę powyżej, aby zaszyfrować je kontem Windows.",
+  "settings.secrets.warning.endpoints": "Nagłówki endpointów są zapisane w settings.json jako zwykły tekst - zobacz Integracje, aby je chronić.",
+  "settings.backup.importFailed": "Nie udało się zaimportować pliku ustawień. {0}",
+  "settings.backup.exportFailed": "Nie udało się zapisać ustawień do tego pliku. {0}",
+  "secrets.prompt.title": "Chronić dane logowania?",
+  "secrets.prompt.message": "settings.json zawiera dane logowania jako zwykły tekst: adres URL webhooka, adres URL Uptime Kuma lub nagłówek endpointu.\n\nChronić je kontem Windows? Zostaną wtedy zaszyfrowane tak, że odczytasz je tylko Ty, na tym komputerze. Wybierz Nie, aby pozostawić je czytelne; możesz to później zmienić w Ustawienia → Integracje."
 }

@@ -661,7 +661,7 @@
   "networkHealth.packetLoss.speedTest.cause": "Durchschnittlich {0} % Packet loss in den letzten {1} Minuten, während ein Geschwindigkeitstest lief. Bei bewusst ausgelasteter Leitung stehen Pings hinter dem Testverkehr an und einige gehen verloren - das ist normal und keine Störung.",
   "networkHealth.packetLoss.speedTest.todo": "Nichts, wenn es nur während des Tests auftrat. Kommt es auch ohne Geschwindigkeitstest wieder, prüfe das WLAN-Signal und die Kabel.",
   "settings.endpoint.warn.httpHeaders": "Diese URL verwendet einfaches http://, daher werden diese Header-Werte (API-Schlüssel, Tokens) unverschlüsselt gesendet. Verwenden Sie möglichst https://.",
-  "settings.backup.note": "Der Export enthält die Uptime-Kuma-URL und Endpoint-Header unverändert - die Datei also nicht weitergeben.",
+  "settings.backup.note": "Der Export enthält die Uptime-Kuma-URL, die Webhook-URL und Endpoint-Header als lesbaren Text - die Datei also nicht weitergeben.",
   "incident.toast.resolved.title": "Verbindung wiederhergestellt",
   "incident.toast.resolved.text": "Wieder da nach {0}.",
   "menu.pause": "Überwachung pausieren",
@@ -907,5 +907,13 @@
   "history.group.quality": "Leitungsqualität",
   "history.group.traffic": "Verkehr",
   "history.group.speedtest": "Geschwindigkeitstest",
-  "history.group.endpoints": "Eigene Ziele"
+  "history.group.endpoints": "Eigene Ziele",
+  "settings.secrets.protect": "Zugangsdaten mit dem Windows-Konto schützen",
+  "settings.secrets.protect.help": "Die Webhook-URL, die Uptime-Kuma-URL und Endpoint-Header stehen in settings.json. Ein: Sie werden dort verschlüsselt, sodass nur Ihr Windows-Konto auf diesem Computer sie lesen kann; aus: lesbarer Text. Ein von Hand in die Datei eingetragenes Zugangsdatum wird in beiden Fällen erkannt und beim nächsten Speichern verschlüsselt, solange dies eingeschaltet ist.",
+  "settings.secrets.warning": "Zugangsdaten stehen als lesbarer Text in settings.json. Schalten Sie den Schutz oben ein, um sie mit Ihrem Windows-Konto zu verschlüsseln.",
+  "settings.secrets.warning.endpoints": "Endpoint-Header stehen als lesbarer Text in settings.json - siehe Integrationen, um sie zu schützen.",
+  "settings.backup.importFailed": "Die Einstellungsdatei konnte nicht importiert werden. {0}",
+  "settings.backup.exportFailed": "Die Einstellungen konnten nicht in diese Datei geschrieben werden. {0}",
+  "secrets.prompt.title": "Zugangsdaten schützen?",
+  "secrets.prompt.message": "settings.json enthält Zugangsdaten als lesbaren Text: eine Webhook-URL, eine Uptime-Kuma-URL oder einen Endpoint-Header.\n\nMit Ihrem Windows-Konto schützen? Sie werden dann so verschlüsselt, dass nur Sie auf diesem Computer sie lesen können. Wählen Sie Nein, um sie lesbar zu lassen; Sie können das später unter Einstellungen → Integrationen ändern."
 }
