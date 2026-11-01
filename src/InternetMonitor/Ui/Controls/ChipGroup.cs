@@ -38,6 +38,9 @@ public sealed class ChipGroup : ThemedControl
 
     public ChipGroup()
     {
+        SetStyle(ControlStyles.Selectable, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.PageTabList;
         Cursor = Cursors.Hand;
         Height = Dp(30);
         _tipDelay.Tick += (_, _) => ShowTip();
@@ -87,6 +90,43 @@ public sealed class ChipGroup : ThemedControl
         Invalidate();
     }
 
+    protected override bool IsInputKey(Keys keyData) => keyData is Keys.Left or Keys.Right or Keys.Home or Keys.End || base.IsInputKey(keyData);
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (_chips.Count == 0)
+        {
+            return;
+        }
+
+        int target = e.KeyCode switch
+        {
+            Keys.Left => Math.Max(0, _selectedIndex - 1),
+            Keys.Right => Math.Min(_chips.Count - 1, _selectedIndex + 1),
+            Keys.Home => 0,
+            Keys.End => _chips.Count - 1,
+            _ => -1,
+        };
+        if (target >= 0)
+        {
+            Select(_chips[target].Id);
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        Invalidate();
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        Invalidate();
+    }
+
     public void Select(string id, bool raiseEvent = true)
     {
         int index = _chips.FindIndex(c => c.Id == id);
@@ -96,6 +136,7 @@ public sealed class ChipGroup : ThemedControl
         }
 
         _selectedIndex = index;
+        AccessibleDescription = _chips[index].Label;
         Invalidate();
 
         if (raiseEvent)
@@ -218,6 +259,10 @@ public sealed class ChipGroup : ThemedControl
             var rect = new RectangleF(bounds.X + 0.5f, bounds.Y + 0.5f, bounds.Width - 1, bounds.Height - 1);
 
             g.FillRounded(rect, radius, selected ? p.Accent : hovered ? p.SurfaceHover : p.SurfaceAlt);
+            if (selected && Focused)
+            {
+                g.DrawRounded(RectangleF.Inflate(rect, DpF(1.5f), DpF(1.5f)), radius + Dp(2), p.Accent.WithAlpha(150), DpF(1.2f));
+            }
 
             // A resting Filter chip leans on its fill alone rather than a border too - with a whole
             // row of them, a border on every single one is what reads as "busy", so the border

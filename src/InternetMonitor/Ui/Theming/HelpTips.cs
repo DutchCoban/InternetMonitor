@@ -52,10 +52,14 @@ public sealed class HelpTips : IDisposable
                 if (_texts.Remove(control))
                 {
                     Detach(control);
+                    control.AccessibleDescription = null;
                 }
 
                 continue;
             }
+
+            // A screen reader gets the same help a mouse gets.
+            control.AccessibleDescription = text;
 
             if (_texts.TryAdd(control, text))
             {

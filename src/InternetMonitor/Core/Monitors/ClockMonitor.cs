@@ -1,3 +1,4 @@
+using InternetMonitor.Configuration;
 using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Monitors;
@@ -16,7 +17,10 @@ public sealed record ClockStatus(DateTimeOffset CheckedUtc, string Server, TimeS
 /// wrong fails every TLS handshake - the site looks down while nothing on the line is - and the
 /// target step says so when it sees a TLS failure (<see cref="Latest"/> is read there).
 ///
-/// One UDP question an hour to a server the user can change; <c>pool.ntp.org</c> by default.
+/// One UDP question an hour to a server the user can change; the PTB's (Germany's national
+/// metrology institute) by default. When that server stays silent, the NTP pool is asked once
+/// instead - the same European-first-with-a-proven-fallback rule as the ping targets - and the
+/// status names the server that actually answered.
 /// </summary>
 public sealed class ClockMonitor : IAsyncDisposable
 {
@@ -51,10 +55,16 @@ public sealed class ClockMonitor : IAsyncDisposable
         string server = _server().Trim();
         if (server.Length == 0)
         {
-            server = "pool.ntp.org";
+            server = AppSettings.DefaultNtpServer;
         }
 
         SntpResult? result = await SntpClient.QueryAsync(server, Timeout, cancellationToken).ConfigureAwait(false);
+        if (result is null && !string.Equals(server, AppSettings.LegacyNtpServer, StringComparison.OrdinalIgnoreCase))
+        {
+            server = AppSettings.LegacyNtpServer;
+            result = await SntpClient.QueryAsync(server, Timeout, cancellationToken).ConfigureAwait(false);
+        }
+
         var status = result is null
             ? new ClockStatus(DateTimeOffset.UtcNow, server, null, "no answer")
             : new ClockStatus(DateTimeOffset.UtcNow, server, result.Offset, null);

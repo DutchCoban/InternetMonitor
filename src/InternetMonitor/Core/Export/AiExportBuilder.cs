@@ -254,7 +254,7 @@ public static class AiExportBuilder
 
         // The app's own public addresses stay readable in the export; see Pseudonymizer.
         var targets = new CheckTargets();
-        var names = new Pseudonymizer([.. targets.PublicIpTargets, .. targets.PublicResolvers, .. settings.ParsedPublicIpTargets(), .. settings.ParsedCustomDnsServers()]);
+        var names = new Pseudonymizer([.. targets.PublicIpTargets, .. targets.FallbackPublicIpTargets, .. targets.PublicResolvers, .. settings.ParsedPublicIpTargets(), .. settings.ParsedCustomDnsServers()]);
         names.Learn(incidents, Series(SeriesNames.WifiSignal));
 
         ProviderReportData report = ProviderReportData.Compute(incidents, Series, from, to, zone);
@@ -422,7 +422,14 @@ public static class AiExportBuilder
             .GroupBy(o => doc.Local(o.StartUtc).DayOfWeek)
             .OrderBy(g => ((int)g.Key + 6) % 7)
             .Select(g => I($"{g.Key}: {g.Count()}"));
-        doc.Item("By day of week", string.Join(", ", byDay)).Blank();
+        doc.Item("By day of week", string.Join(", ", byDay));
+
+        if (report.Patterns.Count > 0)
+        {
+            doc.Item("Recurring patterns", string.Join(" ", IncidentPatterns.Describe(report.Patterns, LocalizationManager.FormatEnglish)));
+        }
+
+        doc.Blank();
     }
 
     private static void AppendIncidents(Doc doc, IReadOnlyList<Incident> incidents, Limits limits, Func<string, IReadOnlyList<MetricPoint>> series, DateTimeOffset now, TimeSpan sampleInterval)
@@ -461,6 +468,11 @@ public static class AiExportBuilder
                 doc.Item("What happened", doc.Names.Text(explanation.What))
                     .Item("Likely cause", doc.Names.Text(explanation.LikelyCause))
                     .Item("What to do", doc.Names.Text(explanation.WhatToDo));
+            }
+
+            if (IncidentPatterns.For(incident, incidents, doc.Zone, now) is { Count: > 0 } patterns)
+            {
+                doc.Item("Patterns", string.Join(" ", IncidentPatterns.Describe(patterns, LocalizationManager.FormatEnglish)));
             }
 
             if (incident.Note is { Length: > 0 } note)

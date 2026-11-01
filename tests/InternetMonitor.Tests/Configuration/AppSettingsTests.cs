@@ -3,6 +3,7 @@ using Xunit;
 
 namespace InternetMonitor.Tests.Configuration;
 
+[Collection("Localization")]
 public sealed class AppSettingsTests
 {
     [Fact]
@@ -84,6 +85,53 @@ public sealed class AppSettingsTests
     public void The_default_language_is_english()
     {
         Assert.Equal("en", new AppSettings().Language);
+    }
+
+    [Fact]
+    public void The_reachability_url_and_the_speed_test_server_accept_only_https_addresses()
+    {
+        var settings = new AppSettings();
+        Assert.Equal(AppSettings.DefaultReachabilityUrl, settings.ReachabilityUrl);
+        Assert.Equal(string.Empty, settings.SpeedTestServerUrl);
+        Assert.Equal(AppSettings.DefaultSpeedTestServers, settings.SpeedTestServers);
+
+        settings.ReachabilityUrl = " https://check.example/generate_204 ";
+        Assert.Equal("https://check.example/generate_204", settings.ReachabilityUrl);
+        foreach (string bad in new[] { "http://check.example/204", "https://user:pw@check.example/204", "not a url", "", "   " })
+        {
+            settings.ReachabilityUrl = bad;
+            Assert.Equal(AppSettings.DefaultReachabilityUrl, settings.ReachabilityUrl);
+        }
+
+        settings.SpeedTestServerUrl = "https://speed.example/backend/";
+        Assert.Equal("https://speed.example/backend", settings.SpeedTestServerUrl);
+        Assert.Equal(["https://speed.example/backend"], settings.SpeedTestServers);
+        settings.SpeedTestServerUrl = "ftp://speed.example";
+        Assert.Equal(string.Empty, settings.SpeedTestServerUrl);
+    }
+
+    [Fact]
+    public void The_defaults_of_releases_before_2_8_are_moved_on_load_and_a_users_own_values_are_not()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"im-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            Directory.CreateDirectory(AppPaths.Root);
+            File.WriteAllText(AppPaths.SettingsFile, """{ "PublicIpTargets": ["9.9.9.9", "8.8.8.8", "1.1.1.1"], "NtpServer": "pool.ntp.org" }""");
+            AppSettings moved = AppSettings.Load();
+            Assert.Equal(AppSettings.DefaultPublicIpTargets, moved.PublicIpTargets);
+            Assert.Equal(AppSettings.DefaultNtpServer, moved.NtpServer);
+
+            File.WriteAllText(AppPaths.SettingsFile, """{ "PublicIpTargets": ["9.9.9.9", "8.8.8.8"], "NtpServer": "time.example" }""");
+            AppSettings kept = AppSettings.Load();
+            Assert.Equal(["9.9.9.9", "8.8.8.8"], kept.PublicIpTargets);
+            Assert.Equal("time.example", kept.NtpServer);
+        }
+        finally
+        {
+            File.Delete(AppPaths.SettingsFile);
+            File.Delete(path);
+        }
     }
 
     [Fact]

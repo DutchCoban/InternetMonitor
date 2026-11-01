@@ -35,6 +35,7 @@ public sealed class NavRail : ThemedControl
 
     public NavRail()
     {
+        AccessibleRole = AccessibleRole.PageTabList;
         Cursor = Cursors.Hand;
         TabStop = true;
     }
@@ -83,6 +84,7 @@ public sealed class NavRail : ThemedControl
 
     public void Select(string id)
     {
+        AccessibleDescription = _items.FirstOrDefault(i => i.Id == id)?.Label;
         int index = _items.FindIndex(i => i.Id == id);
         if (index < 0 || index == _selectedIndex)
         {
@@ -254,6 +256,8 @@ public sealed class NavRail : ThemedControl
 
             y += itemHeight;
         }
+
+        DrawMadeInEurope(g, y);
     }
 
     /// <summary>
@@ -281,6 +285,37 @@ public sealed class NavRail : ThemedControl
             Theme.Font(FontRole.BodyStrong),
             p.TextPrimary,
             new Rectangle(textX, 0, Math.Max(0, Width - textX - Sp(2)), BrandHeight));
+    }
+
+    /// <summary>The "Made in Europe" badge, from the embedded PNG (rendered from Assets/source/made-in-europe.svg); null only when the resource is missing.</summary>
+    public static readonly Lazy<Bitmap?> MadeInEuropeBadge = new(() =>
+    {
+        using Stream? stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("InternetMonitor.Assets.made-in-europe.png");
+        return stream is null ? null : new Bitmap(stream);
+    });
+
+    /// <summary>
+    /// The badge in the bottom-left corner of the rail, at just over half the rail's inset width
+    /// (the owner's choice: a mark, not a banner), only when the rail is expanded and there is room
+    /// under the last item - a badge that squeezed the items, or one shrunk further in the
+    /// collapsed rail, would say nothing.
+    /// </summary>
+    private void DrawMadeInEurope(Graphics g, int itemsBottom)
+    {
+        if (_collapsed || MadeInEuropeBadge.Value is not { } badge)
+        {
+            return;
+        }
+
+        int width = (int)Math.Round((Width - (2 * Sp(3))) * 0.55f);
+        int height = (int)Math.Round(width * (float)badge.Height / badge.Width);
+        int y = Height - Sp(3) - height;
+        if (y < itemsBottom + Sp(2))
+        {
+            return;
+        }
+
+        g.DrawImage(badge, new Rectangle(Sp(3), y, width, height));
     }
 
     private Bitmap GetLogo(int size)

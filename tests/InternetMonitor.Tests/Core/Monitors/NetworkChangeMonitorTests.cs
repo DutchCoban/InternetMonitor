@@ -112,6 +112,20 @@ public sealed class NetworkChangeMonitorTests
     // ---- Path changes ----------------------------------------------------------------------------
 
     [Fact]
+    public void A_one_second_wifi_reconnect_through_an_adapter_without_an_address_is_not_a_move()
+    {
+        (_, NetworkChangeMonitor monitor, List<Incident> opened, _) = Fresh();
+        var filter = new AdapterReading("{wfp}", "Local Area Connection* 8", false, false, true, null, null, false, false, null, null);
+
+        monitor.Observe(Reading(T0, Wifi, adapters: [WiFi(), filter]), NetworkChangeOptions.All);
+        // Wi-Fi drops for a second: no route, and the fallback names an adapter that never carried traffic.
+        monitor.Observe(Reading(T0.AddSeconds(1), "{wfp}", adapters: [WiFi(up: false), filter]), NetworkChangeOptions.All);
+        monitor.Observe(Reading(T0.AddSeconds(2), Wifi, adapters: [WiFi(), filter]), NetworkChangeOptions.All);
+
+        Assert.Empty(opened);
+    }
+
+    [Fact]
     public void The_first_reading_is_only_a_baseline_and_nothing_opens_without_a_known_previous_adapter()
     {
         (_, NetworkChangeMonitor monitor, List<Incident> opened, _) = Fresh();

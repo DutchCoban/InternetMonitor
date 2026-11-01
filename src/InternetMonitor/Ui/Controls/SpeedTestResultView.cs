@@ -13,6 +13,8 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class SpeedTestResultView : ThemedControl
 {
+    public SpeedTestResultView() => AccessibleRole = AccessibleRole.Pane;
+
     private string _status = string.Empty;
     private double? _pingMs;
     private double? _jitterMs;

@@ -48,31 +48,52 @@ public sealed record TargetEndpoint(
 /// concurrently, so a cycle costs the slowest step (about three seconds in the worst case) rather
 /// than their sum.
 ///
-/// The defaults are European on purpose, as in v1 - this is a generic diagnostics tool with no
+/// The defaults are European on purpose - this is a generic diagnostics tool with no
 /// organisation's endpoints baked in, and a user's own endpoints are added through Settings.
+/// Every built-in address follows one rule: a European operator first, and a fallback with a
+/// long record (Cloudflare, Google) that is only tried when the European addresses stay silent.
+/// Nothing leaves the EU by default, and a European service that disappears one day does not
+/// break a check. The README's "Who this app talks to" lists every one of them.
 /// </summary>
 public sealed record CheckTargets
 {
     /// <summary>
-    /// Three well-known public resolvers, pinged in parallel. Three rather than one because a
-    /// single anycast address being unreachable says nothing about the connection.
+    /// Public resolvers pinged in parallel; the first answer settles step 5. Two rather than one
+    /// because a single anycast address being unreachable says nothing about the connection:
+    /// Quad9 (Swiss foundation, since 2017) and DNS4EU (the EU's own public resolver, operated
+    /// from Czechia). The user's own list replaces this one (Settings → Public internet).
     /// </summary>
     public IReadOnlyList<IPAddress> PublicIpTargets { get; init; } =
     [
         IPAddress.Parse("9.9.9.9"),
-        IPAddress.Parse("8.8.8.8"),
-        IPAddress.Parse("1.1.1.1"),
+        IPAddress.Parse("86.54.11.100"),
     ];
 
     /// <summary>
-    /// The same three resolvers' IPv6 addresses, pinged by step 5 only when the adapter has a
-    /// global IPv6 address - the IPv6 half of the same question.
+    /// Pinged only when none of <see cref="PublicIpTargets"/> answered within the timeout: the two
+    /// addresses with the longest record of simply being there, so an outage of a European
+    /// operator is never reported as "no internet". Not a setting - it is the safety net.
+    /// </summary>
+    public IReadOnlyList<IPAddress> FallbackPublicIpTargets { get; init; } =
+    [
+        IPAddress.Parse("1.1.1.1"),
+        IPAddress.Parse("8.8.8.8"),
+    ];
+
+    /// <summary>
+    /// The same resolvers' IPv6 addresses, pinged by step 5 only when the adapter has a global
+    /// IPv6 address - the IPv6 half of the same question, with the same fallback rule.
     /// </summary>
     public IReadOnlyList<IPAddress> PublicIpv6Targets { get; init; } =
     [
         IPAddress.Parse("2620:fe::fe"),
-        IPAddress.Parse("2001:4860:4860::8888"),
+        IPAddress.Parse("2a13:1001::86:54:11:100"),
+    ];
+
+    public IReadOnlyList<IPAddress> FallbackPublicIpv6Targets { get; init; } =
+    [
         IPAddress.Parse("2606:4700:4700::1111"),
+        IPAddress.Parse("2001:4860:4860::8888"),
     ];
 
     /// <summary>
@@ -89,10 +110,12 @@ public sealed record CheckTargets
     /// Resolvers asked one after the other, in this order, only when the adapter's own DNS
     /// servers fail. The first that resolves the name proves the fault is the adapter's DNS
     /// server rather than DNS as such. Fixed on purpose: this is the yardstick, not a preference.
+    /// European first (Quad9, DNS4EU); the last two are only reached when both stay silent.
     /// </summary>
     public IReadOnlyList<IPAddress> PublicResolvers { get; init; } =
     [
         IPAddress.Parse("9.9.9.9"),
+        IPAddress.Parse("86.54.11.100"),
         IPAddress.Parse("1.1.1.1"),
         IPAddress.Parse("8.8.8.8"),
     ];

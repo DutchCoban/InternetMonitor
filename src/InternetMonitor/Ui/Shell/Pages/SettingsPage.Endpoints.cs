@@ -195,6 +195,7 @@ public sealed partial class SettingsPage
         Services.Webhook.Reconfigure(Services.Settings.WebhookUrl, Services.Settings.WebhookLabel);
         Services.UpdateChecker.Reconfigure(Services.Settings.CheckForUpdates);
         Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
+        Services.Oui.Reconfigure(Services.Settings.LanScanVendorLookup);
         ReconfigureNetworkHealth();
 
         LoadFromSettings();

@@ -8,6 +8,8 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class MtuResultView : ThemedControl
 {
+    public MtuResultView() => AccessibleRole = AccessibleRole.Pane;
+
     private string _status = string.Empty;
     private IReadOnlyList<string> _lines = [];
 

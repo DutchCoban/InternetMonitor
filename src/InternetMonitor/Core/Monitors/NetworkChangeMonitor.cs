@@ -249,6 +249,14 @@ public sealed class NetworkChangeMonitor
             return;
         }
 
+        // A detour is traffic that flowed over one adapter and now flows over another. An adapter
+        // without an address never carried any: the fallback named it while Wi-Fi reconnected,
+        // say. Coming from or going to one is a link blip, which the changes list already shows.
+        if (_last.Adapter(previous) is not { HasRealAddress: true } || reading.Adapter(current) is not { HasRealAddress: true })
+        {
+            return;
+        }
+
         string from = Describe(_last, previous);
         string to = Describe(reading, current);
         string fromName = Name(_last, previous) ?? previous;

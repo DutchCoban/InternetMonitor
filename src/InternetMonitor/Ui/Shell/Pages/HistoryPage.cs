@@ -146,6 +146,10 @@ public sealed class HistoryPage(AppServices services) : PageBase(services)
         }
 
         _card.Title = Loc.Get("history.card.title");
+        _chart.AccessibleName = _card.Title;
+        _ranges.AccessibleName = _card.Title;
+        _steps.AccessibleName = _card.Title;
+        _groups.AccessibleName = _card.Title;
         _card.Subtitle = Loc.Get("history.card.subtitle");
 
         foreach (Label caption in new[] { _groupsCaption, _stepsCaption, _rangesCaption })

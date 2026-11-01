@@ -55,6 +55,7 @@ public sealed class MetricChart : ThemedControl
 
     public MetricChart()
     {
+        AccessibleRole = AccessibleRole.Graphic;
         SetStyle(ControlStyles.Selectable, true);
         TabStop = true;
     }

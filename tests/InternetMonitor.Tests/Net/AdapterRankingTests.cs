@@ -24,10 +24,15 @@ public sealed class AdapterRankingTests
             new FakeAdapter("lo", "Loopback", type: NetworkInterfaceType.Loopback),
             new FakeAdapter("teredo", "Teredo Tunneling", type: NetworkInterfaceType.Tunnel),
             new FakeAdapter("eth", "Ethernet"),
+            new FakeAdapter("wfp", "Local Area Connection* 8", "WFP Native MAC Layer LightWeight Filter-0000"),
+            new FakeAdapter("wfd", "Local Area Connection* 2", "Microsoft Wi-Fi Direct Virtual Adapter", type: NetworkInterfaceType.Wireless80211),
             new FakeAdapter("wifi", "Wi-Fi", type: NetworkInterfaceType.Wireless80211, status: OperationalStatus.Down),
         ];
 
+        // The hidden "Local Area Connection* N" pseudo-adapters are out too: with Wi-Fi down for a
+        // second, the fallback must name Wi-Fi, not a filter driver that is always "up".
         Assert.Equal(["eth", "wifi"], InterfaceSelector.Candidates(all).Select(n => n.Id));
+        Assert.Equal("wifi", InterfaceSelector.GuessPhysical([all[3], all[4], all[5]])!.Id);
     }
 
     [Fact]

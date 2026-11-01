@@ -86,6 +86,9 @@ public sealed record ProviderReportData(
     /// <summary>Packet loss and jitter per day; empty when the period predates the series.</summary>
     public IReadOnlyList<DayQuality> QualityByDay { get; init; } = [];
 
+    /// <summary>What the period's outages have in common with earlier ones (same hour, after a network change, same hop); empty when nothing recurs.</summary>
+    public IReadOnlyList<IncidentPattern> Patterns { get; init; } = [];
+
     /// <summary>Average packet loss over every burst in the period, or null without any.</summary>
     public double? AverageLossPercent
     {
@@ -185,6 +188,10 @@ public sealed record ProviderReportData(
                 InPeriod(history(SeriesNames.PacketLoss), fromUtc, toUtc),
                 InPeriod(history(SeriesNames.Jitter), fromUtc, toUtc),
                 timeZone),
+            Patterns = IncidentPatterns.Across(
+                [.. incidents.Where(i => i.ConditionKey is null && IsOutage(i.Cause) && i.StartUtc < toUtc && (i.EndUtc ?? nowUtc ?? DateTimeOffset.UtcNow) > fromUtc)],
+                timeZone,
+                nowUtc ?? DateTimeOffset.UtcNow),
         };
     }
 

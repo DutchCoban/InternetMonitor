@@ -12,6 +12,8 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class StepDetailPanel : ThemedControl
 {
+    public StepDetailPanel() => AccessibleRole = AccessibleRole.Pane;
+
     private StepId _step = StepId.Adapter;
     private StepResult? _result;
     private int _scrollOffset;

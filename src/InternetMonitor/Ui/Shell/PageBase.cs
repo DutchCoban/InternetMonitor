@@ -138,6 +138,8 @@ public abstract class PageBase : Panel
     public virtual void ApplyLocalization()
     {
         Header.Title = Loc.Get($"page.{Id}.title");
+        AccessibleRole = AccessibleRole.Pane;
+        AccessibleName = Header.Title;
         Header.Subtitle = Loc.Get($"page.{Id}.subtitle");
     }
 

@@ -53,6 +53,27 @@ public sealed class AiExportSectionsTests
     }
 
     [Fact]
+    public void An_incident_that_recurs_around_the_same_hour_says_so_and_a_lone_one_does_not()
+    {
+        static Incident Dns(int daysAgo) => new()
+        {
+            Id = $"INC-{daysAgo}",
+            Cause = RootCause.Dns,
+            StartUtc = Now.AddDays(-daysAgo).AddHours(-9),
+            EndUtc = Now.AddDays(-daysAgo).AddHours(-9).AddMinutes(2),
+            Status = IncidentStatus.Resolved,
+        };
+
+        string recurring = Export([Dns(1), Dns(3), Dns(6)], []);
+        Assert.Contains("- Patterns: Recurs around 11:00: 3 times on 3 different days in the last 30 days, same cause.", recurring);
+        Assert.Contains("- Recurring patterns: Recurs around 11:00", recurring);
+
+        string lone = Export([Dns(1)], []);
+        Assert.DoesNotContain("Patterns", lone);
+        Assert.DoesNotContain("Recurring patterns", lone);
+    }
+
+    [Fact]
     public void Text_that_came_from_the_network_cannot_start_a_line_of_its_own()
     {
         var incident = new Incident

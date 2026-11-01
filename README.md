@@ -5,7 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/DutchCoban/InternetMonitor?label=download&style=for-the-badge)](https://github.com/DutchCoban/InternetMonitor/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/DutchCoban/InternetMonitor/total?style=for-the-badge)](https://github.com/DutchCoban/InternetMonitor/releases)
 ![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge)
-[![MIT license](https://img.shields.io/github/license/DutchCoban/InternetMonitor?style=for-the-badge)](LICENSE)
+[![EUPL-1.2 licence](https://img.shields.io/github/license/DutchCoban/InternetMonitor?style=for-the-badge)](LICENSE)
 
 When the internet drops, "it doesn't work" is all you usually have to go on. Internet Monitor sits
 quietly in your system tray and checks your connection every few seconds, step by step from your
@@ -119,13 +119,13 @@ is attributed to its most likely cause instead of being reported as a generic "i
    answered within 200 ms, a TCP connect to a few common router ports joins in, so a router that
    ignores ping still counts as reachable - and a router that answers ping is never bothered with
    connects.
-5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9`, `8.8.8.8`, and `1.1.1.1` by default (configurable in Settings → Public internet). They're pinged at once and the first answer settles it - a single unreachable endpoint doesn't mean internet is down, and the step doesn't wait out its timeout; the diagnosis only escalates once none of them respond. With IPv6 on offer, the same resolvers are also pinged over IPv6.
+5. **Public internet (multi-endpoint)** - ICMP pings to `9.9.9.9` (Quad9, Switzerland) and `86.54.11.100` (DNS4EU) by default (configurable in Settings → Public internet). They're pinged at once and the first answer settles it - a single unreachable endpoint doesn't mean internet is down, and the step doesn't wait out its timeout. Only when none of them answers are `1.1.1.1` and `8.8.8.8` tried the same way, so a bad day at one operator is never reported as "no internet" while nothing leaves Europe on a normal day; the diagnosis only escalates once none of them respond. With IPv6 on offer, the same resolvers are also pinged over IPv6.
 6. **DNS** - can a hostname (`www.ripe.net` by default) actually be resolved by the DNS servers
    this adapter has, obtained via DHCP or set by hand? Those servers are asked directly, and an
    unanswered query is sent once more halfway through the timeout, so one lost packet is not an
    outage. If they fail, the app works down a fixed chain and stops at the first server that
-   resolves the name: `9.9.9.9`, then `1.1.1.1`, then `8.8.8.8`, skipping any the adapter already
-   uses - if one answers, it's this adapter's DNS server
+   resolves the name: `9.9.9.9`, then `86.54.11.100`, and only when both stay silent `1.1.1.1`
+   and `8.8.8.8`, skipping any the adapter already uses - if one answers, it's this adapter's DNS server
    that's at fault. The adapter's own server, and any public server that gives no DNS answer, is
    also tried on port 443 (the adapter's own as soon as the query has gone unanswered for half the
    timeout - the moment it is re-sent - so a resolver that answers promptly is never probed);
@@ -190,12 +190,13 @@ Settings → Check interval offers 7, 30, 60 or 90 days. Incidents are always ke
   adapter getting an automatic private address, the network's settings changing, the router
   answering from different hardware (see [Network changes](#network-changes)).
 - **Tools**: a live-filling **Traceroute** (each hop optionally annotated with who owns it - your
-  own LAN, your ISP, or a third party, via Team Cymru/RIR lookups, toggleable in Settings - and,
+  own LAN, your ISP, or a third party, via RIPE NCC's RIPEstat service, toggleable in Settings - and,
   when ICMP doesn't reach the destination at all, a plain TCP connect to the destination to tell
   "ICMP is blocked" apart from "it's actually down" - see [Known limitations](#known-limitations));
   a **Network scan** of the local subnet (which devices answer a ping, with hostname, MAC address,
-  and manufacturer - looked up via two free, alternating MAC-vendor APIs, toggleable in Settings -
-  for each; addresses that don't answer a ping also get a TCP-port sweep, toggleable, so a device
+  and manufacturer - from the IEEE's own registry, which ships inside the app and is refreshed
+  daily, so nothing about your devices is sent anywhere - for each; addresses that don't answer a
+  ping also get a TCP-port sweep, toggleable, so a device
   that ignores ICMP but has an open port still shows up - and the scan remembers every device it
   has seen, marks what is new since last time, counts known devices that did not answer, and lets
   you name a device by double-clicking it); a **Speed test** (see below); and a **Path MTU**
@@ -357,12 +358,14 @@ them in the warning colour. The webhook sends them with `kind: "change"`, and th
 ## Speed test
 
 The Tools page's third tab runs a [LibreSpeed](https://librespeed.org/) test (ping, jitter,
-download, upload) against a fixed public server - no server picker, to keep this feature's
-configuration surface small. While the download and upload run, an ICMP ping to `9.9.9.9` measures
-how much the round trip grows with the line full, graded A (under 5 ms extra) to F (200 ms or
-more) - the usual bufferbloat scale. "Run now" is always available; Settings → Tools also has an
-optional automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default), skipped on a
-metered connection unless allowed. Either way, a
+download, upload). It tries the built-in servers in order - CESNET (Czechia), GARR (Italy), then
+Clouvider (Amsterdam) - and uses the first that answers; Settings → Speed test takes the https
+address of one LibreSpeed backend of your own instead, and deliberately no server picker. While
+the download and upload run, an ICMP ping to the first public ping address measures how much the
+round trip grows with the line full, graded A (under 5 ms extra) to F (200 ms or more) - the usual
+bufferbloat scale. "Run now" is always available; Settings → Speed test also has an optional
+automatic run on a fixed interval (1/2/4/8/12/24 hours, off by default), skipped on a metered
+connection unless allowed. Either way, a
 result is recorded into History (download, upload, ping and the extra ping under load) and
 included in "Export all data" and the provider report.
 
@@ -555,8 +558,9 @@ Every setting and button shows a short explanation when the mouse rests on it fo
   adapter while it is connected, or always one fixed adapter.
 - **Thresholds** (Check interval) - from how many milliseconds latency counts as slow or severe,
   and below which signal quality Wi-Fi counts as weak.
-- **Time server** (Public internet) - the NTP server the hourly clock check asks; `pool.ntp.org`
-  by default.
+- **Time server** (Public internet) - the NTP server the hourly clock check asks;
+  `ptbtime1.ptb.de` by default (the German national metrology institute's public time server),
+  with one attempt at `pool.ntp.org` when it stays silent.
 
 ## Project status
 
@@ -657,11 +661,12 @@ Every release goes through the same steps, in this order; none is skipped:
 3. **Refresh the screenshots** with `tools\Screenshots\Make-Screenshots.ps1` (see
    [tools/Screenshots/README.md](tools/Screenshots/README.md)) and check them: the pictures in
    this README show the version being shipped, not an older one.
-4. Publish the single-file executable (above), sign it, verify the signature, and run
-   `InternetMonitor.exe --selftest <file>` against the published file.
+4. Refresh the built-in manufacturer list (`tools\Release\Update-OuiList.ps1`), publish the
+   single-file executable (above), sign it, verify the signature, write and sign the software
+   bill of materials, and run `InternetMonitor.exe --selftest <file>` against the published file.
 5. Check the executable on VirusTotal and put the verdict line in the release notes.
-6. Push `master` and create the GitHub release with `InternetMonitor.exe` and
-   `InternetMonitor.exe.sig`.
+6. Push `master` and create the GitHub release with `InternetMonitor.exe`,
+   `InternetMonitor.exe.sig`, `InternetMonitor-v<version>.cdx.json` and its `.sig`.
 
 ### Signing a release
 
@@ -704,8 +709,9 @@ the executable and its `.sig` to the GitHub release with the notes.
 .\tools\Release\Publish-Release.ps1
 ```
 
-runs the tests three times, publishes, signs, verifies, runs the self-test against the published
-file, has VirusTotal look at it, and writes the verdict line into
+runs the tests three times, refreshes the built-in manufacturer list from the IEEE, publishes,
+signs, verifies, writes and signs the CycloneDX bill of materials, runs the self-test against the
+published file, has VirusTotal look at it, and writes the verdict line into
 `publish-v2\release-notes-v<version>.md` (replacing an earlier verdict or the placeholder under
 *Security*). It stops at the first failing step. `-SkipVirusTotal` keeps a build private;
 `-SkipTests` saves a minute when the suite was just green. The screenshots, the commit, the push
@@ -749,7 +755,8 @@ measured with `dotnet test --collect:"Code Coverage;Format=cobertura"`.
 - Diagnostic log: `%AppData%\InternetMonitor\logs\diagnostics.log` (+ rotated `.log.1`, `.log.2`, ...)
 - Incident history: `%AppData%\InternetMonitor\incidents.json`
 - Per-check history (the History screen's charts): `%AppData%\InternetMonitor\history\`
-- Cached lookups (traceroute hop ownership, MAC vendors): `%AppData%\InternetMonitor\cache\`
+- Cached lookups (traceroute hop ownership `asn.json`; the daily-refreshed IEEE manufacturer
+  list `oui.tsv` and its `oui.etag`): `%AppData%\InternetMonitor\cache\`
 
 None of these live inside the application directory, so the app itself can be replaced/updated
 (by hand, or via the self-update feature above) without touching configuration or history.
@@ -798,7 +805,57 @@ shared tools folder. The `INTERNETMONITOR_DATA_DIR` environment variable, when s
   80) tells you whether it's ICMP that's blocked or the destination that's actually unreachable -
   not which routers are in between.
 
-## Security notes
+## Security and sovereignty
+
+### Who this app talks to
+
+Every address the app contacts on its own, who runs it and under which jurisdiction, what is sent,
+and the setting that controls it. The table is generated from the list in the code and a test keeps
+the two identical. The rule behind the defaults: European first, with a long-proven
+fallback that is only tried when the European address stays silent - so nothing leaves the EU
+by default, and a European service that disappears one day does not break a check.
+
+<!-- connections:start -->
+| What | Host | Operator (jurisdiction) | What is sent | Setting |
+|---|---|---|---|---|
+| Step 5: internet reachable (IPv4) | `9.9.9.9, 86.54.11.100 → 1.1.1.1, 8.8.8.8` | Quad9 Foundation, DNS4EU (Whalebone); fallback Cloudflare, Google (CH, EU (CZ); fallback US) | An ICMP echo every cycle; the fallback only when the first two stay silent | Step 5 ping addresses (IPv4, comma-separated) |
+| Step 5: internet reachable (IPv6) | `2620:fe::fe, 2a13:1001::86:54:11:100 → 2606:4700:4700::1111, 2001:4860:4860::8888` | Quad9 Foundation, DNS4EU (Whalebone); fallback Cloudflare, Google (CH, EU (CZ); fallback US) | An ICMPv6 echo every cycle, only when the adapter has a global IPv6 address | always |
+| Step 6: name to resolve | `www.ripe.net` | RIPE NCC (NL) | A DNS query for this name, to the adapter's own DNS servers | always |
+| Step 6: public DNS servers | `9.9.9.9, 86.54.11.100, 1.1.1.1, 8.8.8.8` | Quad9 Foundation, DNS4EU (Whalebone); then Cloudflare, Google (CH, EU (CZ); then US) | The same DNS query, one server at a time, only when the adapter's servers fail | always |
+| Step 7: reachability check | `https://connectivitycheck.volla.tech/generate_204` | Volla Systeme GmbH (default) (DE) | One HTTPS request every cycle, expecting 204 | Reachability check URL (must answer 204) |
+| Login-page detection | `www.msftconnecttest.com` | Microsoft (US) | One plain-HTTP request, only when the reachability check fails - the same request Windows makes itself | always |
+| Step 7: IPv6 test | `ipv6.msftconnecttest.com` | Microsoft (US) | One plain-HTTP request over IPv6 every cycle, only when the adapter has a global IPv6 address - Windows' own IPv6 test page | always |
+| Clock check | `ptbtime1.ptb.de → pool.ntp.org` | PTB, the German national metrology institute (default); fallback NTP Pool Project (DE; fallback worldwide) | One NTP question an hour; the fallback only when the first server stays silent | Time server for the clock check (NTP) |
+| Speed test | `speedtest.cesnet.cz, st-be-rm2.infra.garr.it, ams.speedtest.clouvider.net` | CESNET (CZ), GARR (IT), Clouvider (default chain) (EU; Clouvider is a UK company with the server in NL) | Real download and upload traffic, only when you run a test or the automatic run is on; the first server that answers is used | Speed test server (optional) |
+| Traceroute: who owns each hop | `stat.ripe.net` | RIPE NCC (RIPEstat) (NL) | The public addresses of the route's hops, during a traceroute and the trace an incident records; cached for a month | Look up who owns each traceroute hop |
+| Network scan: manufacturer list | `standards-oui.ieee.org` | IEEE Registration Authority (US) | Once a day, whether the IEEE's public registry file changed, and the file itself when it did - nothing about your devices | Refresh the manufacturer list daily |
+| Update check | `api.github.com` | GitHub (Microsoft) (US) | Once a day, a request for the latest release; nothing about your network | Check for updates |
+| Automatic update | `github.com` | GitHub (Microsoft) (US) | The signed release download, only when a newer release exists and you turned automatic updates on | Update automatically |
+| Your own endpoints | `-` | Your choice (-) | Whatever check you configured, every cycle | Endpoints |
+| Uptime Kuma heartbeat | `-` | Your choice (-) | A periodic HTTPS request to the URL you entered; nothing when empty | Uptime Kuma push URL |
+| Webhook | `-` | Your choice (-) | One JSON message when an incident opens and one when it closes, to the URL you entered; nothing when empty | Webhook URL |
+<!-- connections:end -->
+
+### What is processed
+
+Measurements, incidents and history stay on this computer, under `%AppData%\InternetMonitor`
+(or next to the executable in portable mode). There is no account and no telemetry. The only
+data that leaves the computer are the probes in the table above - and, when you choose to, an
+export you make yourself. The AI export replaces network names and hardware addresses with
+stand-ins before it is written.
+
+### Reporting a vulnerability
+
+See [SECURITY.md](SECURITY.md): the private "Report a vulnerability" button in the repository's
+Security tab, what helps in a report, and what this one-person project can and cannot promise.
+
+### Software bill of materials
+
+Every release ships `InternetMonitor-v<version>.cdx.json`, a CycloneDX bill of materials listing
+the executable's SHA-256 and the .NET runtime it bundles - the app has no other dependencies. It
+is signed with the release key like the executable itself.
+
+### Notes
 
 - **Every release executable is checked on VirusTotal before it is published.** The release
   notes carry the link to the file report, which is tied to the file's SHA-256 and so describes
@@ -834,14 +891,14 @@ shared tools folder. The `INTERNETMONITOR_DATA_DIR` environment variable, when s
 - **The Uptime Kuma push URL is only ever called over HTTPS.** It carries the monitor's token, so a
   plain `http://` URL - even one placed in `settings.json` by hand or by import - is treated as "no
   URL" rather than sent in the clear.
-- **Several features send third parties something about your network, each with its own
-  off switch.** Traceroute's hop-ownership lookup sends hop IP addresses to Team Cymru and the
-  regional internet registries (toggleable in Settings → Tools); the LAN scanner's manufacturer
-  lookup sends each device's MAC prefix - never the full address - to macvendorlookup.com and
-  macvendors.com (same toggle group); and the update checker sends nothing but a plain request to
-  GitHub's public release API. All three are on by default except where noted, and every one is
-  switchable. When the reachability check fails, the login-page probe requests Microsoft's
-  connectivity test page - the same request Windows makes itself.
+- **Two features send a third party something about your network, each with its own off
+  switch.** Traceroute's hop-ownership lookup sends hop IP addresses to RIPEstat, the RIPE NCC's
+  data service in Amsterdam (toggleable in Settings → Tools), and the update checker sends
+  nothing but a plain request to GitHub's public release API. The LAN scanner's manufacturer
+  names come from the IEEE's registry inside the app; its daily refresh downloads a public file
+  and sends nothing about your devices (its own switch, same card). When the reachability check
+  fails, the login-page probe requests Microsoft's connectivity test page - the same request
+  Windows makes itself. The full list is in [Who this app talks to](#who-this-app-talks-to).
 - **Speed Test moves real data to a third-party server.** Unlike every other check, a speed test
   (manual or automatic) transfers real download/upload traffic to a public LibreSpeed server, not
   just small probe packets. It never runs unless "Run now" is clicked or the automatic interval is
@@ -856,5 +913,7 @@ shared tools folder. The `INTERNETMONITOR_DATA_DIR` environment variable, when s
 
 ## License
 
-MIT - see [LICENSE](LICENSE). Internet Monitor is an independent open-source project, not
-affiliated with or endorsed by any company; no organisation's endpoints or branding are built in.
+EUPL-1.2, the European Union Public Licence - see [LICENSE](LICENSE). Releases up to and
+including 2.7.0 were published under the MIT licence and remain available under it. Internet
+Monitor is an independent open-source project, not affiliated with or endorsed by any company; no
+organisation's endpoints or branding are built in.

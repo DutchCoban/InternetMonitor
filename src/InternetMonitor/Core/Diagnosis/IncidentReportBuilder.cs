@@ -21,7 +21,8 @@ namespace InternetMonitor.Core.Diagnosis;
 public static class IncidentReportBuilder
 {
     /// <param name="throughput">This computer's traffic around the incident, resolved by the caller (which has the history); null leaves the section out.</param>
-    public static string Build(Incident incident, IncidentThroughput? throughput = null)
+    /// <param name="patterns">What the incident has in common with earlier ones, resolved by the caller (which has every incident); null or empty leaves the section out.</param>
+    public static string Build(Incident incident, IncidentThroughput? throughput = null, IReadOnlyList<IncidentPattern>? patterns = null)
     {
         LocalizationManager loc = LocalizationManager.Instance;
         var sb = new StringBuilder();
@@ -40,6 +41,11 @@ public static class IncidentReportBuilder
             AppendParagraph(sb, loc.Get("incidents.what"), explanation.What);
             AppendParagraph(sb, loc.Get("incidents.likelyCause"), explanation.LikelyCause);
             AppendParagraph(sb, loc.Get("incidents.whatToDo"), explanation.WhatToDo);
+        }
+
+        if (patterns is { Count: > 0 })
+        {
+            AppendList(sb, loc.Get("incidents.patterns"), IncidentPatterns.Describe(patterns, loc.Format));
         }
 
         if (incident.Note is { Length: > 0 } note)

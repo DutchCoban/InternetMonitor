@@ -55,6 +55,22 @@ public sealed class PageSmokeTests
                     foreach (Control control in UiTestHost.Descendants(page))
                     {
                         Assert.False(control.Text.StartsWith('[') && control.Text.EndsWith(']'), $"{pageType.Name} in {language}: {control.GetType().Name} shows the raw key {control.Text}");
+
+                        // Everything painted by hand, and everything the keyboard can reach, has a
+                        // name and a role for a screen reader - the check that stands in for one.
+                        // A pill with no label yet has nothing to read; it is named the moment it gets
+                        // one. A card without a title is a plain grouping of what it holds.
+                        if ((control is ThemedControl || control.TabStop) && control is not StatusPill { Label: "" } && control is not Card { Title: "" })
+                        {
+                            string? name = control.AccessibilityObject.Name;
+                            Assert.False(string.IsNullOrWhiteSpace(name), $"{pageType.Name} in {language}: {control.GetType().Name} ({control.Name}) has no accessible name");
+                            Assert.False(name!.StartsWith('[') && name.EndsWith(']'), $"{pageType.Name} in {language}: {control.GetType().Name} is named by a raw key {name}");
+                        }
+
+                        if (control is ThemedControl)
+                        {
+                            Assert.NotEqual(AccessibleRole.Default, control.AccessibleRole);
+                        }
                     }
                 }
 

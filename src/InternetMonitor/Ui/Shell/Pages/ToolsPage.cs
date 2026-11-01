@@ -361,10 +361,9 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
 
         var progress = new Progress<LanDevice>(device => _lanDevices.Upsert(Decorate(device)));
 
-        // The only thing in the LAN scanner that tells a third party anything (a MAC prefix)
-        // about this network - same reasoning as RunAsync's ownership lookup for traceroute - so
-        // it only runs when the setting allows it.
-        using MacVendorLookup? vendorLookup = Services.Settings.LanScanVendorLookup ? new MacVendorLookup() : null;
+        // Manufacturer names come from the IEEE list inside the app (and its daily-refreshed copy),
+        // so nothing about the devices leaves the machine - see OuiRegistry.
+        OuiRegistry vendorLookup = Services.Oui;
 
         try
         {
@@ -627,7 +626,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _runSpeedTest.SizeToContent();
         LayoutSpeedTestBar();
 
-        using var client = new SpeedTestClient();
+        using var client = new SpeedTestClient(Services.Settings.SpeedTestServers, Services.Settings.ParsedPublicIpTargets()[0]);
         var progress = new Progress<SpeedTestProgress>(p => _speedTestView.Apply(p));
 
         try
@@ -639,7 +638,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
             SpeedTestRecorder.Record(Services.History, Services.Pipeline.Throughput, result, DateTimeOffset.UtcNow);
             _speedTestView.Complete(result);
 
-            _speedTestView.Status = Loc.Get("speedtest.done");
+            _speedTestView.Status = result.Server is { Length: > 0 } server ? Loc.Format("speedtest.done.server", server) : Loc.Get("speedtest.done");
         }
         catch (OperationCanceledException)
         {
@@ -680,15 +679,20 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
             _toolSwitcher.SelectedId ?? TracerouteChipId);
 
         _tracerouteCard.Title = Loc.Get("traceroute.title");
+        _view.AccessibleName = _tracerouteCard.Title;
+        _toolSwitcher.AccessibleName = Header.Title;
         _tracerouteCard.Subtitle = Loc.Get("traceroute.subtitle");
         _run.Text = Loc.Get(_running is null ? "traceroute.run" : "traceroute.stop");
         Tip(_run, "traceroute.run");
         Tip(_target, "traceroute.target");
+        _target.AccessibleName = _tracerouteCard.Title;
+        _mtuTarget.AccessibleName = _mtuCard.Title;
         _run.SizeToContent();
         LayoutBar();
         _view.Status = Loc.Get("traceroute.idle");
 
         _lanScanCard.Title = Loc.Get("lanScan.title");
+        _lanDevices.AccessibleName = _lanScanCard.Title;
         _lanScanCard.Subtitle = Loc.Get("lanScan.subtitle");
         _scan.Text = Loc.Get(_scanning is null ? "lanScan.scan" : "lanScan.stop");
         Tip(_scan, "lanScan.scan");
@@ -700,6 +704,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _lanDevices.Status = Loc.Get("lanScan.idle");
 
         _speedTestCard.Title = Loc.Get("speedtest.title");
+        _speedTestView.AccessibleName = _speedTestCard.Title;
         _speedTestCard.Subtitle = Loc.Get("speedtest.subtitle");
         _runSpeedTest.Text = Loc.Get(_speedTestRunning is null ? "speedtest.run" : "speedtest.stop");
         Tip(_runSpeedTest, "speedtest.run");
@@ -708,6 +713,7 @@ public sealed class ToolsPage(AppServices services) : PageBase(services)
         _speedTestView.Status = Loc.Get("speedtest.idle");
 
         _mtuCard.Title = Loc.Get("mtu.title");
+        _mtuView.AccessibleName = _mtuCard.Title;
         _mtuCard.Subtitle = Loc.Get("mtu.subtitle");
         _runMtu.Text = Loc.Get(_mtuRunning is null ? "mtu.run" : "mtu.stop");
         Tip(_runMtu, "mtu.run");

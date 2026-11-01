@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using InternetMonitor.Configuration;
 using InternetMonitor.Core.Diagnosis;
+using InternetMonitor.Core.Incidents;
 using InternetMonitor.Localization;
 
 namespace InternetMonitor.Core.Reports;
@@ -146,6 +147,17 @@ public static class ProviderReportHtml
             }
 
             html.Append("</tbody></table><p class=\"note\">").Append(E(loc.Get("report.p.loadBefore.note"))).Append("</p>");
+        }
+
+        if (data.Patterns.Count > 0)
+        {
+            html.Append("<h3>").Append(E(loc.Get("report.p.patterns"))).Append("</h3><ul>");
+            foreach (string line in IncidentPatterns.Describe(data.Patterns, loc.Format))
+            {
+                html.Append("<li>").Append(E(line)).Append("</li>");
+            }
+
+            html.Append("</ul>");
         }
 
         html.Append("</section>");

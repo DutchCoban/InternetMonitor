@@ -192,9 +192,9 @@ public sealed class AppSettings
 
     /// <summary>
     /// Whether traceroute looks up who owns each hop. On by default because it is most of the
-    /// value of the feature, but switchable because it is the one thing in the app that sends
-    /// third parties (Team Cymru, the RIR RDAP services) a list of addresses on your route.
-    /// Private and bogon ranges are never looked up either way.
+    /// value of the feature, but switchable because it is the one thing in the app that sends a
+    /// third party (RIPEstat, the RIPE NCC's data service in Amsterdam) a list of addresses on
+    /// your route. Private and bogon ranges are never looked up either way.
     /// </summary>
     public bool TracerouteOwnerLookup { get; set; } = true;
 
@@ -206,11 +206,11 @@ public sealed class AppSettings
     public bool TracerouteOnIncident { get; set; } = true;
 
     /// <summary>
-    /// Whether the LAN scanner looks up each device's manufacturer. Same reasoning and the same
-    /// default as <see cref="TracerouteOwnerLookup"/>: on by default because it is most of the
-    /// value of the feature, switchable because it is the only thing in the scanner that sends a
-    /// third party anything (a MAC prefix, never the full device-specific address) about the
-    /// user's own network.
+    /// Whether the manufacturer list behind the LAN scan is refreshed from the IEEE's registry once
+    /// a day (see <see cref="Core.Tools.LanScan.OuiRegistry"/>). The list itself ships inside the
+    /// app and answers either way; this only decides whether it gets newer. On by default: the
+    /// refresh sends nothing about the user's network - it downloads a public file - and it is
+    /// switchable because it is a network path of its own, like every other one in this app.
     /// </summary>
     public bool LanScanVendorLookup { get; set; } = true;
 
@@ -302,8 +302,69 @@ public sealed class AppSettings
     /// </summary>
     public List<EndpointConfig> ApplicationEndpoints { get; set; } = [];
 
-    /// <summary>The default for <see cref="PublicIpTargets"/>: three well-known public resolvers.</summary>
-    public static readonly IReadOnlyList<string> DefaultPublicIpTargets = ["9.9.9.9", "8.8.8.8", "1.1.1.1"];
+    /// <summary>
+    /// The default for <see cref="PublicIpTargets"/>: two European public resolvers, Quad9 and
+    /// DNS4EU. The non-European fallback that is tried only when these stay silent lives in
+    /// <see cref="CheckTargets.FallbackPublicIpTargets"/> and is not a setting.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DefaultPublicIpTargets = ["9.9.9.9", "86.54.11.100"];
+
+    /// <summary>What the default was up to 2.7.0; a file that still holds exactly this list is moved to the new default on load.</summary>
+    private static readonly IReadOnlyList<string> LegacyPublicIpTargets = ["9.9.9.9", "8.8.8.8", "1.1.1.1"];
+
+    /// <summary>The default time server: the German national metrology institute's, stratum 1, public since the 1990s.</summary>
+    public const string DefaultNtpServer = "ptbtime1.ptb.de";
+
+    /// <summary>What the default was up to 2.7.0, and what the clock check falls back to when the configured server stays silent.</summary>
+    public const string LegacyNtpServer = "pool.ntp.org";
+
+    /// <summary>The built-in reachability check: a generate_204 endpoint run by Volla (Germany) - see <see cref="CheckTargets.Targets"/> for why a 204 endpoint and not a website.</summary>
+    public const string DefaultReachabilityUrl = "https://connectivitycheck.volla.tech/generate_204";
+
+    private string _reachabilityUrl = DefaultReachabilityUrl;
+
+    /// <summary>
+    /// The URL step 7 fetches every cycle to decide whether the internet is there at all; it must
+    /// answer 204. Any https address; anything else - including an empty value - means the default.
+    /// </summary>
+    public string ReachabilityUrl
+    {
+        get => _reachabilityUrl;
+        set => _reachabilityUrl = IsHttpsUrl(value) ? value.Trim() : DefaultReachabilityUrl;
+    }
+
+    /// <summary>
+    /// The LibreSpeed servers the speed test tries in order until one answers its ping phase:
+    /// CESNET (the Czech national research network), GARR (Italy's), and the Clouvider Amsterdam
+    /// server every release up to 2.7.0 used, as the proven fallback.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DefaultSpeedTestServers =
+    [
+        "https://speedtest.cesnet.cz/backend",
+        "https://st-be-rm2.infra.garr.it",
+        "https://ams.speedtest.clouvider.net/backend",
+    ];
+
+    private string _speedTestServerUrl = string.Empty;
+
+    /// <summary>
+    /// One LibreSpeed backend of the user's own (the base URL under which garbage.php and empty.php
+    /// live), replacing the built-in chain; empty means the chain. Any https address, with a trailing
+    /// slash trimmed; anything else means empty.
+    /// </summary>
+    public string SpeedTestServerUrl
+    {
+        get => _speedTestServerUrl;
+        set => _speedTestServerUrl = IsHttpsUrl(value) ? value.Trim().TrimEnd('/') : string.Empty;
+    }
+
+    /// <summary>The servers a speed test tries, in order: the user's own when set, otherwise the built-in chain.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> SpeedTestServers => SpeedTestServerUrl.Length > 0 ? [SpeedTestServerUrl] : DefaultSpeedTestServers;
+
+    /// <summary>An absolute https address without credentials in it - what every URL setting that is called from the app must be.</summary>
+    public static bool IsHttpsUrl(string? value) =>
+        Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri) && uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0;
 
     /// <summary>
     /// The addresses step 5 pings to decide whether the public internet is reachable at all (and
@@ -333,8 +394,8 @@ public sealed class AppSettings
     /// </summary>
     public List<string> CustomDnsServers { get; set; } = [];
 
-    /// <summary>The time server the hourly clock check asks (see <see cref="Core.Monitors.ClockMonitor"/>). A host name; the pool is the sensible default.</summary>
-    public string NtpServer { get; set; } = "pool.ntp.org";
+    /// <summary>The time server the hourly clock check asks (see <see cref="Core.Monitors.ClockMonitor"/>). A host name; <see cref="DefaultNtpServer"/> unless chosen otherwise.</summary>
+    public string NtpServer { get; set; } = DefaultNtpServer;
 
     /// <summary><see cref="CustomDnsServers"/> as addresses: the valid IPv4 entries, at most <see cref="MaxCustomDnsServers"/>.</summary>
     public IReadOnlyList<IPAddress> ParsedCustomDnsServers() =>
@@ -635,11 +696,31 @@ public sealed class AppSettings
             string json = File.ReadAllText(AppPaths.SettingsFile);
             AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, Json) ?? new AppSettings();
             settings.LoadedPlaintextSecrets = settings.UnprotectSecrets();
+            settings.MoveLegacyDefaults();
             return settings;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
             return new AppSettings();
+        }
+    }
+
+    /// <summary>
+    /// A file that still holds exactly a pre-2.8 default (the three ping addresses, the NTP pool)
+    /// gets the current default: every property is written out on save, so a changed default
+    /// would otherwise never reach an existing installation. A list or server the user chose
+    /// themselves is left alone.
+    /// </summary>
+    private void MoveLegacyDefaults()
+    {
+        if (PublicIpTargets.SequenceEqual(LegacyPublicIpTargets, StringComparer.Ordinal))
+        {
+            PublicIpTargets = [.. DefaultPublicIpTargets];
+        }
+
+        if (string.Equals(NtpServer.Trim(), LegacyNtpServer, StringComparison.OrdinalIgnoreCase))
+        {
+            NtpServer = DefaultNtpServer;
         }
     }
 

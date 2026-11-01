@@ -65,6 +65,7 @@ public sealed class StepList : ThemedControl
 
     public StepList()
     {
+        AccessibleRole = AccessibleRole.List;
         _animation = new System.Windows.Forms.Timer { Interval = AnimationIntervalMs };
         _animation.Tick += OnAnimationTick;
 

@@ -21,6 +21,9 @@ public sealed class IncidentList : ThemedControl
 
     public IncidentList()
     {
+        SetStyle(ControlStyles.Selectable, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.List;
         Cursor = Cursors.Hand;
     }
 
@@ -124,9 +127,35 @@ public sealed class IncidentList : ThemedControl
         Invalidate();
     }
 
+    protected override bool IsInputKey(Keys keyData) => keyData is Keys.Up or Keys.Down or Keys.Home or Keys.End || base.IsInputKey(keyData);
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (_incidents.Count == 0)
+        {
+            return;
+        }
+
+        int target = e.KeyCode switch
+        {
+            Keys.Up => Math.Max(0, _selectedIndex - 1),
+            Keys.Down => Math.Min(_incidents.Count - 1, _selectedIndex + 1),
+            Keys.Home => 0,
+            Keys.End => _incidents.Count - 1,
+            _ => -1,
+        };
+        if (target >= 0 && target != _selectedIndex)
+        {
+            SelectById(_incidents[target].Id);
+            e.Handled = true;
+        }
+    }
+
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
+        Focus();
         int index = IndexAt(e.Y);
         if (e.Button != MouseButtons.Left || index < 0)
         {

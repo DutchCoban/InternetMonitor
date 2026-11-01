@@ -34,6 +34,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private Card _updatesCard = null!;
     private Card _cadenceCard = null!;
     private Card _toolsCard = null!;
+    private Card _speedTestCard = null!;
     private Card _diagnosticsCard = null!;
     private Card _networkChangesCard = null!;
     private Card _networkHealthCard = null!;
@@ -83,6 +84,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private TextBox _customDnsServers = null!;
     private Label _publicIpError = null!;
     private TextBox _ntpServer = null!;
+    private TextBox _reachabilityUrl = null!;
+    private TextBox _speedTestServer = null!;
     private NumericUpDown _kumaInterval = null!;
     private Label _kumaError = null!;
     private Label _settingsBackupNote = null!;
@@ -90,6 +93,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
     private Label _secretsWarning = null!;
     private Label _endpointsSecretsWarning = null!;
     private AppButton _kumaAbout = null!;
+    private AppButton _speedTestAbout = null!;
     private Panel _integrationsDivider = null!;
     private EndpointList _endpoints = null!;
     private AppButton _addEndpoint = null!;
@@ -114,6 +118,9 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
 
         _toolsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Tools };
         BuildToolsRows();
+
+        _speedTestCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Pulse };
+        BuildSpeedTestRows();
 
         _diagnosticsCard = new Card { Dock = DockStyle.Top, HeaderGlyph = Glyph.Diagnostics };
         BuildDiagnosticsRows();
@@ -148,6 +155,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         Controls.Add(_networkHealthCard);
         Controls.Add(_networkChangesCard);
         Controls.Add(_diagnosticsCard);
+        Controls.Add(_speedTestCard);
         Controls.Add(_toolsCard);
         Controls.Add(_cadenceCard);
         Controls.Add(_updatesCard);
@@ -377,6 +385,12 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         LayoutCardRows(_cadenceCard);
         LayoutCardRows(_toolsCard);
         LayoutCardRows(_diagnosticsCard);
+
+        // The LibreSpeed link sits under the speed test rows, like the Kuma link in its card.
+        LayoutCardRows(_speedTestCard);
+        int speedTestY = BelowRows(_speedTestCard);
+        _speedTestAbout.Location = new Point(_speedTestCard.DisplayRectangle.Left, speedTestY);
+        CloseCard(_speedTestCard, speedTestY + _speedTestAbout.Height + Sp(2));
         LayoutCardRows(_networkChangesCard);
         LayoutCardRows(_networkHealthCard);
         LayoutConditionRows();
@@ -519,6 +533,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _publicIpTargets.Text = string.Join(", ", settings.ParsedPublicIpTargets());
         _customDnsServers.Text = string.Join(", ", settings.ParsedCustomDnsServers());
         _ntpServer.Text = settings.NtpServer;
+        _reachabilityUrl.Text = settings.ReachabilityUrl;
+        _speedTestServer.Text = settings.SpeedTestServerUrl;
         _publicIpError.Text = string.Empty;
         _publicIpTargets.Leave += OnPublicAddressesChanged;
         _customDnsServers.Leave += OnPublicAddressesChanged;
@@ -661,6 +677,8 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _cadenceCard.Title = Loc.Get("settings.section.cadence");
         _cadenceCard.Subtitle = Loc.Get("settings.section.cadence.subtitle");
         _toolsCard.Title = Loc.Get("settings.section.tools");
+        _speedTestCard.Title = Loc.Get("settings.section.speedTest");
+        _speedTestCard.Subtitle = Loc.Get("settings.section.speedTest.subtitle");
         _diagnosticsCard.Title = Loc.Get("settings.section.diagnostics");
         _diagnosticsCard.Subtitle = Loc.Get("settings.section.diagnostics.subtitle");
         _networkChangesCard.Title = Loc.Get("settings.section.networkChanges");
@@ -676,6 +694,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _settingsBackupCard.Title = Loc.Get("settings.section.configBackup");
         _settingsBackupCard.Subtitle = Loc.Get("settings.section.configBackup.subtitle");
         _settingsBackupNote.Text = Loc.Get("settings.backup.note");
+        _endpoints.AccessibleName = _endpointsCard.Title;
         _secretsWarning.Text = Loc.Get("settings.secrets.warning");
         _endpointsSecretsWarning.Text = Loc.Get("settings.secrets.warning.endpoints");
         RefreshKumaStatus(Services.Kuma.LastPush);
@@ -686,6 +705,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
             if (label.Tag is string key)
             {
                 label.Text = Loc.Get(key);
+                field.AccessibleName = label.Text;
                 Tips.Set(Loc.TryGet(key + ".help"), label, field);
             }
         }
@@ -695,6 +715,13 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
             row.Name.Text = Loc.Get((string)row.Name.Tag!);
             row.IntervalLabel.Text = Loc.Get((string)row.IntervalLabel.Tag!);
             row.MinutesLabel.Text = Loc.Get((string)row.MinutesLabel.Tag!);
+            row.Toggle.AccessibleName = row.Name.Text;
+            row.Window.AccessibleName = row.Name.Text + " - " + row.IntervalLabel.Text;
+            if (row.Threshold is not null)
+            {
+                row.Threshold.AccessibleName = row.Name.Text;
+            }
+
 
             string? help = Loc.TryGet((string)row.Name.Tag! + ".help");
             Tips.Set(help, row.Toggle, row.Name, row.IntervalLabel, row.Window, row.MinutesLabel);
@@ -749,6 +776,9 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _kumaAbout.Text = Loc.Get("settings.kuma.about");
         Tip(_kumaAbout, "settings.kuma.about");
         _kumaAbout.SizeToContent();
+        _speedTestAbout.Text = Loc.Get("settings.speedTest.about");
+        Tip(_speedTestAbout, "settings.speedTest.about");
+        _speedTestAbout.SizeToContent();
         _webhookTest.Text = Loc.Get("settings.webhook.test");
         Tip(_webhookTest, "settings.webhook.test");
         _webhookTest.SizeToContent();
@@ -826,7 +856,7 @@ public sealed partial class SettingsPage(AppServices services) : PageBase(servic
         _endpointsSecretsWarning.BackColor = p.Surface;
         _endpointsSecretsWarning.ForeColor = p.Warn;
 
-        foreach (TextBox box in new[] { _publicIpTargets, _customDnsServers, _ntpServer })
+        foreach (TextBox box in new[] { _publicIpTargets, _customDnsServers, _ntpServer, _reachabilityUrl, _speedTestServer })
         {
             box.BackColor = p.SurfaceAlt;
             box.ForeColor = p.TextPrimary;

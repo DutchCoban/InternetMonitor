@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using InternetMonitor.Configuration;
-using InternetMonitor.Net;
 
 namespace InternetMonitor.Core.Tools.Traceroute;
 
@@ -12,61 +11,54 @@ namespace InternetMonitor.Core.Tools.Traceroute;
 /// Finds out who an address belongs to: which autonomous system announces it, what that network
 /// is called, and which country it is registered in.
 ///
-/// Two free, keyless sources, in order:
-///
-///  1. Team Cymru's IP-to-ASN service, over DNS. A TXT query for
-///     &lt;reversed-ip&gt;.origin.asn.cymru.com returns the AS number, the announced prefix, the
-///     country and the registry; a second query for AS&lt;n&gt;.asn.cymru.com returns the AS name.
-///     It exists for exactly this purpose, needs no account, and is a UDP round trip rather than
-///     an HTTPS request - which matters when this runs during a network problem.
-///  2. RDAP at the regional registries, over HTTPS, for the network name when Cymru gives no AS
-///     name. rdap.org redirects to whichever registry is authoritative.
+/// One source: RIPEstat, the RIPE NCC's public data service in Amsterdam, which carries routing
+/// and registry data for all five regional registries, not only Europe's. Two keyless HTTPS
+/// questions per address, asked together - <c>prefix-overview</c> for the announcing AS, its
+/// holder and the prefix, and <c>rir-stats-country</c> for the registration country - each
+/// tagged with the <c>sourceapp</c> name RIPEstat asks every application to send. Up to 2.7.0 the
+/// same answer came from Team Cymru's DNS service and the rdap.org redirector, both in the
+/// United States; RIPEstat gives the same fields from a European operator with a thirty-year record.
 ///
 /// Private, loopback and carrier-grade-NAT addresses are answered locally and never leave the
 /// machine. Everything else is cached on disk for a month, keyed by /24, so a repeated traceroute
-/// along the same route is instant and sends nothing.
+/// along the same route is instant and sends nothing. The cache file and its shape are the same
+/// as before, so an existing cache stays valid.
 ///
 /// This is the only part of the app that tells a third party anything about your route, which is
 /// why it is a setting the user can turn off (AppSettings.TracerouteOwnerLookup).
 /// </summary>
 public sealed class IpOwnershipLookup : IDisposable
 {
+    public const string ApiBase = "https://stat.ripe.net/data/";
+    private const string SourceApp = "internetmonitor";
+
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromDays(30);
-    private static readonly TimeSpan DnsTimeout = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan RdapTimeout = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(4);
 
-    /// <summary>An RDAP record is a few KB; the client refuses anything larger rather than buffering it.</summary>
-    private const long MaxRdapResponseBytes = 64 * 1024;
-
-    private static readonly IPAddress[] Resolvers =
-    [
-        IPAddress.Parse("9.9.9.9"),
-        IPAddress.Parse("1.1.1.1"),
-        IPAddress.Parse("8.8.8.8"),
-    ];
+    /// <summary>A RIPEstat answer is a few KB; the client refuses anything larger rather than buffering it.</summary>
+    private const long MaxResponseBytes = 64 * 1024;
 
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
-    private readonly ConcurrentDictionary<string, string> _asNames = new();
     private readonly HttpClient _http;
-    private readonly bool _useRdap;
-    private readonly Func<string, CancellationToken, Task<string?>> _queryTxt;
+
+    // ponytail: four lookups in flight at once is a polite rate for a trace of thirty hops; the
+    // pacing gate from OuiRegistry's predecessor can come back if RIPEstat ever answers 429.
+    private readonly SemaphoreSlim _gate = new(4, 4);
     private bool _dirty;
 
-    public IpOwnershipLookup(bool useRdap = true)
-        : this(useRdap, new HttpClientHandler(), QueryTxtAsync)
+    public IpOwnershipLookup()
+        : this(new HttpClientHandler())
     {
     }
 
-    /// <summary>The same lookup over a substituted HTTP handler and TXT query, so the tests can answer without a network.</summary>
-    internal IpOwnershipLookup(bool useRdap, HttpMessageHandler handler, Func<string, CancellationToken, Task<string?>> queryTxt)
+    /// <summary>The same lookup over a substituted HTTP handler, so the tests can answer without a network.</summary>
+    internal IpOwnershipLookup(HttpMessageHandler handler)
     {
-        _useRdap = useRdap;
-        _queryTxt = queryTxt;
         _http = new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan,
-            MaxResponseContentBufferSize = MaxRdapResponseBytes,
-            DefaultRequestHeaders = { { "Accept", "application/rdap+json" }, { "User-Agent", "InternetMonitor/2.0" } },
+            MaxResponseContentBufferSize = MaxResponseBytes,
+            DefaultRequestHeaders = { { "Accept", "application/json" }, { "User-Agent", "InternetMonitor/2.8" } },
         };
 
         LoadCache();
@@ -89,23 +81,22 @@ public sealed class IpOwnershipLookup : IDisposable
             return cached.Owner;
         }
 
-        // Team Cymru (one DNS query) gives the AS number and usually its name. RDAP is slower, so
-        // it is only asked when Cymru left the network name open, and only fills in the gaps.
-        IpOwner? owner = await QueryCymruAsync(address, cancellationToken).ConfigureAwait(false);
-
-        if (_useRdap && (owner is null || owner.NetworkName is null))
+        IpOwner? owner;
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            IpOwner? rdap = await QueryRdapAsync(address, cancellationToken).ConfigureAwait(false);
-            if (rdap is not null)
-            {
-                owner = owner is null
-                    ? rdap
-                    : owner with
-                    {
-                        NetworkName = owner.NetworkName ?? rdap.NetworkName,
-                        CountryCode = owner.CountryCode ?? rdap.CountryCode,
-                    };
-            }
+            Task<(string? AsNumber, string? AsName, string? Prefix)?> overview = QueryPrefixOverviewAsync(address, cancellationToken);
+            Task<string?> country = QueryCountryAsync(address, cancellationToken);
+            await Task.WhenAll(overview, country).ConfigureAwait(false);
+
+            (string? asNumber, string? asName, string? prefix) = overview.Result ?? (null, null, null);
+            owner = asNumber is null && asName is null && country.Result is null
+                ? null
+                : new IpOwner(asNumber, asName, null, country.Result, prefix);
+        }
+        finally
+        {
+            _gate.Release();
         }
 
         // An empty answer is not cached, so a lookup that failed for a network reason is retried
@@ -120,110 +111,56 @@ public sealed class IpOwnershipLookup : IDisposable
     }
 
     /// <summary>
-    /// origin.asn.cymru.com answers with "15169 | 8.8.8.0/24 | US | arin | 1992-12-01".
-    /// asn.cymru.com answers with "15169 | US | arin | 1992-12-01 | GOOGLE, US".
+    /// prefix-overview: <c>data.asns</c> lists the announcing systems as {asn, holder}, and
+    /// <c>data.resource</c> is the announced prefix the address was aligned to. A holder reads
+    /// "GOOGLE - Google LLC" or "SURFNET-NL SURF B.V."; a trailing ", US"-style country is dropped,
+    /// since the country comes from the registry question.
     /// </summary>
-    private async Task<IpOwner?> QueryCymruAsync(IPAddress address, CancellationToken cancellationToken)
+    private async Task<(string? AsNumber, string? AsName, string? Prefix)?> QueryPrefixOverviewAsync(IPAddress address, CancellationToken cancellationToken)
     {
-        byte[] bytes = address.GetAddressBytes();
-        string query = $"{bytes[3]}.{bytes[2]}.{bytes[1]}.{bytes[0]}.origin.asn.cymru.com";
-
-        string? answer = await _queryTxt(query, cancellationToken).ConfigureAwait(false);
-        if (answer is null)
+        JsonNode? data = await GetDataAsync("prefix-overview", address, cancellationToken).ConfigureAwait(false);
+        if (data is null)
         {
             return null;
         }
 
-        string[] fields = answer.Split('|', StringSplitOptions.TrimEntries);
-        if (fields.Length < 3)
+        JsonNode? first = data["asns"] is JsonArray { Count: > 0 } asns ? asns[0] : null;
+        string? asNumber = first?["asn"]?.ToString();
+        string? holder = first?["holder"]?.GetValue<string>();
+        string? prefix = data["resource"]?.GetValue<string>();
+
+        if (holder is not null)
         {
-            return null;
-        }
-
-        // The first field can list several AS numbers when a prefix is announced by more than one.
-        string asNumber = fields[0].Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
-        string prefix = fields[1];
-        string country = fields[2];
-
-        string? asName = asNumber.Length > 0
-            ? await LookupAsNameAsync(asNumber, cancellationToken).ConfigureAwait(false)
-            : null;
-
-        return new IpOwner(
-            asNumber.Length > 0 ? asNumber : null,
-            asName,
-            null,
-            country.Length > 0 ? country : null,
-            prefix.Length > 0 ? prefix : null);
-    }
-
-    private async Task<string?> LookupAsNameAsync(string asNumber, CancellationToken cancellationToken)
-    {
-        if (_asNames.TryGetValue(asNumber, out string? cached))
-        {
-            return cached;
-        }
-
-        string? answer = await _queryTxt($"AS{asNumber}.asn.cymru.com", cancellationToken).ConfigureAwait(false);
-        if (answer is null)
-        {
-            return null;
-        }
-
-        string[] fields = answer.Split('|', StringSplitOptions.TrimEntries);
-        if (fields.Length < 5)
-        {
-            return null;
-        }
-
-        // The name field is "GOOGLE, US" - the trailing country duplicates a field we already
-        // have, so it is trimmed off.
-        string name = fields[4];
-        int comma = name.LastIndexOf(", ", StringComparison.Ordinal);
-        if (comma > 0 && name.Length - comma <= 5)
-        {
-            name = name[..comma];
-        }
-
-        _asNames[asNumber] = name;
-        return name;
-    }
-
-    /// <summary>
-    /// Asks each resolver in turn until one answers. Cymru's zone is not served by every resolver
-    /// equally reliably, and this runs while the network may be degraded, so a single attempt
-    /// would silently produce a route with no ownership on it.
-    /// </summary>
-    private static async Task<string?> QueryTxtAsync(string name, CancellationToken cancellationToken)
-    {
-        foreach (IPAddress resolver in Resolvers)
-        {
-            DnsQueryResult result = await DnsUdpClient
-                .QueryAsync(resolver, name, DnsRecordType.Txt, DnsTimeout, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (result.Success && result.TextRecords.Count > 0)
+            int comma = holder.LastIndexOf(", ", StringComparison.Ordinal);
+            if (comma > 0 && holder.Length - comma <= 5)
             {
-                return result.TextRecords[0];
+                holder = holder[..comma];
             }
         }
 
-        return null;
+        return asNumber is null && holder is null && prefix is null
+            ? null
+            : (string.IsNullOrEmpty(asNumber) ? null : asNumber, string.IsNullOrWhiteSpace(holder) ? null : holder.Trim(), prefix is { Length: > 0 } && prefix.Contains('/') ? prefix : null);
     }
 
-    /// <summary>
-    /// Asks rdap.org, which redirects to the registry responsible for the address, for the network's
-    /// name and country. Only those two fields are read; null on any failure or timeout.
-    /// </summary>
-    private async Task<IpOwner?> QueryRdapAsync(IPAddress address, CancellationToken cancellationToken)
+    /// <summary>rir-stats-country: <c>data.located_resources[0].location</c> is the two-letter country the registry has the block in.</summary>
+    private async Task<string?> QueryCountryAsync(IPAddress address, CancellationToken cancellationToken)
+    {
+        JsonNode? data = await GetDataAsync("rir-stats-country", address, cancellationToken).ConfigureAwait(false);
+        string? location = data?["located_resources"] is JsonArray { Count: > 0 } located ? located[0]?["location"]?.GetValue<string>() : null;
+        return location is { Length: 2 } ? location.ToUpperInvariant() : null;
+    }
+
+    /// <summary>One RIPEstat data call; its <c>data</c> object when the call succeeded, null on any failure, timeout or a non-ok status.</summary>
+    private async Task<JsonNode?> GetDataAsync(string call, IPAddress address, CancellationToken cancellationToken)
     {
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(RdapTimeout);
+            timeout.CancelAfter(HttpTimeout);
 
             using HttpResponseMessage response = await _http
-                .GetAsync($"https://rdap.org/ip/{address}", timeout.Token)
+                .GetAsync($"{ApiBase}{call}/data.json?resource={address}&sourceapp={SourceApp}", timeout.Token)
                 .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
@@ -233,11 +170,7 @@ public sealed class IpOwnershipLookup : IDisposable
 
             string json = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
             JsonNode? root = JsonNode.Parse(json);
-
-            string? name = root?["name"]?.GetValue<string>();
-            string? country = root?["country"]?.GetValue<string>();
-
-            return name is null && country is null ? null : new IpOwner(null, null, name, country, null);
+            return root?["status"]?.GetValue<string>() == "ok" ? root["data"] : null;
         }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException)
         {
@@ -311,5 +244,6 @@ public sealed class IpOwnershipLookup : IDisposable
     {
         SaveCache();
         _http.Dispose();
+        _gate.Dispose();
     }
 }

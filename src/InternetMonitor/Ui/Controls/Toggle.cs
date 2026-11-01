@@ -20,6 +20,7 @@ public sealed class Toggle : ThemedControl
 
     public Toggle()
     {
+        AccessibleRole = AccessibleRole.CheckButton;
         SetStyle(ControlStyles.Selectable | ControlStyles.StandardClick, true);
         TabStop = true;
         Cursor = Cursors.Hand;
@@ -44,6 +45,7 @@ public sealed class Toggle : ThemedControl
             _checked = value;
             _position = value ? 1f : 0f;
             Invalidate();
+            AccessibilityNotifyClients(AccessibleEvents.StateChange, -1);
             CheckedChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -57,6 +59,20 @@ public sealed class Toggle : ThemedControl
     }
 
     public override Size GetPreferredSize(Size proposedSize) => new(Dp(40), Dp(22));
+
+    /// <summary>A check box to assistive technology, with on/off as its state - a painted switch has no state of its own otherwise.</summary>
+    protected override AccessibleObject CreateAccessibilityInstance() => new ToggleAccessibleObject(this);
+
+    private sealed class ToggleAccessibleObject(Toggle owner) : ControlAccessibleObject(owner)
+    {
+        public override AccessibleRole Role => AccessibleRole.CheckButton;
+
+        public override AccessibleStates State => base.State | (owner.Checked ? AccessibleStates.Checked : AccessibleStates.None);
+
+        public override string DefaultAction => "Toggle";
+
+        public override void DoDefaultAction() => owner.Checked = !owner.Checked;
+    }
 
     protected override bool IsInputKey(Keys keyData) => keyData is Keys.Space || base.IsInputKey(keyData);
 

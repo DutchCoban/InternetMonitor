@@ -28,7 +28,7 @@ public sealed partial class SettingsPage
             string server = _ntpServer.Text.Trim();
             if (server.Length == 0)
             {
-                server = "pool.ntp.org";
+                server = AppSettings.DefaultNtpServer;
                 _ntpServer.Text = server;
             }
 
@@ -42,6 +42,25 @@ public sealed partial class SettingsPage
             Services.Clock.Reconfigure();
         };
         AddRow(_publicIpCard, "settings.ntpServer", _ntpServer);
+
+        // The 204 endpoint step 7 fetches every cycle. The setter keeps anything that is not an
+        // https address out; the field shows what was kept and says why when it differs.
+        _reachabilityUrl = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(260), Font = Theme.Font(FontRole.Body) };
+        _reachabilityUrl.Leave += (_, _) =>
+        {
+            string typed = _reachabilityUrl.Text.Trim();
+            if (typed.Length > 0 && !AppSettings.IsHttpsUrl(typed))
+            {
+                _publicIpError.Text = Loc.Get("settings.publicIp.error.url");
+                return;
+            }
+
+            Services.Settings.ReachabilityUrl = typed;
+            _reachabilityUrl.Text = Services.Settings.ReachabilityUrl;
+            _publicIpError.Text = string.Empty;
+            Services.Settings.Save();
+        };
+        AddRow(_publicIpCard, "settings.publicIp.reachabilityUrl", _reachabilityUrl);
 
         _publicIpError = new Label
         {

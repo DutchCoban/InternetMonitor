@@ -30,7 +30,8 @@ public sealed class AppServices(
     UpdateChecker updateChecker,
     SpeedTestScheduler speedTestScheduler,
     IncidentWebhook webhook,
-    ClockMonitor clock)
+    ClockMonitor clock,
+    Core.Tools.LanScan.OuiRegistry oui)
 {
     public AppSettings Settings { get; } = settings;
 
@@ -59,4 +60,7 @@ public sealed class AppServices(
     public IncidentWebhook Webhook { get; } = webhook;
 
     public ClockMonitor Clock { get; } = clock;
+
+    /// <summary>The manufacturer list behind the LAN scan - the IEEE registry, built in and refreshed daily.</summary>
+    public Core.Tools.LanScan.OuiRegistry Oui { get; } = oui;
 }

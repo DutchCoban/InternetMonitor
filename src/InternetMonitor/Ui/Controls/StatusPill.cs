@@ -17,6 +17,7 @@ public sealed class StatusPill : ThemedControl
 
     public StatusPill()
     {
+        AccessibleRole = AccessibleRole.StaticText;
         // A pill is a label, not a target: it must never swallow a click meant for the row it
         // sits on.
         SetStyle(ControlStyles.Selectable, false);
@@ -49,6 +50,7 @@ public sealed class StatusPill : ThemedControl
             }
 
             _label = value ?? string.Empty;
+            AccessibleName = _label;
             Invalidate();
         }
     }

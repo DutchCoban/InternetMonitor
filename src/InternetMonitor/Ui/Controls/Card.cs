@@ -27,6 +27,7 @@ public class Card : ThemedControl
 
     public Card()
     {
+        AccessibleRole = AccessibleRole.Grouping;
         ApplySurfaceColor();
     }
 
@@ -41,6 +42,7 @@ public class Card : ThemedControl
             }
 
             _title = value ?? string.Empty;
+            AccessibleName = _title;
             PerformLayout();
             Invalidate();
         }

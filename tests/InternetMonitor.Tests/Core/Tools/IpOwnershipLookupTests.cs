@@ -6,108 +6,118 @@ using Xunit;
 namespace InternetMonitor.Tests.Core.Tools;
 
 /// <summary>
-/// Who owns a hop's address, without the internet: the TXT answers and the RDAP page are played
-/// back, and the lookup's caching per /24 is checked by counting what it asked.
+/// Who owns a hop's address, without the internet: RIPEstat's two answers are played back, and the
+/// lookup's caching per /24 is checked by counting what it asked.
 /// </summary>
 [Collection("Localization")]
 public sealed class IpOwnershipLookupTests
 {
-    private sealed class Answers
+    private const string GoogleOverview = """
+        {"status":"ok","data":{"announced":true,"asns":[{"asn":15169,"holder":"GOOGLE - Google LLC"}],"resource":"8.8.8.0/24","block":{"resource":"8.0.0.0/8","desc":"Administered by ARIN","name":"IANA IPv4 Address Space Registry"}}}
+        """;
+
+    private const string GoogleCountry = """
+        {"status":"ok","data":{"located_resources":[{"resource":"8.8.8.0/24","location":"US"}]}}
+        """;
+
+    private sealed class RipeStat
     {
-        public Dictionary<string, string> Txt { get; } = [];
+        public Dictionary<string, string> Overview { get; } = [];
 
-        public List<string> Asked { get; } = [];
+        public Dictionary<string, string> Country { get; } = [];
 
-        public FakeHttpHandler Http { get; } = new(request => request.RequestUri!.AbsolutePath.EndsWith("/ip/8.8.8.8", StringComparison.Ordinal)
-            ? FakeHttpHandler.Text(HttpStatusCode.OK, """{"name":"GOGL","country":"US"}""", "application/rdap+json")
-            : FakeHttpHandler.Status(HttpStatusCode.NotFound));
+        public FakeHttpHandler Http { get; }
 
-        public IpOwnershipLookup Lookup(bool useRdap = true) => new(useRdap, Http, (name, _) =>
+        public RipeStat()
         {
-            Asked.Add(name);
-            return Task.FromResult(Txt.GetValueOrDefault(name));
-        });
+            Http = new FakeHttpHandler(request =>
+            {
+                string resource = System.Web.HttpUtility.ParseQueryString(request.RequestUri!.Query)["resource"] ?? string.Empty;
+                Dictionary<string, string> table = request.RequestUri.AbsolutePath.Contains("/prefix-overview/", StringComparison.Ordinal) ? Overview : Country;
+                return table.TryGetValue(resource, out string? body)
+                    ? FakeHttpHandler.Text(HttpStatusCode.OK, body, "application/json")
+                    : FakeHttpHandler.Status(HttpStatusCode.NotFound);
+            });
+        }
+
+        public IpOwnershipLookup Lookup() => new(Http);
     }
 
     [Fact]
     public async Task A_private_or_ipv6_address_is_not_looked_up_at_all()
     {
-        var answers = new Answers();
-        using IpOwnershipLookup lookup = answers.Lookup();
+        var ripe = new RipeStat();
+        using IpOwnershipLookup lookup = ripe.Lookup();
 
         Assert.Null(await lookup.LookupAsync(IPAddress.Parse("10.0.0.1"), CancellationToken.None));
         Assert.Null(await lookup.LookupAsync(IPAddress.Parse("2001:db8::1"), CancellationToken.None));
-        Assert.Empty(answers.Asked);
-        Assert.Empty(answers.Http.Requests);
+        Assert.Empty(ripe.Http.Requests);
     }
 
     [Fact]
-    public async Task Cymru_gives_the_as_and_country_and_rdap_fills_in_the_network_name()
+    public async Task Ripestat_gives_the_as_its_holder_the_prefix_and_the_country_and_a_neighbour_is_served_from_the_cache()
     {
-        var answers = new Answers();
-        answers.Txt["8.8.8.8.origin.asn.cymru.com"] = "15169 | 8.8.8.0/24 | US | arin | 2023-12-28";
-        answers.Txt["AS15169.asn.cymru.com"] = "15169 | US | arin | 2000-03-30 | GOOGLE, US";
-        using IpOwnershipLookup lookup = answers.Lookup();
+        var ripe = new RipeStat();
+        ripe.Overview["8.8.8.8"] = GoogleOverview;
+        ripe.Country["8.8.8.8"] = GoogleCountry;
+        using IpOwnershipLookup lookup = ripe.Lookup();
 
         IpOwner? owner = await lookup.LookupAsync(IPAddress.Parse("8.8.8.8"), CancellationToken.None);
 
-        Assert.NotNull(owner);
-        Assert.Equal(new IpOwner("15169", "GOOGLE", "GOGL", "US", "8.8.8.0/24"), owner);
-        Assert.Equal(["8.8.8.8.origin.asn.cymru.com", "AS15169.asn.cymru.com"], answers.Asked);
-        Assert.Equal("https://rdap.org/ip/8.8.8.8", Assert.Single(answers.Http.Requests).ToString());
+        Assert.Equal(new IpOwner("15169", "GOOGLE - Google LLC", null, "US", "8.8.8.0/24"), owner);
+        Assert.Equal(2, ripe.Http.Requests.Count);
+        Assert.All(ripe.Http.Requests, u => Assert.Contains("sourceapp=internetmonitor", u.Query, StringComparison.Ordinal));
+        Assert.All(ripe.Http.Requests, u => Assert.Equal("stat.ripe.net", u.Host));
+        Assert.Equal("AS15169  GOOGLE - Google LLC   US", owner!.Describe());
 
         // The same /24 again: served from the cache, nothing asked.
         IpOwner? neighbour = await lookup.LookupAsync(IPAddress.Parse("8.8.8.200"), CancellationToken.None);
         Assert.Same(owner, neighbour);
-        Assert.Equal(2, answers.Asked.Count);
-        Assert.Single(answers.Http.Requests);
+        Assert.Equal(2, ripe.Http.Requests.Count);
     }
 
     [Fact]
-    public async Task Without_rdap_only_the_dns_side_is_asked_and_a_multi_as_answer_takes_the_first()
+    public async Task A_holder_with_a_trailing_country_loses_it_and_one_failing_answer_still_yields_the_other()
     {
-        var answers = new Answers();
-        answers.Txt["7.0.0.1.origin.asn.cymru.com"] = "13335 395747 | 1.0.0.0/24 | AU | apnic | 2011-08-11";
-        answers.Txt["AS13335.asn.cymru.com"] = "13335 | US | arin | 2010-07-14 | CLOUDFLARENET, US";
-        using IpOwnershipLookup lookup = answers.Lookup(useRdap: false);
+        var ripe = new RipeStat();
+        ripe.Overview["1.0.0.7"] = """{"status":"ok","data":{"asns":[{"asn":"13335","holder":"CLOUDFLARENET, US"}],"resource":"1.0.0.0/24"}}""";
+        // No country answer at all for this one.
+        using IpOwnershipLookup lookup = ripe.Lookup();
 
         IpOwner? owner = await lookup.LookupAsync(IPAddress.Parse("1.0.0.7"), CancellationToken.None);
 
-        Assert.Equal(("13335", "CLOUDFLARENET", "AU"), (owner!.AsNumber, owner.AsName, owner.CountryCode));
-        Assert.Null(owner.NetworkName);
-        Assert.Empty(answers.Http.Requests);
+        Assert.Equal(("13335", "CLOUDFLARENET", null, "1.0.0.0/24"), (owner!.AsNumber, owner.AsName, owner.CountryCode, owner.Prefix));
     }
 
     [Fact]
-    public async Task Nothing_known_is_not_cached_so_the_next_trace_asks_again()
+    public async Task Nothing_known_or_a_status_that_is_not_ok_is_not_cached_so_the_next_trace_asks_again()
     {
-        var answers = new Answers();
-        using IpOwnershipLookup lookup = answers.Lookup();
+        var ripe = new RipeStat();
+        ripe.Overview["9.9.9.9"] = """{"status":"error","data":{"asns":[{"asn":19281,"holder":"QUAD9-AS-1"}]}}""";
+        using IpOwnershipLookup lookup = ripe.Lookup();
 
         Assert.Null(await lookup.LookupAsync(IPAddress.Parse("9.9.9.9"), CancellationToken.None));
         Assert.Null(await lookup.LookupAsync(IPAddress.Parse("9.9.9.9"), CancellationToken.None));
 
-        Assert.Equal(2, answers.Asked.Count);
-        Assert.Equal(2, answers.Http.Requests.Count);
+        Assert.Equal(4, ripe.Http.Requests.Count);
     }
 
     [Fact]
     public async Task The_cache_survives_a_restart()
     {
-        var first = new Answers();
-        // Cymru is asked with the octets reversed, the way reverse DNS does it.
-        first.Txt["2.2.2.4.origin.asn.cymru.com"] = "3356 | 4.0.0.0/9 | US | arin | 1992-12-01";
-        first.Txt["AS3356.asn.cymru.com"] = "3356 | US | arin | 2000-03-10 | LEVEL3, US";
-        using (IpOwnershipLookup lookup = first.Lookup(useRdap: false))
+        var first = new RipeStat();
+        first.Overview["4.2.2.2"] = """{"status":"ok","data":{"asns":[{"asn":3356,"holder":"LEVEL3"}],"resource":"4.0.0.0/9"}}""";
+        first.Country["4.2.2.2"] = """{"status":"ok","data":{"located_resources":[{"resource":"4.0.0.0/9","location":"us"}]}}""";
+        using (IpOwnershipLookup lookup = first.Lookup())
         {
             Assert.NotNull(await lookup.LookupAsync(IPAddress.Parse("4.2.2.2"), CancellationToken.None));
         }
 
-        var second = new Answers();
-        using IpOwnershipLookup restarted = second.Lookup(useRdap: false);
+        var second = new RipeStat();
+        using IpOwnershipLookup restarted = second.Lookup();
         IpOwner? owner = await restarted.LookupAsync(IPAddress.Parse("4.2.2.7"), CancellationToken.None);
 
-        Assert.Equal("LEVEL3", owner!.AsName);
-        Assert.Empty(second.Asked);
+        Assert.Equal(("LEVEL3", "US"), (owner!.AsName, owner.CountryCode));
+        Assert.Empty(second.Http.Requests);
     }
 }

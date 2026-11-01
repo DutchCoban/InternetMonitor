@@ -27,6 +27,7 @@ public sealed class PageHeader : ThemedControl
 
     public PageHeader()
     {
+        AccessibleRole = AccessibleRole.StaticText;
         Dock = DockStyle.Top;
         Height = Dp(64);
 
@@ -59,6 +60,7 @@ public sealed class PageHeader : ThemedControl
         set
         {
             _title = value ?? string.Empty;
+            AccessibleName = _title;
             UpdateHeight();
             Invalidate();
         }

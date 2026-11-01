@@ -259,6 +259,7 @@ public sealed partial class SettingsPage
         {
             Services.Settings.LanScanVendorLookup = _lanScanVendorLookup.Checked;
             Services.Settings.Save();
+            Services.Oui.Reconfigure(Services.Settings.LanScanVendorLookup);
         };
         AddRow(_toolsCard, "settings.lanScanVendorLookup", _lanScanVendorLookup);
 
@@ -269,7 +270,11 @@ public sealed partial class SettingsPage
             Services.Settings.Save();
         };
         AddRow(_toolsCard, "settings.lanScanTcpFallback", _lanScanTcpFallback);
+    }
 
+    /// <summary>The speed test's own card: when it runs by itself, and which LibreSpeed server it talks to.</summary>
+    private void BuildSpeedTestRows()
+    {
         _speedTestAutoRun = new Toggle();
         _speedTestAutoRun.CheckedChanged += (_, _) =>
         {
@@ -278,11 +283,11 @@ public sealed partial class SettingsPage
             Services.SpeedTestScheduler.Reconfigure(Services.Settings.SpeedTestAutoRunEnabled, Services.Settings.SpeedTestIntervalHours);
             RefreshDependentRows();
         };
-        AddRow(_toolsCard, "settings.speedTestAutoRun", _speedTestAutoRun);
+        AddRow(_speedTestCard, "settings.speedTestAutoRun", _speedTestAutoRun);
 
         _speedTestInterval = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dp(160) };
         _speedTestInterval.SelectedIndexChanged += OnSpeedTestIntervalChanged;
-        AddRow(_toolsCard, "settings.speedTestInterval", _speedTestInterval);
+        AddRow(_speedTestCard, "settings.speedTestInterval", _speedTestInterval);
 
         _speedTestOnMetered = new Toggle();
         _speedTestOnMetered.CheckedChanged += (_, _) =>
@@ -290,7 +295,23 @@ public sealed partial class SettingsPage
             Services.Settings.SpeedTestOnMetered = _speedTestOnMetered.Checked;
             Services.Settings.Save();
         };
-        AddRow(_toolsCard, "settings.speedTestOnMetered", _speedTestOnMetered);
+        AddRow(_speedTestCard, "settings.speedTestOnMetered", _speedTestOnMetered);
+
+        // One LibreSpeed backend of the user's own; empty means the built-in European chain. The
+        // setter drops anything that is not an https address, and the field shows what was kept.
+        _speedTestServer = new TextBox { BorderStyle = BorderStyle.FixedSingle, Width = Dp(260), Font = Theme.Font(FontRole.Body) };
+        _speedTestServer.Leave += (_, _) =>
+        {
+            Services.Settings.SpeedTestServerUrl = _speedTestServer.Text;
+            _speedTestServer.Text = Services.Settings.SpeedTestServerUrl;
+            Services.Settings.Save();
+        };
+        AddRow(_speedTestCard, "settings.speedTestServer", _speedTestServer);
+
+        _speedTestAbout = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Globe, Text = Loc.Get("settings.speedTest.about") };
+        _speedTestAbout.SizeToContent();
+        _speedTestAbout.Click += (_, _) => ShellOpen.OpenUrl("https://librespeed.org/");
+        _speedTestCard.Controls.Add(_speedTestAbout);
     }
 
     private void OnSpeedTestIntervalChanged(object? sender, EventArgs e)

@@ -16,11 +16,14 @@ namespace InternetMonitor.Core.Monitors;
 /// </summary>
 public sealed class SpeedTestScheduler : IAsyncDisposable
 {
-    private readonly SpeedTestClient _client = new();
+    private readonly Func<(IReadOnlyList<string> Servers, System.Net.IPAddress PingTarget)> _configuration;
     private readonly BackgroundLoop _loop = new();
 
     private bool _enabled;
     private TimeSpan _interval = TimeSpan.FromHours(4);
+
+    /// <param name="configuration">Read at every run, so a server or ping address changed in Settings applies to the next test without a restart.</param>
+    public SpeedTestScheduler(Func<(IReadOnlyList<string> Servers, System.Net.IPAddress PingTarget)> configuration) => _configuration = configuration;
 
     public event EventHandler<SpeedTestResult>? RunCompleted;
 
@@ -70,7 +73,9 @@ public sealed class SpeedTestScheduler : IAsyncDisposable
 
         try
         {
-            SpeedTestResult result = await _client.RunAsync(null, cancellationToken).ConfigureAwait(false);
+            (IReadOnlyList<string> servers, System.Net.IPAddress pingTarget) = _configuration();
+            using var client = new SpeedTestClient(servers, pingTarget);
+            SpeedTestResult result = await client.RunAsync(null, cancellationToken).ConfigureAwait(false);
             RunCompleted?.Invoke(this, result);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
@@ -80,9 +85,5 @@ public sealed class SpeedTestScheduler : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await _loop.DisposeAsync().ConfigureAwait(false);
-        _client.Dispose();
-    }
+    public ValueTask DisposeAsync() => _loop.DisposeAsync();
 }

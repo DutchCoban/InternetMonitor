@@ -5,6 +5,7 @@ using InternetMonitor.Core.History;
 using InternetMonitor.Core.Incidents;
 using InternetMonitor.Core.Monitors;
 using InternetMonitor.Core.Steps;
+using InternetMonitor.Core.Tools.LanScan;
 using InternetMonitor.Core.Tools.SpeedTest;
 using InternetMonitor.Core.Tools.Traceroute;
 using InternetMonitor.Core.Updates;
@@ -51,6 +52,7 @@ public sealed class AppHost : ApplicationContext
     private readonly ClockMonitor _clock;
     private System.Windows.Forms.Timer? _updateRestartTimer;
     private readonly SpeedTestScheduler _speedTestScheduler;
+    private readonly OuiRegistry _oui;
 
     public AppHost(bool showWindowOnStart = false, string? initialPage = null, string? initialTrace = null)
     {
@@ -125,12 +127,15 @@ public sealed class AppHost : ApplicationContext
         _webhook.Reconfigure(_settings.WebhookUrl, _settings.WebhookLabel);
         _clock = new ClockMonitor(() => _settings.NtpServer);
 
-        _speedTestScheduler = new SpeedTestScheduler();
+        _speedTestScheduler = new SpeedTestScheduler(() => (_settings.SpeedTestServers, _settings.ParsedPublicIpTargets()[0]));
         _speedTestScheduler.RunCompleted += OnSpeedTestRunCompleted;
         _speedTestScheduler.SkipRun = () => !_settings.SpeedTestOnMetered && IsMetered();
         _speedTestScheduler.Reconfigure(_settings.SpeedTestAutoRunEnabled, _settings.SpeedTestIntervalHours);
 
-        var services = new AppServices(_settings, BuildTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler, _webhook, _clock);
+        _oui = new OuiRegistry();
+        _oui.Reconfigure(_settings.LanScanVendorLookup);
+
+        var services = new AppServices(_settings, BuildTargets, _pipeline, _cadence, _history, _incidents, _kuma, _diagnosticLog, _networkHealth, _updateChecker, _speedTestScheduler, _webhook, _clock, _oui);
         _window = new MainWindow(services);
 
         // Creating the handle now rather than on first show means the pipeline has somewhere to
@@ -688,7 +693,8 @@ public sealed class AppHost : ApplicationContext
                 _updateChecker.DisposeAsync().AsTask(),
                 _speedTestScheduler.DisposeAsync().AsTask(),
                 _webhook.DisposeAsync().AsTask(),
-                _clock.DisposeAsync().AsTask())).GetAwaiter().GetResult();
+                _clock.DisposeAsync().AsTask(),
+                _oui.DisposeAsync().AsTask())).GetAwaiter().GetResult();
 
             _updateRestartTimer?.Stop();
             _updateRestartTimer?.Dispose();

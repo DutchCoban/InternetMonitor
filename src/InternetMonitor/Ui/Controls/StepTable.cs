@@ -22,6 +22,9 @@ public sealed class StepTable : ThemedControl
 
     public StepTable()
     {
+        SetStyle(ControlStyles.Selectable, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.List;
         Cursor = Cursors.Hand;
         foreach (StepId step in Order)
         {
@@ -77,9 +80,31 @@ public sealed class StepTable : ThemedControl
         Invalidate();
     }
 
+    protected override bool IsInputKey(Keys keyData) => keyData is Keys.Up or Keys.Down || base.IsInputKey(keyData);
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        int current = Array.IndexOf(Order, _selected);
+        int target = e.KeyCode switch
+        {
+            Keys.Up => Math.Max(0, current - 1),
+            Keys.Down => Math.Min(Order.Length - 1, current + 1),
+            _ => -1,
+        };
+        if (target >= 0 && target != current)
+        {
+            _selected = Order[target];
+            Invalidate();
+            SelectionChanged?.Invoke(_selected);
+            e.Handled = true;
+        }
+    }
+
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
+        Focus();
         if (e.Button != MouseButtons.Left)
         {
             return;

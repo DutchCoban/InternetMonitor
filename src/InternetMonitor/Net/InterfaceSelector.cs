@@ -63,13 +63,23 @@ public static class InterfaceSelector
         }
     }
 
-    /// <summary>Every adapter that could plausibly carry real traffic: physical ones, in no particular order.</summary>
+    /// <summary>
+    /// Every adapter that could plausibly carry real traffic: physical ones, in no particular order.
+    /// Windows' own hidden pseudo-adapters are left out: it names them "Local Area Connection* N"
+    /// (the asterisk is reserved for them) and they are filter drivers and Wi-Fi Direct ports that
+    /// never hold an address. One was once picked as the fallback during a one-second Wi-Fi
+    /// reconnect, and the move "from" it was then reported as a detour that could never end.
+    /// </summary>
     public static IReadOnlyList<NetworkInterface> Candidates(IReadOnlyList<NetworkInterface> all) =>
     [
         .. all.Where(nic =>
             nic.NetworkInterfaceType != NetworkInterfaceType.Loopback
-            && nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel),
+            && nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel
+            && !IsHiddenPseudoAdapter(nic)),
     ];
+
+    public static bool IsHiddenPseudoAdapter(NetworkInterface nic) =>
+        nic.Name.StartsWith("Local Area Connection*", StringComparison.OrdinalIgnoreCase);
 
     public static IReadOnlyList<NetworkInterface> GetCandidates() => Candidates(GetAll());
 

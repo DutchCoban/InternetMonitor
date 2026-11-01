@@ -18,12 +18,14 @@ public sealed class IncidentDetail : ThemedControl
     private readonly TextBox _note;
     private Incident? _incident;
     private IncidentThroughput? _throughput;
+    private IReadOnlyList<IncidentPattern> _patterns = [];
     private int _scrollOffset;
     private int _contentHeight;
     private bool _loadingNote;
 
     public IncidentDetail()
     {
+        AccessibleRole = AccessibleRole.Pane;
         _note = new TextBox
         {
             Multiline = true,
@@ -32,6 +34,7 @@ public sealed class IncidentDetail : ThemedControl
             Visible = false,
             ScrollBars = ScrollBars.Vertical,
         };
+        _note.AccessibleName = LocalizationManager.Instance.Get("incidents.note.placeholder");
         _note.Leave += (_, _) => CommitNote();
         Controls.Add(_note);
     }
@@ -42,16 +45,19 @@ public sealed class IncidentDetail : ThemedControl
     protected override Color BehindColor => Theme.Current.Surface;
 
     /// <param name="throughput">The traffic picture to show under the incident - resolved by the page, which has the history; null leaves the section out.</param>
-    public void Show(Incident? incident, IncidentThroughput? throughput = null)
+    /// <param name="patterns">What this incident has in common with earlier ones (<see cref="IncidentPatterns.For"/>); null or empty leaves the section out.</param>
+    public void Show(Incident? incident, IncidentThroughput? throughput = null, IReadOnlyList<IncidentPattern>? patterns = null)
     {
         CommitNote();
         _incident = incident;
         _throughput = throughput;
+        _patterns = patterns ?? [];
         _scrollOffset = 0;
 
         _loadingNote = true;
         _note.Text = incident?.Note ?? string.Empty;
         _note.PlaceholderText = LocalizationManager.Instance.Get("incidents.note.placeholder");
+        _note.AccessibleName = _note.PlaceholderText;
         _note.Visible = incident is not null;
         _loadingNote = false;
 
@@ -115,6 +121,11 @@ public sealed class IncidentDetail : ThemedControl
             y = DrawParagraph(g, p, loc.Get("incidents.what"), explanation.What, width, y);
             y = DrawParagraph(g, p, loc.Get("incidents.likelyCause"), explanation.LikelyCause, width, y);
             y = DrawParagraph(g, p, loc.Get("incidents.whatToDo"), explanation.WhatToDo, width, y);
+        }
+
+        if (_patterns.Count > 0)
+        {
+            y = DrawList(g, p, loc.Get("incidents.patterns"), IncidentPatterns.Describe(_patterns, loc.Format), width, y);
         }
 
         y = DrawNote(g, p, loc, width, y);

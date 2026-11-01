@@ -10,8 +10,11 @@ namespace InternetMonitor.Core.Steps.Checks;
 ///
 /// All configured addresses are pinged at once, and the first answer settles it: one address
 /// replying is proof enough, so the step does not sit out the timeout of another that happens to
-/// be silent. Only total silence is a failure - any single anycast address can be having a bad
-/// day, or be blocked on its own.
+/// be silent. Only when every configured address stays silent are the fallback addresses tried
+/// the same way (<see cref="CheckTargets.FallbackPublicIpTargets"/>), so the usual case sends
+/// nothing beyond the configured - European by default - addresses, while an outage of one
+/// operator is still not mistaken for "no internet". Only total silence is a failure - any single
+/// anycast address can be having a bad day, or be blocked on its own.
 ///
 /// Note what this step does *not* conclude. ICMP being blocked is extremely common, so "nothing
 /// answered" here is evidence, not a verdict: the root-cause analyser compares it against step 7
@@ -102,7 +105,24 @@ public sealed class PublicIpCheck : IStepCheck
             return null;
         }
 
-        PingOutcome[] outcomes = await Task.WhenAll(context.Targets.PublicIpv6Targets
+        PingOutcome? best = await PingAllIpv6Async(context.Targets.PublicIpv6Targets, context, cancellationToken).ConfigureAwait(false);
+        if (best is { Success: true } || context.Targets.FallbackPublicIpv6Targets.Count == 0)
+        {
+            return best;
+        }
+
+        // The European addresses stayed silent: the fallback decides, the same way as for IPv4.
+        return await PingAllIpv6Async(context.Targets.FallbackPublicIpv6Targets, context, cancellationToken).ConfigureAwait(false) ?? best;
+    }
+
+    private static async Task<PingOutcome?> PingAllIpv6Async(IReadOnlyList<IPAddress> targets, StepContext context, CancellationToken cancellationToken)
+    {
+        if (targets.Count == 0)
+        {
+            return null;
+        }
+
+        PingOutcome[] outcomes = await Task.WhenAll(targets
             .Select(target => IcmpPing.SendAsync(target, context.Targets.PublicIpTimeout, cancellationToken))).ConfigureAwait(false);
 
         return outcomes.Where(o => o.Success).OrderBy(o => o.RoundtripMs).FirstOrDefault() is { Success: true } best
@@ -113,17 +133,29 @@ public sealed class PublicIpCheck : IStepCheck
     /// <summary>
     /// Pings every target at once and returns as soon as one answers, cancelling the rest. The
     /// result lists the targets that had finished by then - the answering one, plus any that
-    /// already failed. When none answers, every target's failure is in the list.
+    /// already failed. When none answers, the fallback addresses get the same race, and every
+    /// failure from both rounds is in the list.
     /// </summary>
     private static async Task<IReadOnlyList<PublicIpEndpointResult>> PingUntilFirstAnswerAsync(
         StepContext context,
         CancellationToken cancellationToken)
     {
+        List<PublicIpEndpointResult> results = await RaceAsync(context.Targets.PublicIpTargets, context, cancellationToken).ConfigureAwait(false);
+        if (!results.Any(r => r.Reachable) && context.Targets.FallbackPublicIpTargets.Count > 0)
+        {
+            results.AddRange(await RaceAsync(context.Targets.FallbackPublicIpTargets, context, cancellationToken).ConfigureAwait(false));
+        }
+
+        return results;
+    }
+
+    private static async Task<List<PublicIpEndpointResult>> RaceAsync(IReadOnlyList<IPAddress> targets, StepContext context, CancellationToken cancellationToken)
+    {
         Func<CancellationToken, Task<(IPAddress Address, PingOutcome Outcome)>> Ping(IPAddress target) =>
             async token => (target, await IcmpPing.SendAsync(target, context.Targets.PublicIpTimeout, token, context.LocalAddress).ConfigureAwait(false));
 
         RaceOutcome<(IPAddress Address, PingOutcome Outcome)> race = await Race
-            .FirstAsync([.. context.Targets.PublicIpTargets.Select(Ping)], r => r.Outcome.Success, cancellationToken)
+            .FirstAsync([.. targets.Select(Ping)], r => r.Outcome.Success, cancellationToken)
             .ConfigureAwait(false);
 
         return [.. race.Finished.Select(r => new PublicIpEndpointResult(r.Address, r.Outcome.Success, r.Outcome.RoundtripMs, r.Outcome.Status))];

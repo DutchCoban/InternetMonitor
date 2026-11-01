@@ -158,6 +158,19 @@ public sealed class ProviderReportTests
         Assert.Contains("Only this computer is visible", html);
     }
 
+    [Fact]
+    public void Outages_that_recur_around_the_same_hour_are_listed_as_a_pattern_once()
+    {
+        List<MetricPoint> samples = Samples(From, To - From);
+        ProviderReportData recurring = ProviderReportData.Compute(
+            [Incident(RootCause.Internet, From.AddHours(3), TimeSpan.FromMinutes(5)), Incident(RootCause.Internet, From.AddDays(1).AddHours(3), TimeSpan.FromMinutes(5)), Incident(RootCause.Internet, From.AddDays(1).AddHours(27), TimeSpan.FromMinutes(5))],
+            _ => samples, From, To.AddDays(1), TimeZoneInfo.Utc, To.AddDays(1));
+        IncidentPattern pattern = Assert.Single(recurring.Patterns);
+        Assert.Equal(IncidentPatterns.SameHour, pattern.Key);
+
+        Assert.Empty(Compute(samples, Incident(RootCause.Internet, From.AddHours(3), TimeSpan.FromMinutes(5))).Patterns);
+    }
+
     private static ProviderReportData Compute(IReadOnlyList<MetricPoint> adapterAndLatency, params Incident[] incidents) =>
         Compute(adapterAndLatency, [], incidents);
 

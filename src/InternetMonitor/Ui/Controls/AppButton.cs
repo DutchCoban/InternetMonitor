@@ -41,6 +41,7 @@ public sealed class AppButton : ThemedControl, IButtonControl
 
     public AppButton()
     {
+        AccessibleRole = AccessibleRole.PushButton;
         SetStyle(ControlStyles.Selectable | ControlStyles.StandardClick, true);
         TabStop = true;
         Cursor = Cursors.Hand;

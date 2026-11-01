@@ -19,7 +19,7 @@ public sealed record LanScanResult(
 /// <summary>
 /// A simplified Advanced-IP-Scanner-style sweep of the local subnet: which addresses answer a
 /// ping, with whatever hostname, MAC address and manufacturer can be found for each (the last via
-/// the optional <see cref="MacVendorLookup"/>). No port scanning - this answers "what's on my
+/// the optional <see cref="OuiRegistry"/>). No port scanning - this answers "what's on my
 /// network", not "what's running on it".
 ///
 /// Shaped like <see cref="Tools.Traceroute.TracerouteRunner"/>: the fast part (the ping sweep
@@ -29,7 +29,7 @@ public sealed record LanScanResult(
 /// of blocking on the slowest hostname lookup in the whole subnet.
 ///
 /// Manufacturer lookups are a further, third stage, deliberately split off from the above instead
-/// of folded into the per-host enrichment: <see cref="MacVendorLookup"/> is rate-limited to be
+/// of folded into the per-host enrichment: <see cref="OuiRegistry"/> is rate-limited to be
 /// polite to its two free APIs, so waiting for it before reporting a device would make every scan
 /// as slow as its slowest vendor lookup. Instead <see cref="ScanAsync"/> returns as soon as ping +
 /// ARP + hostname are done, and manufacturer names trickle in afterwards as a background task
@@ -64,7 +64,7 @@ public sealed class LanScanner
         IPAddress subnetMask,
         IProgress<LanDevice>? progress,
         CancellationToken cancellationToken,
-        MacVendorLookup? vendorLookup = null,
+        OuiRegistry? vendorLookup = null,
         bool tcpFallback = false)
     {
         DateTimeOffset started = DateTimeOffset.UtcNow;
@@ -136,7 +136,7 @@ public sealed class LanScanner
         IReadOnlyDictionary<IPAddress, string> pingArp,
         List<LanDevice> devices,
         IProgress<LanDevice>? progress,
-        MacVendorLookup? vendorLookup,
+        OuiRegistry? vendorLookup,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<(IPAddress Address, (int Port, TcpOutcome Outcome)? Result)> results = await TcpConnect
@@ -180,7 +180,7 @@ public sealed class LanScanner
         string? mac,
         List<LanDevice> devices,
         IProgress<LanDevice>? progress,
-        MacVendorLookup? vendorLookup,
+        OuiRegistry? vendorLookup,
         CancellationToken cancellationToken)
     {
         string? hostname = await DnsResolve.TryReverseAsync(address, ReverseDnsTimeout, cancellationToken).ConfigureAwait(false);
@@ -201,7 +201,7 @@ public sealed class LanScanner
     /// (now with <see cref="LanDevice.Vendor"/> filled in and <see cref="LanDevice.VendorPending"/>
     /// cleared) as each lookup finishes, instead of making the caller wait for all of them.
     /// </summary>
-    private static async Task ResolveVendorsAsync(List<LanDevice> devices, MacVendorLookup? vendorLookup, IProgress<LanDevice>? progress, CancellationToken cancellationToken)
+    private static async Task ResolveVendorsAsync(List<LanDevice> devices, OuiRegistry? vendorLookup, IProgress<LanDevice>? progress, CancellationToken cancellationToken)
     {
         if (vendorLookup is null)
         {
@@ -223,9 +223,10 @@ public sealed class LanScanner
         await Task.WhenAll(vendorTasks).ConfigureAwait(false);
     }
 
-    private static async Task ResolveVendorAsync(LanDevice device, MacVendorLookup vendorLookup, List<LanDevice> devices, IProgress<LanDevice>? progress, CancellationToken cancellationToken)
+    private static async Task ResolveVendorAsync(LanDevice device, OuiRegistry vendorLookup, List<LanDevice> devices, IProgress<LanDevice>? progress, CancellationToken cancellationToken)
     {
-        string? vendor = await vendorLookup.LookupAsync(device.MacAddress!, cancellationToken).ConfigureAwait(false);
+        await Task.Yield();
+        string? vendor = vendorLookup.Lookup(device.MacAddress!);
         LanDevice updated = device with { Vendor = vendor, VendorPending = false };
 
         lock (devices)

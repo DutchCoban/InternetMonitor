@@ -25,7 +25,9 @@ internal static class TargetsFromSettings
             AdapterName = settings.AdapterName.Length > 0 ? settings.AdapterName : null,
             Targets =
             [
-                .. defaults.Targets,
+                // The built-in reachability check, at the URL the settings name (the default unless
+                // the user chose another 204 endpoint), ahead of the user's own endpoints.
+                new TargetEndpoint("Internet", settings.ReachabilityUrl, ExpectedStatusCode: 204) { IsReachabilityCheck = true },
                 .. endpoints.Where(e => e.Enabled).Select(e => e.Kind switch
                 {
                     EndpointKind.TcpPort => new TargetEndpoint(e.Name, Url: "", TargetKind.TcpPort, Host: e.Host, Port: e.Port) { Id = e.Id },

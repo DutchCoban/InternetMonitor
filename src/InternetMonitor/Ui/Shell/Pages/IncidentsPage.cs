@@ -35,7 +35,7 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
     protected override void Build()
     {
         _list = new IncidentList { Dock = DockStyle.Fill };
-        _list.SelectionChanged += incident => _detail.Show(incident, incident is null ? null : TrafficAround(incident));
+        _list.SelectionChanged += incident => _detail.Show(incident, incident is null ? null : TrafficAround(incident), incident is null ? null : PatternsOf(incident));
 
         _search = new TextBox { BorderStyle = BorderStyle.FixedSingle, Dock = DockStyle.Top, Font = Theme.Font(FontRole.Body) };
         _search.TextChanged += (_, _) =>
@@ -108,6 +108,10 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
 
         _listCard.Title = Loc.Get("incidents.list.title");
         _detailCard.Title = Loc.Get("incidents.detail.title");
+        _list.AccessibleName = _listCard.Title;
+        _detail.AccessibleName = _detailCard.Title;
+        _sideChips.AccessibleName = _listCard.Title;
+        _periodChips.AccessibleName = _listCard.Title;
         _export.Text = Loc.Get("incidents.export");
         Tip(_export, "incidents.export");
         _export.SizeToContent();
@@ -117,6 +121,7 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
         Header.RefreshActions();
 
         _search.PlaceholderText = Loc.Get("incidents.filter.search");
+        _search.AccessibleName = _search.PlaceholderText;
         _sideChips.SetChips(
             Enum.GetValues<IncidentSideFilter>().Select(s => new ChipGroup.Chip(s.ToString(), Loc.Get($"incidents.filter.side.{s.ToString().ToLowerInvariant()}"))),
             _criteria.Side.ToString());
@@ -198,9 +203,12 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
 
         if (_detail is not null && _list.Selected is { } selected)
         {
-            _detail.Show(selected, TrafficAround(selected));
+            _detail.Show(selected, TrafficAround(selected), PatternsOf(selected));
         }
     }
+
+    private IReadOnlyList<IncidentPattern> PatternsOf(Incident incident) =>
+        IncidentPatterns.For(incident, Services.Incidents.All, TimeZoneInfo.Local, DateTimeOffset.UtcNow);
 
     /// <summary>
     /// The traffic picture for an incident: what was captured with it, completed from history
@@ -217,7 +225,7 @@ public sealed class IncidentsPage(AppServices services) : PageBase(services)
             return;
         }
 
-        string report = IncidentReportBuilder.Build(incident, TrafficAround(incident));
+        string report = IncidentReportBuilder.Build(incident, TrafficAround(incident), PatternsOf(incident));
 
         using var dialog = new SaveFileDialog
         {

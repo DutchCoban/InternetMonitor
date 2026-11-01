@@ -16,9 +16,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
-    <AssemblyVersion>2.7.0.0</AssemblyVersion>
-    <FileVersion>2.7.0.0</FileVersion>
-    <Version>2.7.0</Version>
+    <AssemblyVersion>2.8.0.0</AssemblyVersion>
+    <FileVersion>2.8.0.0</FileVersion>
+    <Version>2.8.0</Version>
     <Product>Internet Monitor</Product>
     <Company>Internet Monitor</Company>
     <InvariantGlobalization>true</InvariantGlobalization>
@@ -57,6 +57,10 @@
     <EmbeddedResource Include="Localization\it.json" LogicalName="InternetMonitor.Localization.it.json" />
     <EmbeddedResource Include="Localization\pt.json" LogicalName="InternetMonitor.Localization.pt.json" />
     <EmbeddedResource Include="..\..\Assets\app.ico" LogicalName="InternetMonitor.Assets.app.ico" />
+    <!-- The IEEE manufacturer list, refreshed at every release by tools/Release/Update-OuiList.ps1 - see OuiRegistry. -->
+    <EmbeddedResource Include="..\..\Assets\oui.tsv" LogicalName="InternetMonitor.Assets.oui.tsv" />
+    <!-- The "Made in Europe" badge at the foot of the navigation rail; the SVG it was rendered from is in Assets\source. -->
+    <EmbeddedResource Include="..\..\Assets\made-in-europe.png" LogicalName="InternetMonitor.Assets.made-in-europe.png" />
   </ItemGroup>
 
 </Project>

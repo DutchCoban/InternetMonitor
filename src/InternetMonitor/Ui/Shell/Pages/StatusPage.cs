@@ -77,8 +77,11 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         }
 
         _stepsCard.Title = Loc.Get("status.steps.title");
+        _steps.AccessibleName = _stepsCard.Title;
+        _hero.AccessibleName = Header.Title;
         _stepsCard.Subtitle = Loc.Get("status.steps.subtitle");
         _uptimeCard.Title = Loc.Get("uptime.title");
+        _uptime.AccessibleName = _uptimeCard.Title;
         _uptimeCard.Subtitle = Loc.Get("uptime.subtitle");
         ResizeUptimeCard();
         _uptime.Invalidate();

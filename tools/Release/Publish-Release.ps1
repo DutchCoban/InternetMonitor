@@ -64,6 +64,11 @@ if (-not $SkipTests) {
     }
 }
 
+Step "Manufacturer list"
+# The IEEE registry snapshot inside the exe is as new as the release (see OuiRegistry).
+& (Join-Path $PSScriptRoot "Update-OuiList.ps1")
+if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $null) { Fail "manufacturer list" }
+
 Step "Publish"
 # A running copy of the previous publish locks the file; the bundler's stack trace does not say so.
 $running = Get-Process InternetMonitor -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
@@ -83,6 +88,60 @@ $publicKey = (Select-String -Path (Join-Path $repo "src\InternetMonitor\Core\Upd
 $verdict = dotnet run --project $signer -c Release -- verify $publicKey $exe
 if ($LASTEXITCODE -ne 0 -or ($verdict | Select-Object -Last 1) -ne "valid") { Fail "signature verify: $verdict" }
 Write-Host "signature valid"
+
+Step "Software bill of materials"
+# CycloneDX 1.5, written by hand: the app has no package dependencies, only the executable and
+# the two .NET shared frameworks the self-contained publish bundles. Their versions come from the
+# restore the publish just did (project.assets.json lists the runtime packs); `dotnet --version`
+# is the SDK, which is a build tool, and goes into metadata.tools.
+$assets = Join-Path $repo "src\InternetMonitor\obj\project.assets.json"
+if (-not (Test-Path $assets)) { Fail "no restore output at $assets" }
+# The runtime packs a self-contained publish bundles are recorded as download dependencies with an
+# exact version range, "[10.0.13, 10.0.13]", under the project's framework.
+$frameworks = (Get-Content $assets -Raw | ConvertFrom-Json).project.frameworks
+$downloads = @($frameworks.PSObject.Properties.Value | ForEach-Object { $_.downloadDependencies })
+$runtimes = @($downloads | Where-Object { $_.name -match '^Microsoft\.(NETCore|WindowsDesktop)\.App\.Runtime\.win-x64$' } | ForEach-Object {
+    $packVersion = ($_.version -replace '[\[\]\(\)\s]', '') -split ',' | Select-Object -First 1
+    "$($_.name)/$packVersion"
+})
+if ($runtimes.Count -ne 2) { Fail "expected the two win-x64 runtime packs in $assets, found: $($runtimes -join ', ')" }
+$exeHash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+$appRef = "pkg:github/DutchCoban/InternetMonitor@v$version"
+$components = @(foreach ($pack in $runtimes) {
+    $name, $packVersion = $pack -split '/', 2
+    @{
+        type = "framework"; "bom-ref" = "pkg:nuget/$name@$packVersion"; name = $name; version = $packVersion
+        supplier = @{ name = "Microsoft" }; licenses = @(@{ license = @{ id = "MIT" } }); purl = "pkg:nuget/$name@$packVersion"
+    }
+})
+$bom = [ordered]@{
+    bomFormat = "CycloneDX"; specVersion = "1.5"; serialNumber = "urn:uuid:$([guid]::NewGuid())"; version = 1
+    metadata = [ordered]@{
+        timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        tools = @(
+            @{ vendor = "Internet Monitor"; name = "Publish-Release.ps1"; version = $version },
+            @{ vendor = "Microsoft"; name = ".NET SDK"; version = (dotnet --version).Trim() }
+        )
+        component = [ordered]@{
+            type = "application"; "bom-ref" = $appRef; name = "InternetMonitor.exe"; version = $version; purl = $appRef
+            hashes = @(@{ alg = "SHA-256"; content = $exeHash })
+            licenses = @(@{ license = @{ id = "EUPL-1.2" } })
+            externalReferences = @(
+                @{ type = "vcs"; url = "https://github.com/DutchCoban/InternetMonitor" },
+                @{ type = "distribution"; url = "https://github.com/DutchCoban/InternetMonitor/releases/tag/v$version" }
+            )
+        }
+    }
+    components = $components
+    dependencies = @(@{ ref = $appRef; dependsOn = @($components | ForEach-Object { $_.purl }) })
+}
+$sbom = Join-Path $Output "InternetMonitor-v$version.cdx.json"
+[IO.File]::WriteAllText($sbom, ($bom | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding $false))
+$check = Get-Content $sbom -Raw | ConvertFrom-Json
+if ($check.components.Count -ne 2 -or $check.metadata.component.hashes[0].content -ne $exeHash) { Fail "the SBOM did not read back as written" }
+dotnet run --project $signer -c Release -- sign $privateKey $sbom
+if ($LASTEXITCODE -ne 0) { Fail "sign SBOM" }
+Write-Host "$sbom ($($runtimes -join ', ')), signed"
 
 Step "Self-test of the published executable"
 $selfTest = Join-Path $env:TEMP "internetmonitor-selftest-v$version.txt"
@@ -130,4 +189,4 @@ else {
 }
 
 Step "Done"
-Write-Host "Next: refresh the screenshots (tools\Screenshots\Make-Screenshots.ps1), commit, push master, create the GitHub release v$version with InternetMonitor.exe + InternetMonitor.exe.sig and the notes."
+Write-Host "Next: refresh the screenshots (tools\Screenshots\Make-Screenshots.ps1), commit (Assets\oui.tsv included), push master, create the GitHub release v$version with InternetMonitor.exe, InternetMonitor.exe.sig, the .cdx.json SBOM and its .sig, and the notes."

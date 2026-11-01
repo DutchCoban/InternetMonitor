@@ -387,8 +387,10 @@ public sealed class DiagnosticsPage(AppServices services) : PageBase(services)
         }
 
         _tableCard.Title = Loc.Get("diagnostics.table.title");
+        _table.AccessibleName = _tableCard.Title;
         _tableCard.Subtitle = Loc.Get("diagnostics.table.subtitle");
         _detailCard.Title = Loc.Get("diagnostics.detail.title");
+        _detail.AccessibleName = _detailCard.Title;
 
         _networkHealthSummaryCard.Title = Loc.Get("diagnostics.networkHealth.title");
         _networkHealthSummaryCard.Subtitle = Loc.Get("diagnostics.networkHealth.subtitle");

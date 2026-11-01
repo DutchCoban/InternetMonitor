@@ -306,6 +306,7 @@ public sealed class MainWindow : Form
         Text = loc.Get("app.name");
         _rail.BrandText = loc.Get("app.name");
         _rail.RefreshLabels(id => loc.Get($"nav.{id}"));
+        _rail.AccessibleName = loc.Get("nav.accessibleName");
 
         foreach (PageBase page in _pages.Values)
         {

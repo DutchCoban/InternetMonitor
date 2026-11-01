@@ -44,6 +44,20 @@ public sealed class TargetsFromSettingsTests
     }
 
     [Fact]
+    public void The_built_in_reachability_check_takes_its_url_from_the_settings()
+    {
+        var settings = new AppSettings { ReachabilityUrl = "https://check.example/generate_204" };
+
+        CheckTargets targets = TargetsFromSettings.Build(settings, new CheckTargets());
+
+        TargetEndpoint first = targets.Targets[0];
+        Assert.True(first.IsReachabilityCheck);
+        Assert.Equal("https://check.example/generate_204", first.Url);
+        Assert.Equal(204, first.ExpectedStatusCode);
+        Assert.Null(first.Id);
+    }
+
+    [Fact]
     public void Thresholds_and_the_adapter_choice_come_from_the_settings_and_empty_names_become_null()
     {
         var settings = new AppSettings

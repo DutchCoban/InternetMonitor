@@ -12,6 +12,8 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class EndpointList : ThemedControl
 {
+    public EndpointList() => AccessibleRole = AccessibleRole.List;
+
     private readonly List<EndpointConfig> _endpoints = [];
     private readonly List<Toggle> _toggles = [];
     private readonly List<AppButton> _removeButtons = [];
@@ -62,7 +64,7 @@ public sealed class EndpointList : ThemedControl
             Controls.Add(toggle);
             _toggles.Add(toggle);
 
-            var remove = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Cross, Tag = endpoint.Id };
+            var remove = new AppButton { Variant = ButtonVariant.Ghost, Glyph = Glyph.Cross, Tag = endpoint.Id, AccessibleName = Localization.LocalizationManager.Instance.Format("endpoints.remove", endpoint.Name) };
             remove.Click += OnRemoveClicked;
             Controls.Add(remove);
             _removeButtons.Add(remove);

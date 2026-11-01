@@ -19,6 +19,8 @@ public sealed class SeverityIconChip : ThemedControl
 
     public SeverityIconChip()
     {
+        AccessibleRole = AccessibleRole.StaticText;
+        AccessibleName = _severity.ToString();
         SetStyle(ControlStyles.Selectable, false);
         TabStop = false;
     }
@@ -34,6 +36,7 @@ public sealed class SeverityIconChip : ThemedControl
             }
 
             _severity = value;
+            AccessibleName = value.ToString();
             Invalidate();
         }
     }

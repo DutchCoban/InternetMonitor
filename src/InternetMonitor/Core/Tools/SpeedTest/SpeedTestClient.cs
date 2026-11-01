@@ -21,6 +21,7 @@ public sealed record SpeedTestProgress(SpeedTestPhase Phase, double Value);
 /// <param name="IdlePingMs">ICMP round trip with the line quiet - the baseline for the two loaded readings.</param>
 /// <param name="LoadedPingDownloadMs">Median ICMP round trip while the download phase filled the line.</param>
 /// <param name="LoadedPingUploadMs">Median ICMP round trip while the upload phase filled the line.</param>
+/// <param name="Server">The host of the LibreSpeed server that answered - the first in the configured chain that did.</param>
 public sealed record SpeedTestResult(
     double PingMs,
     double JitterMs,
@@ -28,7 +29,8 @@ public sealed record SpeedTestResult(
     double UploadMbps,
     double? IdlePingMs = null,
     double? LoadedPingDownloadMs = null,
-    double? LoadedPingUploadMs = null)
+    double? LoadedPingUploadMs = null,
+    string? Server = null)
 {
     /// <summary>
     /// How much the round trip grew while the line was full, in the worse direction - the number
@@ -56,24 +58,21 @@ public sealed record SpeedTestResult(
 
 /// <summary>
 /// Speaks the LibreSpeed backend protocol (github.com/librespeed/speedtest) directly over a plain
-/// <see cref="HttpClient"/> - no server picker, a single fixed server (see <see cref="BaseUrl"/>),
-/// per user direction that this feature not grow a configuration surface. Ported from v1's
-/// identically-named class (<c>InternetMonitor/Network/SpeedTestClient.cs</c>) essentially
-/// unchanged - the protocol and the chosen server are both still correct, and v2 has nothing to
-/// add here beyond its own namespace.
+/// <see cref="HttpClient"/>. No server picker: a chain of servers is tried in order and the first
+/// whose ping phase answers runs the test - European research networks first, the long-serving
+/// Amsterdam server as the fallback (<see cref="Configuration.AppSettings.DefaultSpeedTestServers"/>),
+/// or the one server the user typed in Settings. A public LibreSpeed server is a volunteer's, and
+/// one that disappears must not take the feature with it.
 ///
 /// Protocol confirmed by reading the actual backend source (backend/garbage.php,
 /// backend/empty.php) rather than assumed: garbage.php streams back <c>ckSize</c> MiB of
 /// octet-stream data; empty.php accepts and discards any POST body (used for both the upload
-/// measurement and, with no body, as a lightweight round-trip-time probe for ping/jitter).
+/// measurement and, with no body, as a lightweight round-trip-time probe for ping/jitter). The
+/// base URL is wherever those two files live - some servers serve them under <c>backend/</c>,
+/// others at the root.
 /// </summary>
 public sealed class SpeedTestClient : IDisposable
 {
-    // Amsterdam, Netherlands (Clouvider) - picked from LibreSpeed's own official public-server
-    // directory (https://librespeed.org/backend-servers/servers.php), not guessed: a real,
-    // currently-working server, European (matches this app's other checks), geographically close
-    // for most of this app's users.
-    private const string BaseUrl = "https://ams.speedtest.clouvider.net/backend";
     private const string DownloadPath = "garbage.php";
     private const string UploadPath = "empty.php";
     private const string PingPath = "empty.php";
@@ -98,9 +97,17 @@ public sealed class SpeedTestClient : IDisposable
     private const int IdlePingSamples = 5;
 
     private readonly HttpClient _httpClient = new() { Timeout = Timeout.InfiniteTimeSpan };
+    private readonly IReadOnlyList<string> _servers;
     private readonly IPAddress _pingTarget;
+    private string _baseUrl = string.Empty;
 
-    public SpeedTestClient(IPAddress? pingTarget = null) => _pingTarget = pingTarget ?? IPAddress.Parse("9.9.9.9");
+    /// <param name="servers">LibreSpeed backend base URLs, tried in order until one answers.</param>
+    /// <param name="pingTarget">Where the ICMP pings for the latency-under-load reading go: the first of the step-5 addresses.</param>
+    public SpeedTestClient(IReadOnlyList<string> servers, IPAddress pingTarget)
+    {
+        _servers = servers.Count > 0 ? servers : Configuration.AppSettings.DefaultSpeedTestServers;
+        _pingTarget = pingTarget;
+    }
 
     public async Task<SpeedTestResult> RunAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
     {
@@ -109,11 +116,23 @@ public sealed class SpeedTestClient : IDisposable
         SpeedTestActivity.Begin();
         try
         {
-            (double pingMs, double jitterMs) = await MeasurePingJitterAsync(progress, cancellationToken).ConfigureAwait(false);
+            // The first server whose ping phase answers runs the whole test; a server that is gone
+            // costs five failed requests and the chain moves on.
+            (double pingMs, double jitterMs) = (0, 0);
+            foreach (string server in _servers)
+            {
+                _baseUrl = server.TrimEnd('/');
+                (pingMs, jitterMs, bool answered) = await MeasurePingJitterAsync(progress, cancellationToken).ConfigureAwait(false);
+                if (answered)
+                {
+                    break;
+                }
+            }
+
             double? idlePing = Median(await PingRepeatedlyAsync(IdlePingSamples, cancellationToken).ConfigureAwait(false));
             (double downloadMbps, double? loadedDown) = await MeasureDownloadAsync(progress, cancellationToken).ConfigureAwait(false);
             (double uploadMbps, double? loadedUp) = await MeasureUploadAsync(progress, cancellationToken).ConfigureAwait(false);
-            return new SpeedTestResult(pingMs, jitterMs, downloadMbps, uploadMbps, idlePing, loadedDown, loadedUp);
+            return new SpeedTestResult(pingMs, jitterMs, downloadMbps, uploadMbps, idlePing, loadedDown, loadedUp, new Uri(_baseUrl).Host);
         }
         finally
         {
@@ -157,17 +176,23 @@ public sealed class SpeedTestClient : IDisposable
         return samples[samples.Count / 2];
     }
 
-    private async Task<(double PingMs, double JitterMs)> MeasurePingJitterAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
+    private async Task<(double PingMs, double JitterMs, bool Answered)> MeasurePingJitterAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
     {
         var samples = new List<double>();
         for (int i = 0; i < PingSampleCount; i++)
         {
-            string url = $"{BaseUrl}/{PingPath}?r={Random.Shared.Next()}";
+            string url = $"{_baseUrl}/{PingPath}?r={Random.Shared.Next()}";
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 sw.Stop();
+                if (!response.IsSuccessStatusCode)
+                {
+                    // A 404 means the backend is not at this base URL (or is gone): not an answer.
+                    continue;
+                }
+
                 samples.Add(sw.Elapsed.TotalMilliseconds);
                 progress?.Report(new SpeedTestProgress(SpeedTestPhase.Ping, samples.Min()));
             }
@@ -179,7 +204,7 @@ public sealed class SpeedTestClient : IDisposable
 
         if (samples.Count == 0)
         {
-            return (0, 0);
+            return (0, 0, false);
         }
 
         double pingMs = samples.Min();
@@ -187,13 +212,13 @@ public sealed class SpeedTestClient : IDisposable
             ? samples.Zip(samples.Skip(1), (a, b) => Math.Abs(b - a)).Average()
             : 0;
         progress?.Report(new SpeedTestProgress(SpeedTestPhase.Jitter, jitterMs));
-        return (pingMs, jitterMs);
+        return (pingMs, jitterMs, true);
     }
 
     private Task<(double Mbps, double? LoadedPingMs)> MeasureDownloadAsync(IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken) =>
         RunThroughputPhaseAsync(SpeedTestPhase.Download, async (token, reportBytes) =>
         {
-            string url = $"{BaseUrl}/{DownloadPath}?ckSize=100&r={Random.Shared.Next()}";
+            string url = $"{_baseUrl}/{DownloadPath}?ckSize=100&r={Random.Shared.Next()}";
             using HttpResponseMessage response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
             using Stream stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
             byte[] buffer = new byte[65536];
@@ -214,7 +239,7 @@ public sealed class SpeedTestClient : IDisposable
 
         return RunThroughputPhaseAsync(SpeedTestPhase.Upload, async (token, reportBytes) =>
         {
-            string url = $"{BaseUrl}/{UploadPath}?r={Random.Shared.Next()}";
+            string url = $"{_baseUrl}/{UploadPath}?r={Random.Shared.Next()}";
             using var content = new ByteArrayContent(payload);
             using HttpResponseMessage response = await _httpClient.PostAsync(url, content, token).ConfigureAwait(false);
             // Unlike download, HttpClient doesn't expose upload progress mid-POST without a

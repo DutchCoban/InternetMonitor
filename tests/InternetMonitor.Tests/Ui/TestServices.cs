@@ -42,11 +42,12 @@ internal sealed class TestServices : IAsyncDisposable
         var log = new DiagnosticLogger(settings);
         var networkHealth = new NetworkHealthMonitor(incidents, () => [], () => null);
         var updates = new UpdateChecker(new Version(2, 3, 0));
-        var speedTests = new SpeedTestScheduler();
+        var oui = new InternetMonitor.Core.Tools.LanScan.OuiRegistry(new InternetMonitor.Tests.Net.FakeHttpHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)), Path.Combine(TestSetup.DataDirectory, "cache"));
+        var speedTests = new SpeedTestScheduler(() => (settings.SpeedTestServers, System.Net.IPAddress.Parse("9.9.9.9")));
         var webhook = new IncidentWebhook("2.3.0");
         var clock = new ClockMonitor(() => settings.NtpServer);
 
-        var services = new AppServices(settings, targetsProvider, pipeline, cadence, history, incidents, kuma, log, networkHealth, updates, speedTests, webhook, clock);
+        var services = new AppServices(settings, targetsProvider, pipeline, cadence, history, incidents, kuma, log, networkHealth, updates, speedTests, webhook, clock, oui);
         var result = new TestServices(services, settings);
         result._owned.AddRange([cadence, history, kuma, networkHealth, updates, speedTests, webhook, clock, pipeline]);
         return result;

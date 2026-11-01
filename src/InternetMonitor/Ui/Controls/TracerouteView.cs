@@ -18,6 +18,8 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class TracerouteView : ThemedControl
 {
+    public TracerouteView() => AccessibleRole = AccessibleRole.Table;
+
     private readonly List<TracerouteHop> _hops = [];
     private int _scrollOffset;
     private int _contentHeight;

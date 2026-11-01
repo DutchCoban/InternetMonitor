@@ -25,6 +25,7 @@ public sealed class LanDeviceList : ThemedControl
 
     public LanDeviceList()
     {
+        AccessibleRole = AccessibleRole.Table;
         _animation = new System.Windows.Forms.Timer { Interval = AnimationIntervalMs };
         _animation.Tick += OnAnimationTick;
     }

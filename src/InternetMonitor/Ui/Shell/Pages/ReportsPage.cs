@@ -425,6 +425,7 @@ public sealed class ReportsPage(AppServices services) : PageBase(services)
         foreach ((Label label, Control field) in _rows)
         {
             label.Text = Loc.Get((string)label.Tag!);
+            field.AccessibleName = label.Text;
             Tips.Set(Loc.TryGet((string)label.Tag! + ".help"), label, field);
         }
 

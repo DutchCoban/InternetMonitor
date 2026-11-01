@@ -17,6 +17,8 @@ namespace InternetMonitor.Ui.Controls;
 /// </summary>
 public sealed class UptimeStrip : ThemedControl
 {
+    public UptimeStrip() => AccessibleRole = AccessibleRole.Graphic;
+
     private readonly ToolTip _toolTip = new() { InitialDelay = 150, ReshowDelay = 50 };
     private readonly List<(Rectangle Bounds, string Tip, string? IncidentId)> _hits = [];
     private UptimeOverview? _overview;
