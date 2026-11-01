@@ -8,16 +8,18 @@ namespace InternetMonitor.Core.Steps.Checks;
 /// <summary>
 /// Step 4: can I reach my own router?
 ///
-/// ICMP and a TCP connect to a few common router ports start at the same moment. This is carried
-/// straight over from v1 (Network/GatewayReachability) and it matters: plenty of routers do not
-/// answer pings, and plenty of networks filter ICMP, so a ping-only check reports a perfectly
-/// healthy gateway as unreachable.
+/// ICMP first, and a TCP connect to a few common router ports when the ping has not answered
+/// within <see cref="TcpProbeGrace"/>. The TCP side is carried over from v1
+/// (Network/GatewayReachability) and it matters: plenty of routers do not answer pings, and plenty
+/// of networks filter ICMP, so a ping-only check reports a perfectly healthy gateway as unreachable.
 ///
-/// A successful ping settles it and the TCP attempt is cancelled, so the common case stays as fast
-/// as a single ping - even on a router with none of the ports open, which would otherwise hold the
-/// step for the full timeout. When TCP answers first the ping is still awaited: ICMP is the
-/// preferred source of the latency, and "the router ignores ping" is worth showing. See
-/// <see cref="AwaitAnswersAsync"/>.
+/// The grace is what keeps a healthy network quiet: a router on the LAN answers a ping in a few
+/// milliseconds, and starting the three connects at the same moment - as v1 did - meant they had
+/// completed against the router's admin ports before the ping could cancel them, thousands of
+/// times an hour. A successful ping settles it and the TCP attempt (started or not) is cancelled,
+/// so the common case stays as fast as a single ping. When TCP answers first the ping is still
+/// awaited: ICMP is the preferred source of the latency, and "the router ignores ping" is worth
+/// showing. See <see cref="AwaitAnswersAsync"/>.
 ///
 /// Deliberately no retry. A settings change - even just switching DNS server - can genuinely make
 /// the gateway unreachable at the OS level for a second or two, and that is real, momentary state
@@ -25,6 +27,12 @@ namespace InternetMonitor.Core.Steps.Checks;
 /// </summary>
 public sealed class GatewayCheck : IStepCheck
 {
+    /// <summary>
+    /// How long the ping gets to answer before the TCP connects start. Generous for a LAN round
+    /// trip, even over busy Wi-Fi, and still leaves the connects most of the 800 ms timeout.
+    /// </summary>
+    internal static readonly TimeSpan TcpProbeGrace = TimeSpan.FromMilliseconds(200);
+
     public StepId Id => StepId.Gateway;
 
     public bool IsLocal => false;
@@ -57,8 +65,11 @@ public sealed class GatewayCheck : IStepCheck
         using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         Task<PingOutcome> icmp = IcmpPing.SendAsync(gateway, timeout, race.Token, context.LocalAddress);
-        Task<(int Port, TcpOutcome Outcome)?> tcp = TcpConnect.FirstAnsweringPortAsync(
-            gateway, context.Targets.GatewayProbePorts, timeout, race.Token, context.LocalAddress);
+        Task<(int Port, TcpOutcome Outcome)?> tcp = UnlessAnsweredAsync(
+            icmp,
+            TcpProbeGrace,
+            () => TcpConnect.FirstAnsweringPortAsync(gateway, context.Targets.GatewayProbePorts, timeout - TcpProbeGrace, race.Token, context.LocalAddress),
+            race.Token);
 
         (PingOutcome ping, (int Port, TcpOutcome Outcome)? tcpAnswer) =
             await AwaitAnswersAsync(icmp, tcp, race).ConfigureAwait(false);
@@ -125,6 +136,25 @@ public sealed class GatewayCheck : IStepCheck
             DetailKey = detailKey,
             DetailArgs = detailArgs,
         };
+    }
+
+    /// <summary>
+    /// Starts <paramref name="probe"/> once <paramref name="grace"/> has passed without a successful
+    /// ping, or straight away when the ping has already failed. Null - no probe, no answer - when
+    /// the ping succeeded in time. Cancelled with <paramref name="cancellationToken"/> like the
+    /// probe itself would be. Shared with the DNS step, which holds its port-443 probes back the
+    /// same way.
+    /// </summary>
+    internal static async Task<T?> UnlessAnsweredAsync<T>(Task<PingOutcome> icmp, TimeSpan grace, Func<Task<T?>> probe, CancellationToken cancellationToken)
+    {
+        Task first = await Task.WhenAny(icmp, Task.Delay(grace, cancellationToken)).ConfigureAwait(false);
+        if (first == icmp && icmp.IsCompletedSuccessfully && icmp.Result.Success)
+        {
+            return default;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return await probe().ConfigureAwait(false);
     }
 
     /// <summary>

@@ -76,19 +76,24 @@ public sealed class DnsCheck : IStepCheck
             new(loc.Get("measure.dnsServers"), servers.Count > 0 ? string.Join(", ", servers) : "-"),
         };
 
-        // The own servers are probed on 443 at the same moment as the query, so when the query
-        // goes unanswered, "is the server there at all?" is already known at no extra cost - the
-        // difference between a server that is gone and one that is reachable but silent on
-        // port 53, which points at something on the way dropping DNS traffic.
+        // The own servers are probed on 443 while the query is still out, so when the query goes
+        // unanswered, "is the server there at all?" is already known by the time that is decided -
+        // the difference between a server that is gone and one that is reachable but silent on
+        // port 53, which points at something on the way dropping DNS traffic. The probes hold back
+        // for half the timeout first: a healthy resolver answers in a few milliseconds, and probing
+        // it on 443 every cycle regardless was a TCP connection to the router for nothing. Half the
+        // timeout is also when the query itself is re-sent, so a server that has not answered by
+        // then is genuinely suspect.
+        TimeSpan timeout = context.Targets.DnsTimeout;
+        TimeSpan grace = timeout / 2;
         using var ownProbeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task<(IPAddress? Server, DnsQueryResult Result)> query = _probes.AskAll(servers, hostname, timeout, cancellationToken, context.LocalAddress);
         List<(IPAddress Server, Task<TcpOutcome> Probe)> ownProbes =
         [
-            .. servers.Take(MaxOwnServerProbes).Select(s => (s, _probes.Reach(s, ReachabilityProbePort, context.Targets.DnsTimeout, ownProbeCts.Token, context.LocalAddress))),
+            .. servers.Take(MaxOwnServerProbes).Select(s => (s, ReachUnlessAnsweredAsync(query, grace, () => _probes.Reach(s, ReachabilityProbePort, timeout - grace, ownProbeCts.Token, context.LocalAddress), ownProbeCts.Token))),
         ];
 
-        (IPAddress? answeredBy, DnsQueryResult result) = await _probes
-            .AskAll(servers, hostname, context.Targets.DnsTimeout, cancellationToken, context.LocalAddress)
-            .ConfigureAwait(false);
+        (IPAddress? answeredBy, DnsQueryResult result) = await query.ConfigureAwait(false);
 
         if (answeredBy is not null)
         {
@@ -216,13 +221,31 @@ public sealed class DnsCheck : IStepCheck
     /// The own servers answered, so their probes are no longer needed: cancelled and awaited, so
     /// that nothing of them outlives the step.
     /// </summary>
-    private static async Task DropAsync(List<(IPAddress Server, Task<TcpOutcome> Probe)> probes, CancellationTokenSource cts, CancellationToken cancellationToken)
+    /// <summary>
+    /// Runs <paramref name="probe"/> once <paramref name="grace"/> has passed without the query
+    /// being answered, or at once when the query has already failed; cancelled - never run - when
+    /// the query was answered in time. The same shape as <see cref="GatewayCheck.UnlessAnsweredAsync{T}"/>.
+    /// </summary>
+    private static async Task<TcpOutcome> ReachUnlessAnsweredAsync(
+        Task<(IPAddress? Server, DnsQueryResult Result)> query,
+        TimeSpan grace,
+        Func<Task<TcpOutcome>> probe,
+        CancellationToken cancellationToken)
     {
-        if (probes.All(p => p.Probe.IsCompleted))
+        Task first = await Task.WhenAny(query, Task.Delay(grace, cancellationToken)).ConfigureAwait(false);
+        if (first == query && query.IsCompletedSuccessfully && query.Result.Server is not null)
         {
-            return;
+            throw new OperationCanceledException(cancellationToken);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        return await probe().ConfigureAwait(false);
+    }
+
+    private static async Task DropAsync(List<(IPAddress Server, Task<TcpOutcome> Probe)> probes, CancellationTokenSource cts, CancellationToken cancellationToken)
+    {
+        // Always awaited, even when every probe has finished: one that never started (the query
+        // answered within the grace) finished cancelled, and that has to be observed.
         cts.Cancel();
         try
         {

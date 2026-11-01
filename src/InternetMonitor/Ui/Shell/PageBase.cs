@@ -160,13 +160,36 @@ public abstract class PageBase : Panel
         _settlingScroll = true;
         AutoScrollPosition = Point.Empty;
 
-        OnActivated();
+        SetLive(true);
     }
 
     public void Deactivate()
     {
         Visible = false;
-        if (_built)
+        SetLive(false);
+    }
+
+    private bool _live;
+
+    /// <summary>
+    /// Live data on or off without changing which page is shown: the window going to the tray or
+    /// being minimised, and coming back. A page nobody can see has no reason to follow every
+    /// cycle, and the Status page's work per cycle is not free. Idempotent, so a page is never
+    /// subscribed twice.
+    /// </summary>
+    public void SetLive(bool live)
+    {
+        if (!_built || live == _live)
+        {
+            return;
+        }
+
+        _live = live;
+        if (live)
+        {
+            OnActivated();
+        }
+        else
         {
             OnDeactivated();
         }

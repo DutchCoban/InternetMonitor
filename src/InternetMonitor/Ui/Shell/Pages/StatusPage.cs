@@ -103,7 +103,10 @@ public sealed class StatusPage(AppServices services) : PageBase(services)
         Services.Pipeline.CycleCompleted += OnCycleCompleted;
         Services.NetworkHealth.StatusChanged += OnNetworkHealthStatusChanged;
         Services.Incidents.Changed += OnIncidentsChanged;
-        Services.Cadence.Foreground = true;
+
+        // The cadence is the window's to set (MainWindow.UpdateLive), not this page's: this runs
+        // for a page activated in a window that is still hidden - the tray-only start - and
+        // setting the foreground rate from here kept a never-shown window checking every 3 s.
 
         // Paint whatever the last cycle concluded straight away, so switching to this page never
         // shows an empty list while waiting for the next cycle.

@@ -153,6 +153,7 @@ public sealed class MainWindow : Form
         _activePage?.Deactivate();
         _activePage = page;
         page.Activate();
+        page.SetLive(IsLive);
         page.BringToFront();
 
         if (_rail.SelectedId != id)
@@ -216,15 +217,28 @@ public sealed class MainWindow : Form
         }
 
         _rail.Collapsed = ClientSize.Width < Theme.Dp(RailCollapseWidthDp, DeviceDpi);
+        UpdateLive();
     }
 
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
+        UpdateLive();
+    }
 
-        // The cadence controller only needs to know whether anyone can see a result. Hiding the
-        // window drops it back to the background interval without stopping monitoring.
-        _services.Cadence.Foreground = Visible;
+    /// <summary>Whether anyone can see a result: the window is shown and not sitting minimised on the taskbar.</summary>
+    private bool IsLive => Visible && WindowState != FormWindowState.Minimized;
+
+    /// <summary>
+    /// The cadence controller only needs to know whether anyone can see a result. Hiding or
+    /// minimising the window drops it back to the background interval without stopping
+    /// monitoring, and takes the visible page off the live feed until the window is back.
+    /// </summary>
+    private void UpdateLive()
+    {
+        bool live = IsLive;
+        _services.Cadence.Foreground = live;
+        _activePage?.SetLive(live);
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

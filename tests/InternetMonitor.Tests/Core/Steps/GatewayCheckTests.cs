@@ -12,6 +12,39 @@ public sealed class GatewayCheckTests
     private static readonly (int Port, TcpOutcome Outcome)? Port80 = (80, new TcpOutcome(true, false, 3, null));
 
     [Fact]
+    public async Task The_tcp_probe_is_skipped_when_the_ping_answers_in_time()
+    {
+        int probes = 0;
+        (int, TcpOutcome)? result = await GatewayCheck.UnlessAnsweredAsync(
+            Task.FromResult(PingOk), TimeSpan.FromSeconds(5), () => { probes++; return Task.FromResult(Port80); }, CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Equal(0, probes);
+    }
+
+    [Fact]
+    public async Task The_tcp_probe_runs_at_once_after_a_failed_ping_and_after_the_grace_while_the_ping_is_still_out()
+    {
+        int probes = 0;
+        Task<(int, TcpOutcome)?> Probe()
+        {
+            probes++;
+            return Task.FromResult(Port80);
+        }
+
+        Assert.Equal(Port80, await GatewayCheck.UnlessAnsweredAsync(Task.FromResult(PingTimedOut), TimeSpan.FromSeconds(5), Probe, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2)));
+
+        var pending = new TaskCompletionSource<PingOutcome>();
+        Assert.Equal(Port80, await GatewayCheck.UnlessAnsweredAsync(pending.Task, TimeSpan.FromMilliseconds(30), Probe, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.Equal(2, probes);
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => GatewayCheck.UnlessAnsweredAsync(pending.Task, TimeSpan.FromSeconds(5), Probe, cancelled.Token));
+        Assert.Equal(2, probes);
+    }
+
+    [Fact]
     public async Task A_successful_ping_returns_at_once_and_cancels_the_tcp_attempt()
     {
         using var race = new CancellationTokenSource();

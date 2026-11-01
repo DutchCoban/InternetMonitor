@@ -32,6 +32,7 @@ public readonly record struct MetricPoint(DateTimeOffset Timestamp, double Value
 public sealed class MetricStore : IAsyncDisposable
 {
     private static readonly TimeSpan FlushInterval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan CompactionInterval = TimeSpan.FromDays(1);
 
     private readonly string _directory;
     private readonly object _lock = new();
@@ -45,6 +46,10 @@ public sealed class MetricStore : IAsyncDisposable
     private readonly Dictionary<string, MetricPoint[]> _snapshots = [];
     private readonly Dictionary<string, DateTimeOffset> _lastFlushed = [];
     private readonly Dictionary<string, DateTimeOffset> _lastSampled = [];
+
+    /// <summary>How many lines each series file holds, so the daily compaction check knows how much of it has expired without reading it.</summary>
+    private readonly Dictionary<string, int> _linesOnDisk = [];
+    private DateTimeOffset _lastCompaction = DateTimeOffset.UtcNow;
     private readonly Task _loadTask;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _flushLoop;
@@ -144,15 +149,33 @@ public sealed class MetricStore : IAsyncDisposable
     /// <summary>A series as it is now. The list is shared between callers and never changes; a new one is made after the next change.</summary>
     public IReadOnlyList<MetricPoint> Get(string seriesId) => Snapshot(seriesId);
 
-    /// <summary>The points at or after <paramref name="from"/>, as a view over the current snapshot - no copy.</summary>
+    /// <summary>
+    /// The points at or after <paramref name="from"/>. A view over the whole-series snapshot when
+    /// one is current, otherwise a copy of just the window: the Status page asks for the last week
+    /// of eight series every minute, and a point arrives in each of them every fifteen seconds, so
+    /// refreshing the whole-series snapshot for that would copy the full retention - months of
+    /// points - eight times a minute for a week's worth that is actually read.
+    /// </summary>
     public IReadOnlyList<MetricPoint> Get(string seriesId, DateTimeOffset from)
     {
-        MetricPoint[] snapshot = Snapshot(seriesId);
+        lock (_lock)
+        {
+            // Points are in time order, so the window is a tail slice found by binary search rather
+            // than by filtering a six-figure list.
+            if (_snapshots.TryGetValue(seriesId, out MetricPoint[]? snapshot))
+            {
+                int start = LowerBound(snapshot, from);
+                return new ArraySegment<MetricPoint>(snapshot, start, snapshot.Length - start);
+            }
 
-        // Points are in time order, so the window is a tail slice found by binary search rather
-        // than by filtering a six-figure list.
-        int start = LowerBound(snapshot, from);
-        return new ArraySegment<MetricPoint>(snapshot, start, snapshot.Length - start);
+            if (!_series.TryGetValue(seriesId, out List<MetricPoint>? points))
+            {
+                return [];
+            }
+
+            int first = LowerBound(points, from);
+            return points.GetRange(first, points.Count - first);
+        }
     }
 
     private MetricPoint[] Snapshot(string seriesId)
@@ -178,6 +201,7 @@ public sealed class MetricStore : IAsyncDisposable
             _snapshots.Remove(seriesId);
             _lastFlushed.Remove(seriesId);
             _lastSampled.Remove(seriesId);
+            _linesOnDisk.Remove(seriesId);
         }
 
         try
@@ -254,7 +278,7 @@ public sealed class MetricStore : IAsyncDisposable
             List<MetricPoint> points;
             try
             {
-                points = await ReadAndCompactAsync(file).ConfigureAwait(false);
+                points = await ReadAndCompactAsync(file, seriesId).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
             {
@@ -285,10 +309,11 @@ public sealed class MetricStore : IAsyncDisposable
 
     /// <summary>
     /// Reads one series file, dropping malformed lines and points older than the retention. When
-    /// anything was dropped the file is rewritten, so it does not keep growing between starts -
-    /// the flush loop only ever appends.
+    /// enough was dropped (see <see cref="NeedsCompaction"/>) the file is rewritten, so it does
+    /// not keep growing between starts - the flush loop only appends, and compacts on the same
+    /// rule once a day.
     /// </summary>
-    private async Task<List<MetricPoint>> ReadAndCompactAsync(string path)
+    private async Task<List<MetricPoint>> ReadAndCompactAsync(string path, string seriesId)
     {
         DateTimeOffset cutoff = DateTimeOffset.UtcNow - _retention;
         var points = new List<MetricPoint>();
@@ -308,16 +333,28 @@ public sealed class MetricStore : IAsyncDisposable
 
         points.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
 
-        if (points.Count != lines)
+        if (NeedsCompaction(lines, points.Count))
         {
             await WriteAllAsync(path, points).ConfigureAwait(false);
+            lines = points.Count;
         }
 
-        // The list grew by doubling while reading; give the slack back, since this series will now
-        // only ever grow by a point every few seconds.
-        points.TrimExcess();
+        lock (_lock)
+        {
+            _linesOnDisk[seriesId] = lines;
+        }
+
         return points;
     }
+
+    /// <summary>
+    /// Whether a file with <paramref name="linesOnDisk"/> lines, of which <paramref name="kept"/>
+    /// are still wanted, is worth rewriting: when a tenth or more is dead weight. Once retention is
+    /// full some point has always just expired, so "anything expired" would rewrite every series -
+    /// hundreds of megabytes at 90 days - on every single start, for a file that was fine.
+    /// </summary>
+    internal static bool NeedsCompaction(int linesOnDisk, int kept) =>
+        linesOnDisk > kept && (linesOnDisk - kept) * 10 >= linesOnDisk;
 
     /// <summary>
     /// Reads one "ticks,value[,metadata]" line. False for anything that is not one - including a
@@ -370,20 +407,19 @@ public sealed class MetricStore : IAsyncDisposable
 
     private async Task FlushAsync()
     {
-        var pending = new List<(string SeriesId, List<MetricPoint> Points)>();
+        var pending = new List<(string SeriesId, List<MetricPoint> Points, bool Rewrite)>();
 
         lock (_lock)
         {
             DateTimeOffset cutoff = DateTimeOffset.UtcNow - _retention;
+            bool checkCompaction = DateTimeOffset.UtcNow - _lastCompaction >= CompactionInterval;
+            if (checkCompaction)
+            {
+                _lastCompaction = DateTimeOffset.UtcNow;
+            }
+
             foreach ((string seriesId, List<MetricPoint> points) in _series)
             {
-                DateTimeOffset since = _lastFlushed.GetValueOrDefault(seriesId, DateTimeOffset.MinValue);
-                int firstNew = points.FindIndex(p => p.Timestamp > since);
-                if (firstNew >= 0)
-                {
-                    pending.Add((seriesId, points.GetRange(firstNew, points.Count - firstNew)));
-                }
-
                 // Expired points are a prefix of a time-ordered list: find where it ends and drop
                 // it in one move, rather than testing every point in the series once a minute.
                 int expired = LowerBound(points, cutoff);
@@ -392,19 +428,49 @@ public sealed class MetricStore : IAsyncDisposable
                     points.RemoveRange(0, expired);
                     _snapshots.Remove(seriesId);
                 }
+
+                DateTimeOffset since = _lastFlushed.GetValueOrDefault(seriesId, DateTimeOffset.MinValue);
+                int firstNew = UpperBound(points, since);
+                int unflushed = points.Count - firstNew;
+
+                // Once a day, a file that is mostly expired points is rewritten from memory - the
+                // same rule as on start-up, so a machine that never restarts does not keep a file
+                // growing past its retention for months.
+                int onDisk = _linesOnDisk.GetValueOrDefault(seriesId);
+                if (checkCompaction && NeedsCompaction(onDisk, points.Count - unflushed))
+                {
+                    pending.Add((seriesId, [.. points], true));
+                }
+                else if (unflushed > 0)
+                {
+                    pending.Add((seriesId, points.GetRange(firstNew, unflushed), false));
+                }
             }
         }
 
-        foreach ((string seriesId, List<MetricPoint> points) in pending)
+        foreach ((string seriesId, List<MetricPoint> points, bool rewrite) in pending)
         {
+            if (points.Count == 0)
+            {
+                continue;
+            }
+
             try
             {
                 Directory.CreateDirectory(_directory);
-                await File.AppendAllLinesAsync(PathFor(seriesId), ToLines(points)).ConfigureAwait(false);
+                if (rewrite)
+                {
+                    await WriteAllAsync(PathFor(seriesId), points).ConfigureAwait(false);
+                }
+                else
+                {
+                    await File.AppendAllLinesAsync(PathFor(seriesId), ToLines(points)).ConfigureAwait(false);
+                }
 
                 lock (_lock)
                 {
                     _lastFlushed[seriesId] = points[^1].Timestamp;
+                    _linesOnDisk[seriesId] = rewrite ? points.Count : _linesOnDisk.GetValueOrDefault(seriesId) + points.Count;
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

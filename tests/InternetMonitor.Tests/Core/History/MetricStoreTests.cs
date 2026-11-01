@@ -41,6 +41,61 @@ public sealed class MetricStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_time_window_is_the_same_slice_whether_or_not_the_whole_series_was_asked_for_first()
+    {
+        await using MetricStore store = Store();
+        await store.Loaded;
+
+        for (int i = 0; i < 50; i++)
+        {
+            store.Record("latency", T0.AddSeconds(i * 15), i);
+        }
+
+        // Straight after a Record there is no whole-series snapshot: the window is copied on its own.
+        IReadOnlyList<MetricPoint> fresh = store.Get("latency", T0.AddSeconds(15 * 40));
+        Assert.Equal(Enumerable.Range(40, 10).Select(i => (double)i), fresh.Select(p => p.Value));
+
+        // Once the whole series has been asked for, the window is a view over that snapshot.
+        IReadOnlyList<MetricPoint> whole = store.Get("latency");
+        IReadOnlyList<MetricPoint> view = store.Get("latency", T0.AddSeconds(15 * 40));
+        Assert.Equal(fresh, view);
+        Assert.Equal(50, whole.Count);
+        Assert.Empty(store.Get("latency", T0.AddDays(1)));
+        Assert.Empty(store.Get("never-recorded", T0));
+    }
+
+    [Theory]
+    [InlineData(100, 100, false)]
+    [InlineData(100, 95, false)]
+    [InlineData(100, 90, true)]
+    [InlineData(4, 2, true)]
+    [InlineData(0, 0, false)]
+    [InlineData(10, 0, true)]
+    public void A_file_is_only_rewritten_when_a_tenth_or_more_of_it_has_expired(int onDisk, int kept, bool expected)
+    {
+        Assert.Equal(expected, MetricStore.NeedsCompaction(onDisk, kept));
+    }
+
+    [Fact]
+    public async Task A_file_with_a_single_expired_line_among_many_is_left_alone_on_load()
+    {
+        Directory.CreateDirectory(_directory);
+        DateTimeOffset fresh = DateTimeOffset.UtcNow.AddHours(-1);
+        List<string> lines = [$"{DateTimeOffset.UtcNow.AddDays(-40).UtcTicks},1"];
+        lines.AddRange(Enumerable.Range(0, 20).Select(i => $"{fresh.AddSeconds(i).UtcTicks},{i}"));
+        string path = Path.Combine(_directory, "gateway.csv");
+        File.WriteAllLines(path, lines);
+        DateTime written = File.GetLastWriteTimeUtc(path);
+
+        await using MetricStore store = Store();
+        await store.Loaded;
+
+        Assert.Equal(20, store.Get("gateway").Count);
+        Assert.Equal(21, File.ReadAllLines(path).Length);
+        Assert.Equal(written, File.GetLastWriteTimeUtc(path));
+    }
+
+    [Fact]
     public async Task What_is_held_survives_dispose_and_a_cleared_series_is_gone_from_disk()
     {
         await using (MetricStore store = Store())
