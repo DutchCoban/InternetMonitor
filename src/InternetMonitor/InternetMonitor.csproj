@@ -1,10 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Internet Monitor v2. During the v1 -> v2 transition both projects live in the same
-       solution so their behaviour can be compared side by side; the project file is named
-       InternetMonitorV2 only to avoid a duplicate-project-name clash in the solution, while
-       AssemblyName stays "InternetMonitor" so the shipped executable keeps its name. At
-       cutover v1 is deleted and this file is renamed to InternetMonitor.csproj. -->
+  <!-- Internet Monitor. The v1 generation (the top-level InternetMonitor/ folder) was removed
+       after 2.7.0; it lives on in the history and the v2.x tags. -->
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>

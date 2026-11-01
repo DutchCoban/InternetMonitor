@@ -48,7 +48,7 @@ py -3 -c "import PIL" 2>$null; if ($LASTEXITCODE -ne 0) { throw "Python 3 with P
 
 if (-not $SkipBuild) {
   Write-Host "Building Debug..."
-  dotnet build (Join-Path $root "src\InternetMonitor\InternetMonitorV2.csproj") -c Debug -nologo -v q
+  dotnet build (Join-Path $root "src\InternetMonitor\InternetMonitor.csproj") -c Debug -nologo -v q
   if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 }
 

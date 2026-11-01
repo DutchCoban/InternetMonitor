@@ -40,7 +40,7 @@ param(
 $ErrorActionPreference = "Stop"
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 if ($Output -eq "") { $Output = Join-Path $repo "publish-v2" }
-$project = Join-Path $repo "src\InternetMonitor\InternetMonitorV2.csproj"
+$project = Join-Path $repo "src\InternetMonitor\InternetMonitor.csproj"
 $tests = Join-Path $repo "tests\InternetMonitor.Tests\InternetMonitor.Tests.csproj"
 $signer = Join-Path $repo "tools\ReleaseSigner\ReleaseSigner.csproj"
 $exe = Join-Path $Output "InternetMonitor.exe"
@@ -130,4 +130,4 @@ else {
 }
 
 Step "Done"
-Write-Host "Next: refresh the screenshots (tools\Screenshots\Make-Screenshots.ps1), commit, push, create the GitHub release v$version with InternetMonitor.exe + InternetMonitor.exe.sig and the notes, fast-forward master."
+Write-Host "Next: refresh the screenshots (tools\Screenshots\Make-Screenshots.ps1), commit, push master, create the GitHub release v$version with InternetMonitor.exe + InternetMonitor.exe.sig and the notes."

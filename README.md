@@ -561,9 +561,10 @@ Every setting and button shows a short explanation when the mouse rests on it fo
 ## Project status
 
 Internet Monitor is under active development. The current generation, v2 (`src/InternetMonitor/`),
-is a ground-up rewrite of the original v1 (kept under `InternetMonitor/` for reference) with a
-redesigned interface. Upgrading from v1 is seamless: settings, incident history and per-check
-history - including v1's Wi-Fi signal history - carry over automatically.
+is a ground-up rewrite of the original v1 with a redesigned interface; v1's source was removed
+from the repository after 2.7.0 and lives on in the history. Upgrading from v1 is seamless:
+settings, incident history and per-check history - including v1's Wi-Fi signal history - carry
+over automatically.
 
 **New in v2 compared with v1**: an adaptive check cadence; one consistent path through all seven
 checks on machines with several adapters; DNS diagnosis that tells your DNS server, blocked DNS
@@ -637,7 +638,7 @@ dotnet build InternetMonitor.sln
 Publish a single self-contained `.exe` (no .NET runtime needed on the target machine):
 
 ```powershell
-dotnet publish src/InternetMonitor/InternetMonitorV2.csproj -c Release -r win-x64 --self-contained true `
+dotnet publish src/InternetMonitor/InternetMonitor.csproj -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o ./publish
 ```
 
@@ -650,7 +651,7 @@ cold start is an easy trade for a tray app that starts once and runs for days.
 
 Every release goes through the same steps, in this order; none is skipped:
 
-1. Bump the version in `src/InternetMonitor/InternetMonitorV2.csproj` - the self-update compares
+1. Bump the version in `src/InternetMonitor/InternetMonitor.csproj` - the self-update compares
    it with the tag.
 2. Build, and run the test suite until it is green three times in a row.
 3. **Refresh the screenshots** with `tools\Screenshots\Make-Screenshots.ps1` (see
@@ -659,8 +660,8 @@ Every release goes through the same steps, in this order; none is skipped:
 4. Publish the single-file executable (above), sign it, verify the signature, and run
    `InternetMonitor.exe --selftest <file>` against the published file.
 5. Check the executable on VirusTotal and put the verdict line in the release notes.
-6. Push the branch, create the GitHub release with `InternetMonitor.exe` and
-   `InternetMonitor.exe.sig`, and fast-forward `master`.
+6. Push `master` and create the GitHub release with `InternetMonitor.exe` and
+   `InternetMonitor.exe.sig`.
 
 ### Signing a release
 

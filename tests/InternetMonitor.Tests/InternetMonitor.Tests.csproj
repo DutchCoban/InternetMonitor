@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\InternetMonitor\InternetMonitorV2.csproj" />
+    <ProjectReference Include="..\..\src\InternetMonitor\InternetMonitor.csproj" />
   </ItemGroup>
 
 </Project>
