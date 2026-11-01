@@ -22,9 +22,19 @@ def pixelate(img, box, factor=9):
     img.paste(small.resize(region.size, Image.NEAREST), box)
 
 
-def save(name, img, crop=None):
+# PrintWindow includes the window's invisible resize border: an 8 px grey band left, right and
+# below the window that reads as a hazy frame once the README scales the picture down.
+FRAME = 8
+RAW_HEIGHT = 1100
+
+
+def save(name, img, crop=None, frame=True):
     if crop is not None:
         img = img.crop(crop)
+    if frame:
+        # The bottom band is only there when the picture reaches the window's bottom edge.
+        bottom = img.height - FRAME if crop is None or crop[3] >= RAW_HEIGHT else img.height
+        img = img.crop((FRAME, 0, img.width - FRAME, bottom))
     img.save(os.path.join(out, name), optimize=True)
     print(f"  {name} {img.size[0]}x{img.size[1]}")
 
@@ -65,4 +75,4 @@ save("history-traffic.png", load("history-traffic.png"))
 save("history-packet-loss.png", load("history-packet-loss.png"))
 save("history-speedtest.png", load("history-speedtest.png"))
 save("settings-network.png", load("settings-network.png"), (0, 232, 1164, 705))  # the Network changes and Network health cards
-save("provider-report.png", load("provider-report.png"))
+save("provider-report.png", load("provider-report.png"), frame=False)
